@@ -1,0 +1,1314 @@
+-- ============================================================
+-- SCHEMA COMPLETO - Instituto San Pablo del Oriente
+-- Grupo 07 SC
+-- Ultima revision: 2026-05-25
+-- Estado: sincronizado con base de datos de produccion
+--
+-- NOT NULL aplicado en todas las FK obligatorias.
+-- Columnas NULL intencionales:
+--   materias.id_materia_requisito     -> sin prerequisito
+--   estudiantes.id_carrera_actual     -> sin carrera asignada
+--   periodos_dictado.id_nivel         -> periodos de cursos libres
+--   afiliaciones_estudiante.id_carrera -> curso libre / ofertas sueltas
+-- ============================================================
+
+-- ============================================================
+-- BLOQUE 1: CATÁLOGOS BASE
+-- ============================================================
+
+CREATE TABLE roles (
+    id_rol      SERIAL PRIMARY KEY,
+    nombre_rol  VARCHAR(50)  UNIQUE NOT NULL,
+    descripcion VARCHAR(255),
+    activo      BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE horarios (
+    id_horario  SERIAL PRIMARY KEY,
+    dia_semana  VARCHAR(15)  NOT NULL
+                CHECK (dia_semana IN ('Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo')),
+    hora_inicio TIME         NOT NULL,
+    hora_fin    TIME         NOT NULL,
+    activo      BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE aulas (
+    id_aula    SERIAL PRIMARY KEY,
+    nombre     VARCHAR(50)  NOT NULL,
+    capacidad  INT          NOT NULL,
+    ubicacion  VARCHAR(100),
+    tipo       VARCHAR(20)  DEFAULT 'aula'
+               CHECK (tipo IN ('aula','laboratorio','sala','auditorio')),
+    activo     BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE materias (
+    id_materia            SERIAL PRIMARY KEY,
+    codigo                VARCHAR(20)   UNIQUE NOT NULL,
+    nombre                VARCHAR(150)  NOT NULL,
+    duracion_meses        INT           DEFAULT 1,
+    costo_mensual         DECIMAL(10,2) NOT NULL,
+    creditos              INT           DEFAULT 0,
+    activo                BOOLEAN       DEFAULT TRUE,
+    id_materia_requisito  INT           NULL
+        REFERENCES materias(id_materia) ON DELETE SET NULL
+);
+
+CREATE TABLE carreras (
+    id_carrera              SERIAL PRIMARY KEY,
+    codigo                  VARCHAR(20)   UNIQUE NOT NULL,
+    nombre                  VARCHAR(150)  NOT NULL,
+    descripcion             TEXT,
+    tipo                    VARCHAR(20)   DEFAULT 'tecnico_superior'
+                            CHECK (tipo IN ('tecnico','tecnico_superior','curso_libre')),
+    duracion_niveles        INT           NOT NULL,
+    costo_carrera_completa  DECIMAL(10,2),
+    activo                  BOOLEAN DEFAULT TRUE
+);
+
+-- ============================================================
+-- BLOQUE 2: USUARIOS Y ESPECIALIZACIÓN
+-- ============================================================
+
+CREATE TABLE usuarios (
+    id_usuario     SERIAL PRIMARY KEY,
+    nombre         VARCHAR(100) NOT NULL,
+    apellido       VARCHAR(100) NOT NULL,
+    email          VARCHAR(150) UNIQUE NOT NULL,
+    password_hash  VARCHAR(255) NOT NULL,
+    dni            VARCHAR(20)  UNIQUE NOT NULL,
+    telefono       VARCHAR(20),
+    direccion      TEXT,
+    id_rol         INT          NOT NULL
+        REFERENCES roles(id_rol),
+    foto_perfil    VARCHAR(255),
+    activo         BOOLEAN   DEFAULT TRUE,
+    bloqueado      BOOLEAN   DEFAULT FALSE,
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE estudiantes (
+    id_estudiante            SERIAL PRIMARY KEY,
+    id_usuario               INT UNIQUE NOT NULL
+        REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    legajo                   VARCHAR(20) UNIQUE NOT NULL,
+    fecha_inscripcion_inicial DATE        NOT NULL,
+    tutor_nombre             VARCHAR(100),
+    tutor_telefono           VARCHAR(20),
+    beca_porcentaje          DECIMAL(5,2) DEFAULT 0.00,
+    doc_entregados           BOOLEAN      DEFAULT FALSE,
+    plazo_entrega_docs       DATE,
+    observaciones            TEXT,
+    id_carrera_actual        INT NULL REFERENCES carreras(id_carrera)
+);
+
+CREATE TABLE profesores (
+    id_profesor        SERIAL PRIMARY KEY,
+    id_usuario         INT UNIQUE NOT NULL
+        REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    legajo_profesor    VARCHAR(20) UNIQUE NOT NULL,
+    especialidad       VARCHAR(100) NOT NULL,
+    titulo_maximo      VARCHAR(150),
+    fecha_contratacion DATE         NOT NULL,
+    sueldo_base        DECIMAL(10,2),
+    observaciones      TEXT
+);
+
+CREATE TABLE personal_administrativo (
+    id_personal     SERIAL PRIMARY KEY,
+    id_usuario      INT UNIQUE NOT NULL
+        REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    legajo_personal VARCHAR(20) UNIQUE NOT NULL,
+    cargo           VARCHAR(100) NOT NULL,
+    fecha_ingreso   DATE         NOT NULL,
+    oficina         VARCHAR(50),
+    sueldo_base     DECIMAL(10,2),
+    observaciones   TEXT
+);
+
+CREATE TABLE seguimiento_log (
+    id_log      SERIAL PRIMARY KEY,
+    id_usuario  INT NOT NULL
+        REFERENCES usuarios(id_usuario),
+    accion      VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    ip_origen   VARCHAR(45),
+    fecha_hora  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
+-- BLOQUE 3: MALLA CURRICULAR
+-- ============================================================
+
+
+CREATE TABLE niveles_carrera (
+    id_nivel         SERIAL PRIMARY KEY,
+    id_carrera       INT NOT NULL
+        REFERENCES carreras(id_carrera),
+    numero_nivel     INT NOT NULL,
+    nombre           VARCHAR(50),
+    descripcion      TEXT,
+    UNIQUE (id_carrera, numero_nivel)
+);
+
+CREATE TABLE malla_curricular (
+    id_malla         SERIAL PRIMARY KEY,
+    id_carrera       INT NOT NULL
+        REFERENCES carreras(id_carrera),
+    id_nivel         INT NOT NULL
+        REFERENCES niveles_carrera(id_nivel),
+    id_materia       INT NOT NULL
+        REFERENCES materias(id_materia),
+    orden_en_nivel   INT     DEFAULT 0,
+    obligatoria      BOOLEAN DEFAULT TRUE,
+    UNIQUE (id_carrera, id_materia)
+);
+
+-- ============================================================
+-- BLOQUE 4: PERIODOS Y GRUPOS
+-- ============================================================
+
+CREATE TABLE periodos_dictado (
+    id_periodo       SERIAL PRIMARY KEY,
+    nombre           VARCHAR(50) NOT NULL,
+    tipo_periodo     VARCHAR(20) DEFAULT 'semestral'
+                     CHECK (tipo_periodo IN ('mensual', 'semestral', 'anual', 'intensivo')),
+    fecha_inicio     DATE NOT NULL,
+    fecha_fin        DATE NOT NULL,
+    id_nivel         INT NULL
+                     REFERENCES niveles_carrera(id_nivel),
+    activo           BOOLEAN DEFAULT TRUE
+);
+
+-- id_periodo es NULL para ventanas de inscripcion (independientes de periodos academicos)
+-- id_carrera es NULL para ventanas globales (aplica a todas las carreras)
+-- MIGRACION: ALTER TABLE cronogramas ALTER COLUMN id_periodo DROP NOT NULL;
+-- MIGRACION: ALTER TABLE cronogramas ADD COLUMN id_carrera INT NULL REFERENCES carreras(id_carrera);
+CREATE TABLE cronogramas (
+    id_cronograma    SERIAL PRIMARY KEY,
+    id_periodo       INT NULL
+                     REFERENCES periodos_dictado(id_periodo),
+    id_carrera       INT NULL
+                     REFERENCES carreras(id_carrera),
+    nombre           VARCHAR(50) NOT NULL,
+    tipo_periodo     VARCHAR(20) NOT NULL
+                     CHECK (tipo_periodo IN ('inscripcion', 'clases', 'examenes', 'receso')),
+    fecha_inicio     DATE NOT NULL,
+    fecha_fin        DATE NOT NULL,
+    activo           BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE grupos (
+    id_oferta         SERIAL PRIMARY KEY,
+    id_materia        INT NOT NULL
+        REFERENCES materias(id_materia),
+    id_aula           INT NOT NULL
+        REFERENCES aulas(id_aula),
+    id_periodo        INT NOT NULL
+        REFERENCES periodos_dictado(id_periodo),
+    id_profesor       INT NOT NULL
+        REFERENCES profesores(id_profesor),
+    id_horario        INT NOT NULL
+        REFERENCES horarios(id_horario),
+    vacantes_max      INT NOT NULL,
+    vacantes_ocupadas INT DEFAULT 0,
+    codigo_grupo      VARCHAR(20) UNIQUE,
+    activo            BOOLEAN DEFAULT TRUE
+);
+
+-- ============================================================
+-- BLOQUE 5: INSCRIPCIONES Y EVALUACIONES
+-- ============================================================
+
+CREATE TABLE inscripciones (
+    id_inscripcion    SERIAL PRIMARY KEY,
+    id_estudiante     INT NOT NULL
+        REFERENCES estudiantes(id_estudiante),
+    id_oferta         INT NOT NULL
+        REFERENCES grupos(id_oferta),
+    fecha_inscripcion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    estado            VARCHAR(30) DEFAULT 'pendiente_matricula'
+                      CHECK (estado IN ('pendiente_matricula', 'activo', 'aprobado', 'reprobado', 'retirado')),
+    calificacion_final DECIMAL(5,2),
+    aprobado          BOOLEAN,
+    observaciones     TEXT,
+    fecha_aprobacion  DATE,
+    UNIQUE (id_estudiante, id_oferta)
+);
+
+CREATE TABLE evaluaciones (
+    id_evaluacion  SERIAL PRIMARY KEY,
+    id_inscripcion INT NOT NULL
+        REFERENCES inscripciones(id_inscripcion),
+    id_profesor    INT NOT NULL
+        REFERENCES profesores(id_profesor),
+    tipo           VARCHAR(10) NOT NULL
+                   CHECK (tipo IN ('parcial1','parcial2','final','otros')),
+    descripcion    VARCHAR(150),
+    calificacion   DECIMAL(5,2) NOT NULL,
+    porcentaje     DECIMAL(5,2) NOT NULL,
+    fecha          DATE         NOT NULL
+);
+
+-- ============================================================
+-- BLOQUE 6: PAGOS
+-- ============================================================
+
+-- 1. Pago único de matrícula (1 sola vez en la vida)
+CREATE TABLE matricula_unica (
+    id_matricula SERIAL PRIMARY KEY,
+    id_estudiante INT NOT NULL UNIQUE REFERENCES estudiantes(id_estudiante),
+    fecha_pago DATE NOT NULL DEFAULT CURRENT_DATE,
+    monto_pagado DECIMAL(10,2) NOT NULL,
+    comprobante VARCHAR(255),
+    estado VARCHAR(10) DEFAULT 'pagado'
+        CHECK (estado IN ('pagado', 'reembolsado', 'exonerado'))
+);
+
+-- 2. Pago por carrera completa (opción adelantada)
+-- materias_cubiertas: calculado por Trigger 8.5 = floor(monto_pagado / (monto_total/total_materias))
+-- Las primeras materias_cubiertas inscripciones son GRATIS; desde la siguiente se cobra cuota
+CREATE TABLE pago_carrera_completa (
+    id_pago_carrera    SERIAL PRIMARY KEY,
+    id_estudiante      INT NOT NULL REFERENCES estudiantes(id_estudiante),
+    id_carrera         INT NOT NULL REFERENCES carreras(id_carrera),
+    monto_total        DECIMAL(10,2) NOT NULL,
+    monto_pagado       DECIMAL(10,2) DEFAULT 0,
+    forma_pago         VARCHAR(10) CHECK (forma_pago IN ('contado', 'credito')),
+    cuotas_total       INT DEFAULT 1,
+    materias_cubiertas INT DEFAULT 0,
+    estado             VARCHAR(15) DEFAULT 'pendiente'
+                       CHECK (estado IN ('pendiente', 'parcial', 'pagado')),
+    fecha_contrato     DATE NOT NULL,
+    UNIQUE(id_estudiante, id_carrera)
+);
+
+-- 3. Cuotas de pago de carrera (si aplica)
+CREATE TABLE cuotas_carrera (
+    id_cuota SERIAL PRIMARY KEY,
+    id_pago_carrera INT NOT NULL REFERENCES pago_carrera_completa(id_pago_carrera),
+    numero_cuota INT NOT NULL,
+    monto DECIMAL(10,2) NOT NULL,
+    fecha_vencimiento DATE NOT NULL,
+    fecha_pago DATE,
+    estado VARCHAR(10) DEFAULT 'pendiente'
+        CHECK (estado IN ('pendiente', 'pagado', 'vencido'))
+);
+
+-- 4. Registro de consumo de materias para quienes pagaron carrera completa
+CREATE TABLE consumo_materias_carrera (
+    id_consumo SERIAL PRIMARY KEY,
+    id_pago_carrera INT NOT NULL REFERENCES pago_carrera_completa(id_pago_carrera),
+    id_materia INT NOT NULL REFERENCES materias(id_materia),
+    id_inscripcion INT NOT NULL REFERENCES inscripciones(id_inscripcion),
+    intento_numero INT DEFAULT 1,
+    pagado_adicional BOOLEAN DEFAULT FALSE,
+    fecha_consumo DATE DEFAULT CURRENT_DATE,
+    UNIQUE(id_pago_carrera, id_materia, intento_numero)
+);
+
+-- 5. Pago por materia suelta (paga cada vez que cursa)
+CREATE TABLE pago_materia_suelta (
+    id_pago_materia SERIAL PRIMARY KEY,
+    id_inscripcion INT NOT NULL UNIQUE REFERENCES inscripciones(id_inscripcion),
+    monto_pagado DECIMAL(10,2) NOT NULL,
+    fecha_pago DATE NOT NULL DEFAULT CURRENT_DATE,
+    estado VARCHAR(10) DEFAULT 'pagado'
+        CHECK (estado IN ('pagado', 'pendiente', 'reembolsado'))
+);
+
+-- ============================================================
+-- BLOQUE 7: AFILIACIONES DEL ESTUDIANTE
+-- ============================================================
+
+CREATE TABLE afiliaciones_estudiante (
+    id_afiliacion SERIAL PRIMARY KEY,
+    id_estudiante INT NOT NULL REFERENCES estudiantes(id_estudiante),
+    id_carrera INT NULL REFERENCES carreras(id_carrera),
+    tipo_programa VARCHAR(20) NOT NULL
+        CHECK (tipo_programa IN ('carrera', 'curso_libre', 'ofertas_sueltas')),
+    fecha_inicio DATE NOT NULL,
+    fecha_fin DATE,
+    estado VARCHAR(15) DEFAULT 'activo'
+        CHECK (estado IN ('activo', 'completado', 'abandonado', 'suspendido')),
+    observaciones TEXT,
+    CONSTRAINT check_carrera_requerida CHECK (
+        (tipo_programa = 'carrera' AND id_carrera IS NOT NULL) OR
+        (tipo_programa != 'carrera' AND id_carrera IS NULL)
+    )
+);
+
+-- ============================================================
+-- BLOQUE 8: TRIGGERS DE VALIDACIÓN
+-- ============================================================
+
+-- TRIGGER 1: Validar materia requisito (solo evitar auto-referencia)
+CREATE OR REPLACE FUNCTION validar_materia_requisito()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.id_materia_requisito IS NOT NULL AND NEW.id_materia_requisito = NEW.id_materia THEN
+        RAISE EXCEPTION 'Una materia no puede ser requisito de sí misma';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_materia_requisito
+    BEFORE INSERT OR UPDATE ON materias
+    FOR EACH ROW
+    EXECUTE FUNCTION validar_materia_requisito();
+
+-- TRIGGER 2: Sincronizar id_carrera_actual en estudiantes
+CREATE OR REPLACE FUNCTION sincronizar_carrera_actual()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.tipo_programa = 'carrera' AND NEW.estado = 'activo' THEN
+        UPDATE estudiantes SET id_carrera_actual = NEW.id_carrera
+        WHERE id_estudiante = NEW.id_estudiante;
+    ELSIF OLD.tipo_programa = 'carrera' AND OLD.estado = 'activo' AND NEW.estado != 'activo' THEN
+        UPDATE estudiantes SET id_carrera_actual = (
+            SELECT id_carrera FROM afiliaciones_estudiante
+            WHERE id_estudiante = NEW.id_estudiante
+            AND tipo_programa = 'carrera' AND estado = 'activo'
+            LIMIT 1
+        ) WHERE id_estudiante = NEW.id_estudiante;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_sincronizar_carrera_actual
+    AFTER INSERT OR UPDATE ON afiliaciones_estudiante
+    FOR EACH ROW
+    EXECUTE FUNCTION sincronizar_carrera_actual();
+
+-- TRIGGER 3: Validar que el estudiante pagó matrícula única
+CREATE OR REPLACE FUNCTION validar_matricula_unica_pagada()
+RETURNS TRIGGER AS $$
+DECLARE
+    matricula_pagada BOOLEAN;
+BEGIN
+    SELECT EXISTS(
+        SELECT 1 FROM matricula_unica mu
+        WHERE mu.id_estudiante = NEW.id_estudiante
+        AND mu.estado = 'pagado'
+    ) INTO matricula_pagada;
+    
+    IF matricula_pagada = FALSE THEN
+        RAISE EXCEPTION 'El estudiante debe pagar la matrícula única del instituto antes de inscribirse a cualquier materia.';
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_matricula_unica
+    BEFORE INSERT ON inscripciones
+    FOR EACH ROW
+    EXECUTE FUNCTION validar_matricula_unica_pagada();
+
+-- TRIGGER 4: Validar que el estudiante aprobó el requisito
+CREATE OR REPLACE FUNCTION validar_requisito_aprobado()
+RETURNS TRIGGER AS $$
+DECLARE
+    materia_requisito INT;
+    requisito_aprobado BOOLEAN;
+    nombre_requisito VARCHAR(150);
+    nombre_materia VARCHAR(150);
+BEGIN
+    SELECT m.id_materia_requisito, m2.nombre, m.nombre
+    INTO materia_requisito, nombre_requisito, nombre_materia
+    FROM grupos oa
+    JOIN materias m ON m.id_materia = oa.id_materia
+    LEFT JOIN materias m2 ON m2.id_materia = m.id_materia_requisito
+    WHERE oa.id_oferta = NEW.id_oferta;
+
+    IF materia_requisito IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    SELECT aprobado INTO requisito_aprobado
+    FROM inscripciones i
+    JOIN grupos oa ON oa.id_oferta = i.id_oferta
+    WHERE i.id_estudiante = NEW.id_estudiante
+    AND oa.id_materia = materia_requisito
+    AND i.aprobado = TRUE
+    ORDER BY i.id_inscripcion DESC
+    LIMIT 1;
+    
+    IF requisito_aprobado IS DISTINCT FROM TRUE THEN
+        RAISE EXCEPTION 'No puede inscribirse a "%". Debe aprobar primero "%"',
+                        nombre_materia, COALESCE(nombre_requisito, 'materia requisito');
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_requisito_antes_inscribir
+    BEFORE INSERT ON inscripciones
+    FOR EACH ROW
+    EXECUTE FUNCTION validar_requisito_aprobado();
+
+-- TRIGGER 5: Validar máximo 1 materia activa a la vez
+CREATE OR REPLACE FUNCTION validar_unica_materia_activa()
+RETURNS TRIGGER AS $$
+DECLARE
+    materias_activas INT;
+BEGIN
+    SELECT COUNT(*) INTO materias_activas
+    FROM inscripciones i
+    WHERE i.id_estudiante = NEW.id_estudiante
+    AND i.estado IN ('pendiente_matricula', 'activo')
+    AND i.id_inscripcion != COALESCE(NEW.id_inscripcion, -1);
+    
+    IF materias_activas >= 1 THEN
+        RAISE EXCEPTION 'El estudiante solo puede cursar UNA materia a la vez. Actualmente tiene % materia(s) activa(s)', 
+                        materias_activas;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_unica_materia_antes_insert
+    BEFORE INSERT ON inscripciones
+    FOR EACH ROW
+    WHEN (NEW.estado IN ('pendiente_matricula', 'activo'))
+    EXECUTE FUNCTION validar_unica_materia_activa();
+
+CREATE TRIGGER trg_validar_unica_materia_antes_update
+    BEFORE UPDATE OF estado ON inscripciones
+    FOR EACH ROW
+    WHEN (NEW.estado IN ('pendiente_matricula', 'activo'))
+    EXECUTE FUNCTION validar_unica_materia_activa();
+
+-- TRIGGER 6: Validar que cursos libres no tengan niveles
+CREATE OR REPLACE FUNCTION validar_nivel_solo_carreras()
+RETURNS TRIGGER AS $$
+DECLARE
+    tipo_carrera VARCHAR(20);
+BEGIN
+    SELECT tipo INTO tipo_carrera FROM carreras WHERE id_carrera = NEW.id_carrera;
+    IF tipo_carrera = 'curso_libre' THEN
+        RAISE EXCEPTION 'Los cursos libres no tienen niveles.';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_nivel_solo_carreras
+    BEFORE INSERT ON niveles_carrera
+    FOR EACH ROW
+    EXECUTE FUNCTION validar_nivel_solo_carreras();
+
+-- TRIGGER 7: Actualizar estado de inscripción al aprobar/reprobar
+CREATE OR REPLACE FUNCTION actualizar_estado_inscripcion()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.aprobado = TRUE THEN
+        NEW.estado := 'aprobado';
+        NEW.fecha_aprobacion := CURRENT_DATE;
+    ELSIF NEW.aprobado = FALSE AND NEW.calificacion_final IS NOT NULL THEN
+        NEW.estado := 'reprobado';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_actualizar_estado_aprobacion
+    BEFORE UPDATE OF aprobado, calificacion_final ON inscripciones
+    FOR EACH ROW
+    EXECUTE FUNCTION actualizar_estado_inscripcion();
+
+-- TRIGGER 8: Actualizar vacantes ocupadas
+CREATE OR REPLACE FUNCTION actualizar_vacantes_oferta()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        UPDATE grupos
+        SET vacantes_ocupadas = vacantes_ocupadas + 1
+        WHERE id_oferta = NEW.id_oferta;
+    ELSIF TG_OP = 'DELETE' THEN
+        UPDATE grupos
+        SET vacantes_ocupadas = vacantes_ocupadas - 1
+        WHERE id_oferta = OLD.id_oferta;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_actualizar_vacantes
+    AFTER INSERT OR DELETE ON inscripciones
+    FOR EACH ROW
+    EXECUTE FUNCTION actualizar_vacantes_oferta();
+
+-- TRIGGER 8.5: Crear cuotas automaticamente para pagos a credito
+-- Logica correcta:
+--   costo_por_materia   = monto_total / total_materias
+--   materias_cubiertas  = FLOOR(monto_pagado / costo_por_materia)
+--   Las primeras materias_cubiertas son GRATIS (ya pagadas con el adelanto)
+--   Se crean cuotas solo para las (total - cubiertas) materias restantes
+--   monto_cuota = (monto_total - monto_pagado) / materias_con_cuota
+CREATE OR REPLACE FUNCTION crear_cuotas_credito()
+RETURNS TRIGGER AS $$
+DECLARE
+    total_materias    INT;
+    costo_por_materia DECIMAL(10,2);
+    mat_cubiertas     INT;
+    mat_con_cuota     INT;
+    restante          DECIMAL(10,2);
+    monto_cuota       DECIMAL(10,2);
+    i                 INT;
+BEGIN
+    IF NEW.forma_pago = 'credito' THEN
+        -- Total materias en la malla de la carrera
+        SELECT COUNT(mc.id_malla) INTO total_materias
+        FROM malla_curricular mc
+        WHERE mc.id_carrera = NEW.id_carrera;
+
+        IF total_materias IS NULL OR total_materias = 0 THEN
+            total_materias := 1;
+        END IF;
+
+        -- Costo por materia = total / materias
+        costo_por_materia := ROUND(NEW.monto_total / total_materias, 2);
+
+        -- Materias que cubre el adelanto: floor(adelanto / costo_por_materia)
+        mat_cubiertas := FLOOR(COALESCE(NEW.monto_pagado, 0) / costo_por_materia);
+        IF mat_cubiertas > total_materias THEN
+            mat_cubiertas := total_materias;
+        END IF;
+
+        -- Materias que requieren cuota (las que no cubre el adelanto)
+        mat_con_cuota := total_materias - mat_cubiertas;
+
+        -- Monto restante a financiar
+        restante := NEW.monto_total - COALESCE(NEW.monto_pagado, 0);
+
+        -- Crear una cuota por cada materia que aun falta pagar
+        IF mat_con_cuota > 0 AND restante > 0 THEN
+            monto_cuota := ROUND(restante / mat_con_cuota, 2);
+            FOR i IN 1..mat_con_cuota LOOP
+                INSERT INTO cuotas_carrera
+                    (id_pago_carrera, numero_cuota, monto, fecha_vencimiento, estado)
+                VALUES (
+                    NEW.id_pago_carrera,
+                    i,
+                    monto_cuota,
+                    CURRENT_DATE + (INTERVAL '1 month' * (mat_cubiertas + i)),
+                    'pendiente'
+                );
+            END LOOP;
+        END IF;
+
+        -- Guardar totales calculados en pago_carrera_completa
+        UPDATE pago_carrera_completa
+        SET cuotas_total       = mat_con_cuota,
+            materias_cubiertas = mat_cubiertas
+        WHERE id_pago_carrera = NEW.id_pago_carrera;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_crear_cuotas_credito
+    AFTER INSERT ON pago_carrera_completa
+    FOR EACH ROW
+    EXECUTE FUNCTION crear_cuotas_credito();
+
+-- TRIGGER 9: Determinar tipo de pago al inscribirse
+--
+-- CREDITO: primeras mat_cubiertas inscripciones son GRATIS (adelanto ya las pago)
+--          desde la inscripcion mat_cubiertas+1 en adelante se crea pago_materia_suelta
+--          con el monto de la proxima cuota pendiente
+--
+-- CONTADO: primera vez en cada materia es GRATIS
+--          si reprueba y se reinscribe paga costo_total/total_materias
+--
+-- SIN PAGO CARRERA: siempre paga costo_total/total_materias (o costo_mensual si no hay malla)
+CREATE OR REPLACE FUNCTION validar_pago_inscripcion()
+RETURNS TRIGGER AS $$
+DECLARE
+    materia_actual      INT;
+    carrera_estudiante  INT;
+    intentos_previos    INT;
+    pago_carrera_id     INT;
+    costo_materia       DECIMAL(10,2);
+    costo_total_carrera DECIMAL(10,2);
+    total_materias      INT;
+    forma_pago_actual   VARCHAR(10);
+    consumos_actuales   INT;
+    mat_cubiertas       INT;
+BEGIN
+    SELECT oa.id_materia INTO materia_actual
+    FROM grupos oa WHERE oa.id_oferta = NEW.id_oferta;
+
+    SELECT e.id_carrera_actual INTO carrera_estudiante
+    FROM estudiantes e WHERE e.id_estudiante = NEW.id_estudiante;
+
+    IF carrera_estudiante IS NOT NULL THEN
+
+        SELECT pcc.id_pago_carrera, pcc.forma_pago
+        INTO pago_carrera_id, forma_pago_actual
+        FROM pago_carrera_completa pcc
+        WHERE pcc.id_estudiante = NEW.id_estudiante
+          AND pcc.id_carrera = carrera_estudiante
+        LIMIT 1;
+
+        IF pago_carrera_id IS NOT NULL THEN
+
+            -- -------------------------------------------------------
+            -- CREDITO: primeras N materias gratis, desde N+1 se cobra
+            -- -------------------------------------------------------
+            IF forma_pago_actual = 'credito' THEN
+
+                SELECT COUNT(*) INTO consumos_actuales
+                FROM consumo_materias_carrera
+                WHERE id_pago_carrera = pago_carrera_id;
+
+                SELECT materias_cubiertas INTO mat_cubiertas
+                FROM pago_carrera_completa
+                WHERE id_pago_carrera = pago_carrera_id;
+
+                IF consumos_actuales < mat_cubiertas THEN
+                    -- GRATIS: cubierta por el adelanto
+                    INSERT INTO consumo_materias_carrera
+                        (id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional)
+                    VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, 1, FALSE);
+
+                ELSE
+                    -- A PARTIR DE AQUI SE COBRA: buscar proxima cuota pendiente
+                    SELECT monto INTO costo_materia
+                    FROM cuotas_carrera
+                    WHERE id_pago_carrera = pago_carrera_id AND estado = 'pendiente'
+                    ORDER BY numero_cuota ASC LIMIT 1;
+
+                    IF costo_materia IS NOT NULL THEN
+                        INSERT INTO pago_materia_suelta
+                            (id_inscripcion, monto_pagado, fecha_pago, estado)
+                        VALUES (NEW.id_inscripcion, costo_materia, CURRENT_DATE, 'pendiente');
+
+                        INSERT INTO consumo_materias_carrera
+                            (id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional)
+                        VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, 1, TRUE);
+                    ELSE
+                        -- Sin cuotas pendientes: carrera completamente saldada → gratis
+                        INSERT INTO consumo_materias_carrera
+                            (id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional)
+                        VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, 1, FALSE);
+                    END IF;
+                END IF;
+
+            -- -------------------------------------------------------
+            -- CONTADO: primera vez gratis, reintento paga
+            -- -------------------------------------------------------
+            ELSE
+                SELECT COUNT(*) INTO intentos_previos
+                FROM consumo_materias_carrera cmc
+                WHERE cmc.id_pago_carrera = pago_carrera_id
+                  AND cmc.id_materia = materia_actual;
+
+                IF intentos_previos = 0 THEN
+                    -- Primera vez: GRATIS
+                    INSERT INTO consumo_materias_carrera
+                        (id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional)
+                    VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, 1, FALSE);
+                ELSE
+                    -- Reintento (reprobo): pago adicional
+                    SELECT c.costo_carrera_completa, COUNT(mc.id_malla)
+                    INTO costo_total_carrera, total_materias
+                    FROM carreras c
+                    LEFT JOIN malla_curricular mc ON mc.id_carrera = c.id_carrera
+                    WHERE c.id_carrera = carrera_estudiante
+                    GROUP BY c.costo_carrera_completa;
+
+                    IF costo_total_carrera IS NOT NULL AND total_materias > 0 THEN
+                        costo_materia := ROUND(costo_total_carrera / total_materias, 2);
+                    ELSE
+                        SELECT costo_mensual INTO costo_materia FROM materias WHERE id_materia = materia_actual;
+                    END IF;
+
+                    INSERT INTO pago_materia_suelta
+                        (id_inscripcion, monto_pagado, fecha_pago, estado)
+                    VALUES (NEW.id_inscripcion, costo_materia, CURRENT_DATE, 'pendiente');
+
+                    INSERT INTO consumo_materias_carrera
+                        (id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional)
+                    VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, intentos_previos + 1, TRUE);
+                END IF;
+            END IF;
+
+        ELSE
+            -- -------------------------------------------------------
+            -- SIN PAGO DE CARRERA: pago por materia suelta
+            -- -------------------------------------------------------
+            SELECT c.costo_carrera_completa, COUNT(mc.id_malla)
+            INTO costo_total_carrera, total_materias
+            FROM carreras c
+            LEFT JOIN malla_curricular mc ON mc.id_carrera = c.id_carrera
+            WHERE c.id_carrera = carrera_estudiante
+            GROUP BY c.costo_carrera_completa;
+
+            IF costo_total_carrera IS NOT NULL AND total_materias > 0 THEN
+                costo_materia := ROUND(costo_total_carrera / total_materias, 2);
+            ELSE
+                SELECT costo_mensual INTO costo_materia FROM materias WHERE id_materia = materia_actual;
+            END IF;
+
+            INSERT INTO pago_materia_suelta
+                (id_inscripcion, monto_pagado, fecha_pago, estado)
+            VALUES (NEW.id_inscripcion, costo_materia, CURRENT_DATE, 'pendiente');
+        END IF;
+
+    ELSE
+        -- Sin carrera asignada: usa costo_mensual de la materia
+        SELECT costo_mensual INTO costo_materia FROM materias WHERE id_materia = materia_actual;
+        INSERT INTO pago_materia_suelta
+            (id_inscripcion, monto_pagado, fecha_pago, estado)
+        VALUES (NEW.id_inscripcion, costo_materia, CURRENT_DATE, 'pendiente');
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_pago_inscripcion
+    AFTER INSERT ON inscripciones
+    FOR EACH ROW
+    EXECUTE FUNCTION validar_pago_inscripcion();
+
+-- TRIGGER 12: Al pagar una materia suelta de credito, marca la cuota correspondiente como pagada
+-- y actualiza el estado global del pago de carrera
+CREATE OR REPLACE FUNCTION marcar_cuota_al_pagar_materia()
+RETURNS TRIGGER AS $$
+DECLARE
+    pago_carrera_id INT;
+BEGIN
+    IF NEW.estado = 'pagado' AND OLD.estado = 'pendiente' THEN
+        SELECT cmc.id_pago_carrera INTO pago_carrera_id
+        FROM consumo_materias_carrera cmc
+        WHERE cmc.id_inscripcion = NEW.id_inscripcion
+          AND cmc.pagado_adicional = TRUE
+        LIMIT 1;
+
+        IF pago_carrera_id IS NOT NULL THEN
+            -- Marcar la proxima cuota pendiente como pagada
+            UPDATE cuotas_carrera
+            SET estado = 'pagado', fecha_pago = CURRENT_DATE
+            WHERE id_cuota = (
+                SELECT id_cuota FROM cuotas_carrera
+                WHERE id_pago_carrera = pago_carrera_id AND estado = 'pendiente'
+                ORDER BY numero_cuota ASC LIMIT 1
+            );
+
+            -- Actualizar estado del pago de carrera
+            UPDATE pago_carrera_completa
+            SET estado = CASE
+                WHEN (SELECT COUNT(*) FROM cuotas_carrera
+                      WHERE id_pago_carrera = pago_carrera_id AND estado = 'pendiente') = 0
+                THEN 'pagado'
+                ELSE 'parcial'
+            END
+            WHERE id_pago_carrera = pago_carrera_id;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_marcar_cuota_al_pagar_materia
+    AFTER UPDATE OF estado ON pago_materia_suelta
+    FOR EACH ROW
+    EXECUTE FUNCTION marcar_cuota_al_pagar_materia();
+
+-- TRIGGER 10: Validar inscripción según afiliación activa
+CREATE OR REPLACE FUNCTION validar_inscripcion_segun_afiliacion()
+RETURNS TRIGGER AS $$
+DECLARE
+    afiliacion_activa RECORD;
+    materia_ofertada INT;
+    materia_en_malla BOOLEAN;
+BEGIN
+    SELECT oa.id_materia INTO materia_ofertada
+    FROM grupos oa WHERE oa.id_oferta = NEW.id_oferta;
+    
+    SELECT * INTO afiliacion_activa
+    FROM afiliaciones_estudiante ae
+    WHERE ae.id_estudiante = NEW.id_estudiante
+    AND ae.estado = 'activo'
+    ORDER BY ae.fecha_inicio DESC LIMIT 1;
+    
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'No tiene una afiliación activa. Debe inscribirse a un programa.';
+    END IF;
+    
+    IF afiliacion_activa.tipo_programa = 'carrera' THEN
+        SELECT EXISTS(
+            SELECT 1 FROM malla_curricular mc
+            WHERE mc.id_carrera = afiliacion_activa.id_carrera
+            AND mc.id_materia = materia_ofertada
+        ) INTO materia_en_malla;
+        
+        IF materia_en_malla = FALSE THEN
+            RAISE EXCEPTION 'Esta materia no pertenece a su carrera.';
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_inscripcion_segun_afiliacion
+    BEFORE INSERT ON inscripciones
+    FOR EACH ROW
+    EXECUTE FUNCTION validar_inscripcion_segun_afiliacion();
+
+-- TRIGGER 11: Cerrar calificacion final cuando las 4 evaluaciones estan registradas
+-- Pesos: parcial1=25%, parcial2=25%, final=40%, otros=10%  (suma = 100%)
+-- Aprobado si calificacion_final >= 51
+-- El TRIGGER 7 existente reacciona al UPDATE y ajusta estado a 'aprobado'/'reprobado'
+-- Ponderacion: parcial1=25%, parcial2=25%, final=40%, otros=10%
+-- Se activa cuando las 4 evaluaciones estan registradas
+CREATE OR REPLACE FUNCTION cerrar_calificacion_final()
+RETURNS TRIGGER AS $$
+DECLARE
+    tiene_p1    INT;
+    tiene_p2    INT;
+    tiene_final INT;
+    tiene_otros INT;
+    suma_ponderada DECIMAL(5,2);
+BEGIN
+    SELECT
+        COUNT(*) FILTER (WHERE tipo = 'parcial1'),
+        COUNT(*) FILTER (WHERE tipo = 'parcial2'),
+        COUNT(*) FILTER (WHERE tipo = 'final'),
+        COUNT(*) FILTER (WHERE tipo = 'otros')
+    INTO tiene_p1, tiene_p2, tiene_final, tiene_otros
+    FROM evaluaciones
+    WHERE id_inscripcion = NEW.id_inscripcion;
+
+    IF tiene_p1 = 1 AND tiene_p2 = 1 AND tiene_final = 1 AND tiene_otros = 1 THEN
+        SELECT ROUND(
+            SUM(CASE WHEN tipo = 'parcial1' THEN calificacion * 0.25 ELSE 0 END) +
+            SUM(CASE WHEN tipo = 'parcial2' THEN calificacion * 0.25 ELSE 0 END) +
+            SUM(CASE WHEN tipo = 'final'    THEN calificacion * 0.40 ELSE 0 END) +
+            SUM(CASE WHEN tipo = 'otros'    THEN calificacion * 0.10 ELSE 0 END),
+        2)
+        INTO suma_ponderada
+        FROM evaluaciones
+        WHERE id_inscripcion = NEW.id_inscripcion;
+
+        UPDATE inscripciones
+        SET calificacion_final = suma_ponderada,
+            aprobado           = (suma_ponderada >= 51.00)
+        WHERE id_inscripcion = NEW.id_inscripcion;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_cerrar_calificacion_final
+    AFTER INSERT ON evaluaciones
+    FOR EACH ROW
+    EXECUTE FUNCTION cerrar_calificacion_final();
+
+-- ============================================================
+-- BLOQUE 9: ÍNDICES
+-- ============================================================
+
+CREATE INDEX idx_usuarios_rol ON usuarios(id_rol);
+CREATE INDEX idx_usuarios_dni ON usuarios(dni);
+CREATE INDEX idx_usuarios_email ON usuarios(email);
+CREATE INDEX idx_usuarios_bloqueado ON usuarios(bloqueado);
+
+CREATE INDEX idx_estudiantes_legajo ON estudiantes(legajo);
+CREATE INDEX idx_estudiantes_carrera_actual ON estudiantes(id_carrera_actual);
+
+CREATE INDEX idx_materias_requisito ON materias(id_materia_requisito);
+CREATE INDEX idx_materias_codigo ON materias(codigo);
+
+CREATE INDEX idx_malla_carrera ON malla_curricular(id_carrera);
+CREATE INDEX idx_malla_nivel ON malla_curricular(id_nivel);
+CREATE INDEX idx_malla_materia ON malla_curricular(id_materia);
+
+CREATE INDEX idx_nivel_carrera ON niveles_carrera(id_carrera);
+
+CREATE INDEX idx_periodo_nivel ON periodos_dictado(id_nivel);
+CREATE INDEX idx_periodo_fechas ON periodos_dictado(fecha_inicio, fecha_fin);
+
+CREATE INDEX idx_cronograma_periodo ON cronogramas(id_periodo);
+CREATE INDEX idx_cronograma_tipo ON cronogramas(tipo_periodo, fecha_inicio);
+
+CREATE INDEX idx_oferta_materia ON grupos(id_materia);
+CREATE INDEX idx_oferta_aula ON grupos(id_aula);
+CREATE INDEX idx_oferta_periodo ON grupos(id_periodo);
+CREATE INDEX idx_oferta_profesor ON grupos(id_profesor);
+CREATE INDEX idx_oferta_horario ON grupos(id_horario);
+
+CREATE INDEX idx_inscripcion_estudiante ON inscripciones(id_estudiante);
+CREATE INDEX idx_inscripcion_oferta ON inscripciones(id_oferta);
+CREATE INDEX idx_inscripcion_estado ON inscripciones(estado);
+CREATE INDEX idx_inscripcion_aprobado ON inscripciones(aprobado);
+
+CREATE INDEX idx_evaluacion_inscripcion ON evaluaciones(id_inscripcion);
+
+CREATE INDEX idx_pago_carrera_estudiante ON pago_carrera_completa(id_estudiante);
+CREATE INDEX idx_pago_carrera_carrera ON pago_carrera_completa(id_carrera);
+CREATE INDEX idx_consumo_pago_carrera ON consumo_materias_carrera(id_pago_carrera);
+CREATE INDEX idx_consumo_materia ON consumo_materias_carrera(id_materia);
+CREATE INDEX idx_pago_materia_inscripcion ON pago_materia_suelta(id_inscripcion);
+CREATE INDEX idx_matricula_unica_estudiante ON matricula_unica(id_estudiante);
+
+CREATE INDEX idx_afiliacion_estudiante ON afiliaciones_estudiante(id_estudiante, estado);
+CREATE INDEX idx_afiliacion_carrera ON afiliaciones_estudiante(id_carrera);
+
+CREATE INDEX idx_log_usuario ON seguimiento_log(id_usuario);
+CREATE INDEX idx_log_fecha ON seguimiento_log(fecha_hora);
+
+-- ============================================================
+-- BLOQUE 10: VISTAS
+-- ============================================================
+
+CREATE OR REPLACE VIEW v_kardex_estudiante AS
+SELECT
+    e.legajo,
+    u.nombre || ' ' || u.apellido AS estudiante,
+    m.nombre AS materia,
+    pd.nombre AS periodo,
+    i.calificacion_final,
+    i.aprobado,
+    i.estado,
+    i.fecha_aprobacion
+FROM inscripciones i
+JOIN estudiantes e ON e.id_estudiante = i.id_estudiante
+JOIN usuarios u ON u.id_usuario = e.id_usuario
+JOIN grupos oa ON oa.id_oferta = i.id_oferta
+JOIN materias m ON m.id_materia = oa.id_materia
+JOIN periodos_dictado pd ON pd.id_periodo = oa.id_periodo;
+
+CREATE OR REPLACE VIEW v_materia_actual_estudiante AS
+SELECT DISTINCT ON (e.id_estudiante)
+    e.id_estudiante,
+    u.nombre || ' ' || u.apellido AS estudiante,
+    m.nombre AS materia_actual,
+    i.estado,
+    i.fecha_inscripcion,
+    pd.nombre AS periodo
+FROM inscripciones i
+JOIN estudiantes e ON e.id_estudiante = i.id_estudiante
+JOIN usuarios u ON u.id_usuario = e.id_usuario
+JOIN grupos oa ON oa.id_oferta = i.id_oferta
+JOIN materias m ON m.id_materia = oa.id_materia
+JOIN periodos_dictado pd ON pd.id_periodo = oa.id_periodo
+WHERE i.estado IN ('pendiente_matricula', 'activo')
+ORDER BY e.id_estudiante, i.fecha_inscripcion DESC;
+
+CREATE OR REPLACE VIEW v_deuda_estudiante AS
+SELECT
+    e.id_estudiante,
+    u.nombre || ' ' || u.apellido AS estudiante,
+    COALESCE(SUM(pms.monto_pagado), 0) AS total_adeudado
+FROM estudiantes e
+JOIN usuarios u ON u.id_usuario = e.id_usuario
+LEFT JOIN inscripciones i ON i.id_estudiante = e.id_estudiante
+LEFT JOIN pago_materia_suelta pms ON pms.id_inscripcion = i.id_inscripcion AND pms.estado = 'pendiente'
+GROUP BY e.id_estudiante, u.nombre, u.apellido;
+
+CREATE OR REPLACE VIEW v_progreso_carrera AS
+SELECT
+    e.id_estudiante,
+    u.nombre || ' ' || u.apellido AS estudiante,
+    c.nombre AS carrera,
+    COUNT(DISTINCT CASE WHEN i.aprobado = TRUE THEN oa.id_materia END) AS materias_aprobadas,
+    COUNT(DISTINCT mc.id_materia) AS total_materias_carrera,
+    ROUND(100.0 * COUNT(DISTINCT CASE WHEN i.aprobado = TRUE THEN oa.id_materia END) / 
+          NULLIF(COUNT(DISTINCT mc.id_materia), 0), 2) AS porcentaje_avance
+FROM estudiantes e
+JOIN usuarios u ON u.id_usuario = e.id_usuario
+LEFT JOIN afiliaciones_estudiante ae ON ae.id_estudiante = e.id_estudiante AND ae.tipo_programa = 'carrera' AND ae.estado = 'activo'
+LEFT JOIN carreras c ON c.id_carrera = ae.id_carrera
+LEFT JOIN malla_curricular mc ON mc.id_carrera = c.id_carrera
+LEFT JOIN inscripciones i ON i.id_estudiante = e.id_estudiante
+LEFT JOIN grupos oa ON oa.id_oferta = i.id_oferta
+GROUP BY e.id_estudiante, u.nombre, u.apellido, c.nombre;
+
+-- ============================================================
+-- BLOQUE 11: DATOS DE PRUEBA
+-- ============================================================
+
+INSERT INTO roles (nombre_rol, descripcion) VALUES
+('Propietario', 'Dueño del sistema, acceso total'),
+('Director', 'Director académico'),
+('Secretaria', 'Personal administrativo y atención'),
+('Profesor', 'Docente del instituto'),
+('Estudiante', 'Alumno inscrito');
+
+INSERT INTO horarios (dia_semana, hora_inicio, hora_fin, descripcion) VALUES
+('Lunes', '08:00', '10:00', 'Mañana lunes'),
+('Lunes', '10:00', '12:00', 'Mañana lunes 2'),
+('Martes', '08:00', '10:00', 'Mañana martes'),
+('Martes', '14:00', '16:00', 'Tarde martes'),
+('Miércoles', '18:00', '20:00', 'Noche miércoles'),
+('Jueves', '08:00', '10:00', 'Mañana jueves'),
+('Sábado', '08:00', '12:00', 'Mañana sábado');
+
+INSERT INTO aulas (nombre, capacidad, ubicacion, tipo) VALUES
+('Aula 101', 30, 'Piso 1', 'aula'),
+('Aula 102', 25, 'Piso 1', 'aula'),
+('Laboratorio 1', 20, 'Piso 2', 'laboratorio'),
+('Sala Reuniones', 15, 'Piso 3', 'sala');
+
+-- Cadena de prerrequisitos: MAT101 -> PROG101 -> MAT102 -> PROG102 -> EST101 -> BD101 -> SO101
+--                           BD101 -> RED101 (rama optativa)
+-- IDs asignados por orden de insercion: MAT101=1, PROG101=2, MAT102=3, PROG102=4,
+--                                        EST101=5, BD101=6, SO101=7, RED101=8
+INSERT INTO materias (codigo, nombre, duracion_meses, costo_mensual, creditos, id_materia_requisito) VALUES
+('MAT101',  'Cálculo I',              1, 150.00, 3, NULL),  -- id=1  libre
+('PROG101', 'Programación Básica',    2, 200.00, 4, 1),     -- id=2  req MAT101
+('MAT102',  'Cálculo II',             1, 150.00, 3, 2),     -- id=3  req PROG101
+('PROG102', 'Programación Avanzada',  2, 220.00, 4, 3),     -- id=4  req MAT102
+('EST101',  'Estadística',            1, 160.00, 3, 4),     -- id=5  req PROG102
+('BD101',   'Bases de Datos I',       1, 180.00, 3, 5),     -- id=6  req EST101
+('SO101',   'Sistemas Operativos',    1, 170.00, 3, 6),     -- id=7  req BD101
+('RED101',  'Redes Básicas',          1, 160.00, 3, 6);     -- id=8  req BD101
+
+INSERT INTO usuarios (nombre, apellido, email, password_hash, dni, id_rol) VALUES
+('Admin', 'Sistema', 'admin@instituto.com', '$2b$10$hash1', '10000001', 1),
+('Carlos', 'López', 'carlos.lopez@instituto.com', '$2b$10$hash2', '10000002', 4),
+('Ana', 'Martínez', 'ana.martinez@instituto.com', '$2b$10$hash3', '10000003', 3),
+('Juan', 'Pérez', 'juan.perez@instituto.com', '$2b$10$hash4', '10000004', 5),
+('María', 'García', 'maria.garcia@instituto.com', '$2b$10$hash5', '10000005', 5),
+('Roberto', 'Suárez', 'roberto.suarez@instituto.com', '$2b$10$hash6', '10000006', 4),
+('Lucía', 'Flores', 'lucia.flores@instituto.com', '$2b$10$hash7', '10000007', 2);
+
+INSERT INTO personal_administrativo (id_usuario, legajo_personal, cargo, fecha_ingreso, oficina, sueldo_base) VALUES
+(1, 'ADM-001', 'Propietario', '2023-01-01', 'Oficina 1', 3000.00),
+(3, 'ADM-002', 'Secretaria', '2024-02-01', 'Oficina 2', 800.00),
+(7, 'ADM-003', 'Director', '2023-06-01', 'Dirección', 2000.00);
+
+INSERT INTO profesores (id_usuario, legajo_profesor, especialidad, titulo_maximo, fecha_contratacion, sueldo_base) VALUES
+(2, 'PROF-001', 'Programación y BD', 'Ingeniero en Sistemas', '2024-03-01', 1200.00),
+(6, 'PROF-002', 'Redes y Telecomunicaciones', 'Técnico Superior', '2024-05-01', 900.00);
+
+INSERT INTO carreras (codigo, nombre, tipo, duracion_niveles, costo_carrera_completa) VALUES
+('TEC-PROG', 'Técnico en Programación', 'tecnico_superior', 4, 20000.00),
+('TEC-RED', 'Técnico en Redes', 'tecnico', 2, 15000.00),
+('CUR-BD', 'Curso Bases de Datos', 'curso_libre', 0, NULL);
+
+INSERT INTO niveles_carrera (id_carrera, numero_nivel, nombre) VALUES
+(1, 1, 'Primer Nivel'),
+(1, 2, 'Segundo Nivel'),
+(1, 3, 'Tercer Nivel'),
+(1, 4, 'Cuarto Nivel'),
+(2, 1, 'Primer Nivel'),
+(2, 2, 'Segundo Nivel');
+
+INSERT INTO estudiantes (id_usuario, legajo, fecha_inscripcion_inicial, tutor_nombre, beca_porcentaje, doc_entregados, id_carrera_actual) VALUES
+(4, 'EST-2026001', '2026-01-10', 'Pedro Pérez', 10.00, FALSE, 1),
+(5, 'EST-2026002', '2026-01-15', NULL, 0.00, TRUE, 1);
+
+-- Estructura: 4 niveles, 2 materias c/u — orden_en_nivel es cosmético
+-- Carrera TEC-PROG (id=1):
+--   Nivel 1: MAT101(1), PROG101(2)
+--   Nivel 2: MAT102(3), PROG102(4)
+--   Nivel 3: EST101(5), BD101(6)
+--   Nivel 4: SO101(7), RED101(8) -- RED101 optativa
+INSERT INTO malla_curricular (id_carrera, id_nivel, id_materia, orden_en_nivel, obligatoria) VALUES
+(1, 1, 1, 1, TRUE),   -- Nivel 1: MAT101
+(1, 1, 2, 2, TRUE),   -- Nivel 1: PROG101
+(1, 2, 3, 1, TRUE),   -- Nivel 2: MAT102
+(1, 2, 4, 2, TRUE),   -- Nivel 2: PROG102
+(1, 3, 5, 1, TRUE),   -- Nivel 3: EST101
+(1, 3, 6, 2, TRUE),   -- Nivel 3: BD101
+(1, 4, 7, 1, TRUE),   -- Nivel 4: SO101
+(1, 4, 8, 2, FALSE);  -- Nivel 4: RED101 (optativa)
+
+INSERT INTO periodos_dictado (nombre, tipo_periodo, fecha_inicio, fecha_fin, id_nivel) VALUES
+('Mayo 2026',  'mensual', '2026-05-01', '2026-05-31', 1),
+('Junio 2026', 'mensual', '2026-06-01', '2026-06-30', 2);
+
+INSERT INTO cronogramas (id_periodo, nombre, tipo_periodo, fecha_inicio, fecha_fin) VALUES
+(1, 'Inscripciones Mayo', 'inscripcion', '2026-05-01', '2026-05-05'),
+(1, 'Clases Mayo',        'clases',      '2026-05-06', '2026-05-25'),
+(1, 'Exámenes Mayo',      'examenes',    '2026-05-26', '2026-05-31');
+
+-- id_materia usa los IDs del INSERT de materias (orden de insercion):
+--   1=MAT101  2=PROG101  3=MAT102  4=PROG102  5=EST101  6=BD101  7=SO101  8=RED101
+-- PROG101-A esta en posicion 6 para que id_oferta=6 coincida con los datos de prueba
+INSERT INTO grupos (id_materia, id_aula, id_periodo, id_profesor, id_horario, vacantes_max, codigo_grupo) VALUES
+(1, 1, 1, 1, 1, 20, 'MAT101-A'),    -- id_oferta=1  MAT101
+(3, 1, 1, 1, 2, 20, 'MAT102-A'),    -- id_oferta=2  MAT102  (req PROG101)
+(5, 1, 1, 1, 3, 20, 'EST101-A'),    -- id_oferta=3  EST101  (req PROG102)
+(7, 2, 1, 1, 4, 20, 'SO101-A'),     -- id_oferta=4  SO101   (req BD101)
+(6, 3, 1, 1, 5, 20, 'BD101-A'),     -- id_oferta=5  BD101   (req EST101)
+(2, 3, 1, 1, 1, 20, 'PROG101-A'),   -- id_oferta=6  PROG101 (req MAT101) — datos de prueba
+(4, 3, 1, 1, 2, 20, 'PROG102-A'),   -- id_oferta=7  PROG102 (req MAT102)
+(8, 1, 2, 2, 7, 25, 'RED101-A');    -- id_oferta=8  RED101  (req BD101, periodo Junio)
+
+INSERT INTO matricula_unica (id_estudiante, monto_pagado, estado) VALUES
+(1, 100.00, 'pagado'),
+(2, 100.00, 'pagado');
+
+INSERT INTO afiliaciones_estudiante (id_estudiante, id_carrera, tipo_programa, fecha_inicio, estado) VALUES
+(1, 1, 'carrera', '2026-01-01', 'activo'),
+(2, 1, 'carrera', '2026-01-01', 'activo');
+
+-- Estudiantes inscritos en PROG101-A (id_oferta=6)
+INSERT INTO inscripciones (id_estudiante, id_oferta, estado) VALUES
+(1, 6, 'activo'),   -- EST-2026001 en PROG101-A
+(2, 6, 'activo');   -- EST-2026002 en PROG101-A
+
+-- EST-2026001: APROBADO (81.75 pts)
+-- 80*0.25 + 75*0.25 + 85*0.40 + 90*0.10 = 20 + 18.75 + 34 + 9 = 81.75
+-- Al insertar la 4ta evaluacion el TRIGGER 11 cierra la inscripcion automaticamente
+-- El TRIGGER 7 reacciona al UPDATE aprobado -> cambia estado a 'aprobado'
+INSERT INTO evaluaciones (id_inscripcion, id_profesor, tipo, calificacion, porcentaje, fecha) VALUES
+(1, 1, 'parcial1', 80.00, 25.00, '2026-05-08'),
+(1, 1, 'parcial2', 75.00, 25.00, '2026-05-15'),
+(1, 1, 'final',    85.00, 40.00, '2026-05-22'),
+(1, 1, 'otros',    90.00, 10.00, '2026-05-25');
+-- Resultado esperado: estado='aprobado', calificacion_final=81.75, aprobado=TRUE
+-- grupo listar_disponibles() mostrara MAT102-A como siguiente materia disponible
+
+-- EST-2026002: REPROBADO (41.75 pts)
+-- 40*0.25 + 35*0.25 + 45*0.40 + 50*0.10 = 10 + 8.75 + 18 + 5 = 41.75
+INSERT INTO evaluaciones (id_inscripcion, id_profesor, tipo, calificacion, porcentaje, fecha) VALUES
+(2, 1, 'parcial1', 40.00, 25.00, '2026-05-08'),
+(2, 1, 'parcial2', 35.00, 25.00, '2026-05-15'),
+(2, 1, 'final',    45.00, 40.00, '2026-05-22'),
+(2, 1, 'otros',    50.00, 10.00, '2026-05-25');
+-- Resultado esperado: estado='reprobado', calificacion_final=41.75, aprobado=FALSE
+-- grupo listar_disponibles() mostrara PROG101-A de nuevo para reinscribirse
+
+INSERT INTO seguimiento_log (id_usuario, accion, descripcion, ip_origen) VALUES
+(1, 'LOGIN', 'Inicio de sesión exitoso', '192.168.1.10'),
+(3, 'INSCRIPCION_NUEVA', 'Inscripción de Juan Pérez a Cálculo I', '192.168.1.15'),
+(1, 'PAGO_REGISTRADO', 'Pago matrícula única EST-2026001', '192.168.1.10');
+
+-- ============================================================
+-- PASARELA DE PAGOS: PAGO FÁCIL (QR)
+-- ============================================================
+
+CREATE TABLE pagofacil_transacciones (
+    id_transaccion_pf SERIAL PRIMARY KEY,
+    transaction_id_api BIGINT UNIQUE NOT NULL,       -- ID retornado por la pasarela de Pago Fácil
+    payment_number VARCHAR(50) UNIQUE NOT NULL,      -- Código de transacción único enviado a la API
+    id_estudiante INT NOT NULL REFERENCES estudiantes(id_estudiante) ON DELETE CASCADE,
+    monto DECIMAL(10,2) NOT NULL,
+    concepto VARCHAR(20) NOT NULL CHECK (concepto IN ('matricula', 'materia')),
+    codigo_grupo VARCHAR(20) NULL,                   -- Código de grupo (ej: PROG101-A) si el concepto es materia
+    id_inscripcion INT NULL REFERENCES inscripciones(id_inscripcion) ON DELETE SET NULL,
+    estado VARCHAR(20) DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'pagado', 'expirado', 'cancelado')),
+    fecha_generacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_pago TIMESTAMP NULL
+);
+
+CREATE INDEX idx_pf_transacciones_api ON pagofacil_transacciones(transaction_id_api);
+
+CREATE OR REPLACE FUNCTION fn_confirmar_pago_qr()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_id_inscripcion INT;
+    v_id_carrera     INT;
+    v_costo_total    DECIMAL(10,2);
+    v_forma_pago     VARCHAR(10);
+    v_estado_carrera VARCHAR(15);
+BEGIN
+    IF NEW.estado = 'pagado' AND OLD.estado = 'pendiente' THEN
+        NEW.fecha_pago := CURRENT_TIMESTAMP;
+
+        -- CASO 1: Cobro de Matrícula Única
+        IF NEW.concepto = 'matricula' THEN
+            INSERT INTO matricula_unica (id_estudiante, monto_pagado, comprobante, estado)
+            VALUES (NEW.id_estudiante, NEW.monto, NEW.payment_number, 'pagado')
+            ON CONFLICT (id_estudiante) DO NOTHING;
+
+        -- CASO 2: Cobro de Inscripción por Materia Suelta
+        ELSIF NEW.concepto = 'materia' THEN
+            IF NEW.id_inscripcion IS NOT NULL THEN
+                v_id_inscripcion := NEW.id_inscripcion;
+            ELSE
+                SELECT i.id_inscripcion INTO v_id_inscripcion
+                FROM inscripciones i
+                JOIN grupos g ON i.id_oferta = g.id_oferta
+                WHERE i.id_estudiante = NEW.id_estudiante
+                  AND g.codigo_grupo = NEW.codigo_grupo
+                  AND i.estado = 'pendiente_matricula'
+                LIMIT 1;
+            END IF;
+
+            IF v_id_inscripcion IS NOT NULL THEN
+                INSERT INTO pago_materia_suelta (id_inscripcion, monto_pagado, estado)
+                VALUES (v_id_inscripcion, NEW.monto, 'pagado')
+                ON CONFLICT (id_inscripcion) DO UPDATE
+                SET estado = 'pagado', fecha_pago = CURRENT_DATE;
+            ELSE
+                RAISE NOTICE 'Advertencia: No se encontró inscripción pendiente para Estudiante % en Grupo %', NEW.id_estudiante, NEW.codigo_grupo;
+            END IF;
+
+        -- CASO 3: Pago de Carrera Completa (contado o parcial)
+        -- codigo_grupo contiene el código de la carrera (ej: 'TEC-PROG')
+        ELSIF NEW.concepto = 'carrera' THEN
+            SELECT id_carrera, costo_carrera_completa
+            INTO v_id_carrera, v_costo_total
+            FROM carreras
+            WHERE codigo = NEW.codigo_grupo;
+
+            IF v_id_carrera IS NOT NULL THEN
+                IF NEW.monto >= v_costo_total THEN
+                    v_forma_pago     := 'contado';
+                    v_estado_carrera := 'pagado';
+                ELSE
+                    v_forma_pago     := 'credito';
+                    v_estado_carrera := 'parcial';
+                END IF;
+
+                INSERT INTO pago_carrera_completa
+                    (id_estudiante, id_carrera, monto_total, monto_pagado, forma_pago, estado, fecha_contrato)
+                VALUES
+                    (NEW.id_estudiante, v_id_carrera, v_costo_total, NEW.monto, v_forma_pago, v_estado_carrera, CURRENT_DATE)
+                ON CONFLICT (id_estudiante, id_carrera) DO NOTHING;
+            ELSE
+                RAISE NOTICE 'Advertencia: No se encontró carrera con código % para pago QR', NEW.codigo_grupo;
+            END IF;
+
+        -- CASO 4: Pago de Cuota de Carrera
+        -- id_inscripcion reutilizado como id_pago_carrera
+        -- codigo_grupo   reutilizado como numero_cuota (string numérico)
+        ELSIF NEW.concepto = 'cuota' THEN
+            UPDATE cuotas_carrera
+            SET    estado     = 'pagado',
+                   fecha_pago = CURRENT_DATE
+            WHERE  id_pago_carrera = NEW.id_inscripcion
+              AND  numero_cuota    = NEW.codigo_grupo::INT
+              AND  estado          = 'pendiente';
+
+            UPDATE pago_carrera_completa
+            SET estado = CASE
+                WHEN (SELECT COUNT(*) FROM cuotas_carrera
+                      WHERE id_pago_carrera = NEW.id_inscripcion
+                        AND estado = 'pendiente') = 0
+                     THEN 'pagado'
+                ELSE 'parcial'
+            END
+            WHERE id_pago_carrera = NEW.id_inscripcion;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_pagofacil_confirmacion
+    BEFORE UPDATE ON pagofacil_transacciones
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_confirmar_pago_qr();
+
+-- ============================================================
+-- FIN DEL SCRIPT
+-- Instituto San Pablo del Oriente - Grupo07sc
+-- ============================================================
+	
