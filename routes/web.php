@@ -48,8 +48,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/usuarios/{id}/password', [UsuarioController::class, 'cambiarPassword'])->name('usuarios.password');
     });
 
-    // CU2 y CU11 — solo propietario
-    Route::middleware('role:propietario')->prefix('propietario')->name('propietario.')->group(function () {
+    // CU2 y CU11 — todos los roles admin
+    Route::middleware('role:propietario,director,secretaria')->prefix('propietario')->name('propietario.')->group(function () {
         // CU2 — Gestión de Aulas
         Route::get('/aulas', [AulaController::class, 'index'])->name('aulas.index');
         Route::post('/aulas', [AulaController::class, 'store'])->name('aulas.store');
@@ -72,8 +72,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->middleware('role:director')->name('dashboard.director');
 
-    // CU4 — Gestión de Carreras + CU5 Materias (director)
-    Route::middleware('role:director')->prefix('director')->name('director.')->group(function () {
+    // CU4 — Gestión de Carreras + CU5 Materias + CU6 Malla — todos los roles admin
+    Route::middleware('role:propietario,director,secretaria')->prefix('director')->name('director.')->group(function () {
         // CU4 Carreras
         Route::get('/carreras', [\App\Http\Controllers\Director\CU4Carreras\CarreraController::class, 'index'])->name('carreras.index');
         Route::post('/carreras', [\App\Http\Controllers\Director\CU4Carreras\CarreraController::class, 'store'])->name('carreras.store');
@@ -96,14 +96,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     // ── Panel Secretaria ───────────────────────────────────────────────────────
-    Route::middleware('role:secretaria')->prefix('secretaria')->name('secretaria.')->group(function () {
+    Route::middleware('role:propietario,director,secretaria')->prefix('secretaria')->name('secretaria.')->group(function () {
         Route::get('/panel', function () {
             return Inertia::render('Dashboard/Secretaria');
         })->name('dashboard');
 
         // Cronogramas (CU10)
         Route::get('/cronogramas', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'index'])->name('cronogramas.index');
-        Route::post('/cronogramas', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'store'])->name('cronogramas.store');
+        Route::put('/cronogramas/{id}', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'update'])->name('cronogramas.update');
         Route::patch('/cronogramas/{id}/toggle-activo', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'toggleActivo'])->name('cronogramas.toggle-activo');
 
         Route::get('/inscripciones', [\App\Http\Controllers\Secretaria\CU2Inscripciones\InscripcionController::class, 'index'])->name('inscripciones.index');

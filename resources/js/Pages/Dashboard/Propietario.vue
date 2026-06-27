@@ -1,5 +1,5 @@
 <script setup>
-import PropietarioLayout from '@/Layouts/PropietarioLayout.vue';
+import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
@@ -45,7 +45,7 @@ const modulos = [
 <template>
     <Head title="Panel Propietario" />
 
-    <PropietarioLayout>
+    <AdminLayout>
         <template #header>
             <h2 class="text-base font-semibold" style="color: var(--text-color);">Panel de Propietario</h2>
         </template>
@@ -94,5 +94,5 @@ const modulos = [
                 </Link>
             </div>
         </div>
-    </PropietarioLayout>
+    </AdminLayout>
 </template>

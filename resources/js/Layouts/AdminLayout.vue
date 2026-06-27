@@ -7,35 +7,61 @@ import ThemeBar from '@/Components/ThemeBar.vue';
 const page = usePage();
 const user = computed(() => page.props.auth?.user);
 
-// Adapta el dashboard según el rol del usuario autenticado
 const dashboardRoute = computed(() => {
     const role = user.value?.role;
-    if (role === 'director')  return 'dashboard.director';
+    if (role === 'director')   return 'dashboard.director';
+    if (role === 'propietario') return 'dashboard.propietario';
     if (role === 'secretaria') return 'secretaria.dashboard';
-    return 'dashboard.propietario';
+    return 'dashboard';
 });
 
 const dashboardUrl = computed(() => {
     const role = user.value?.role;
-    if (role === 'director')  return '/panel/director';
-    if (role === 'secretaria') return '/secretaria/panel';
-    return '/panel/propietario';
+    if (role === 'director')   return '/panel/director';
+    if (role === 'propietario') return '/panel/propietario';
+    return '/secretaria/panel';
 });
 
 const roleBadge = computed(() => {
     const role = user.value?.role;
-    if (role === 'director')  return { emoji: '🎓', label: 'Director' };
+    if (role === 'director')   return { emoji: '🎓', label: 'Director' };
     if (role === 'secretaria') return { emoji: '📋', label: 'Secretaría' };
     return { emoji: '🏛️', label: 'Propietario' };
 });
 
-const modulos = [
-    { name: 'Gestión de Usuarios', route: 'propietario.usuarios.index',   activeUrls: ['/propietario/usuarios'] },
-    { name: 'Gestión de Aulas',    route: 'propietario.aulas.index',      activeUrls: ['/propietario/aulas'] },
-    { name: 'Gestión de Horarios', route: 'propietario.horarios.index',   activeUrls: ['/propietario/horarios'] },
+const secciones = [
+    {
+        key: 'academico',
+        label: 'Académico',
+        items: [
+            { name: 'Gestión de Carreras', route: 'director.carreras.index', activeUrls: ['/director/carreras'] },
+            { name: 'Gestión de Materias', route: 'director.materias.index', activeUrls: ['/director/materias'] },
+        ],
+    },
+    {
+        key: 'administrativo',
+        label: 'Administrativo',
+        items: [
+            { name: 'Gestión de Usuarios', route: 'propietario.usuarios.index',   activeUrls: ['/propietario/usuarios'] },
+            { name: 'Gestión de Aulas',    route: 'propietario.aulas.index',      activeUrls: ['/propietario/aulas'] },
+            { name: 'Gestión de Horarios', route: 'propietario.horarios.index',   activeUrls: ['/propietario/horarios'] },
+            { name: 'Cronogramas',         route: 'secretaria.cronogramas.index', activeUrls: ['/secretaria/cronogramas'] },
+        ],
+    },
+    {
+        key: 'secretaria',
+        label: 'Secretaría',
+        items: [
+            { name: 'Inscripciones', route: 'secretaria.inscripciones.index', activeUrls: ['/secretaria/inscripciones'] },
+            { name: 'Caja y Pagos',  route: 'secretaria.pagos.index',         activeUrls: ['/secretaria/pagos'] },
+        ],
+    },
 ];
 
-const isRouteActive = (urls) => urls.some(url => page.url.startsWith(url));
+const openSections = ref({ academico: true, administrativo: true, secretaria: false });
+const toggleSection = (key) => { openSections.value[key] = !openSections.value[key]; };
+
+const isActive = (urls) => urls.some(url => page.url.startsWith(url));
 
 const showMobileMenu = ref(false);
 const showUserMenu   = ref(false);
@@ -59,55 +85,74 @@ const showUserMenu   = ref(false);
 
             <!-- Logo -->
             <div class="h-16 flex items-center justify-between px-4 shrink-0 border-b" style="border-color: var(--border-color);">
-                <Link :href="route(dashboardRoute)" class="flex items-center gap-3 w-full" @click="showMobileMenu = false">
-                    <InstituteLogo :size="38" />
+                <Link :href="route(dashboardRoute)" class="flex items-center gap-3 flex-1 overflow-hidden" @click="showMobileMenu = false">
+                    <InstituteLogo :size="36" />
                     <div class="leading-tight overflow-hidden">
                         <p class="font-bold text-sm leading-none truncate" style="color: var(--text-color);">Instituto San Pablo</p>
                         <p class="text-xs leading-none mt-0.5 truncate" style="color: #f59e0b;">del Oriente</p>
                     </div>
                 </Link>
-                <button @click="showMobileMenu = false" class="lg:hidden text-xs font-medium uppercase tracking-wider ml-2" style="color: var(--text-secondary);">X</button>
+                <button @click="showMobileMenu = false" class="lg:hidden text-xs font-medium ml-2" style="color: var(--text-secondary);">✕</button>
             </div>
 
-            <!-- Badge de rol -->
-            <div class="px-4 pt-4 pb-2">
+            <!-- Badge rol -->
+            <div class="px-4 pt-3 pb-2">
                 <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
                       style="background-color: var(--primary-color); color: var(--primary-text);">
                     {{ roleBadge.emoji }} {{ roleBadge.label }}
                 </span>
             </div>
 
-            <!-- Navegación -->
-            <nav class="flex-1 overflow-y-auto pt-2 px-4 space-y-1">
-                <p class="px-2 mb-3 text-[11px] font-semibold uppercase tracking-widest opacity-50" style="color: var(--text-secondary);">Principal</p>
+            <!-- Nav -->
+            <nav class="flex-1 overflow-y-auto pb-4 px-4 space-y-0.5">
 
-                <!-- Dashboard dinámico según rol -->
+                <!-- Principal -->
+                <p class="px-2 pt-3 pb-1.5 text-[11px] font-semibold uppercase tracking-widest opacity-50" style="color: var(--text-secondary);">Principal</p>
                 <Link
                     :href="route(dashboardRoute)"
                     @click="showMobileMenu = false"
-                    class="block px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150"
+                    class="flex items-center gap-2 px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150"
                     :style="page.url.startsWith(dashboardUrl)
-                        ? 'background-color: color-mix(in srgb, var(--text-color) 8%, transparent); color: var(--text-color);'
+                        ? 'background-color: color-mix(in srgb, var(--primary-color) 15%, transparent); color: var(--primary-color);'
                         : 'color: var(--text-secondary);'"
                 >
-                    ← Volver al Dashboard
+                    <span class="text-base leading-none">⊞</span> Dashboard
                 </Link>
 
-                <Link
-                    v-for="mod in modulos"
-                    :key="mod.name"
-                    :href="route(mod.route)"
-                    @click="showMobileMenu = false"
-                    class="block px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150"
-                    :style="isRouteActive(mod.activeUrls)
-                        ? 'background-color: color-mix(in srgb, var(--text-color) 8%, transparent); color: var(--text-color);'
-                        : 'color: var(--text-secondary);'"
-                >
-                    {{ mod.name }}
-                </Link>
+                <!-- Secciones colapsables -->
+                <div v-for="sec in secciones" :key="sec.key" class="pt-1">
+                    <!-- Header de sección (colapsable) -->
+                    <button
+                        @click="toggleSection(sec.key)"
+                        class="w-full flex items-center justify-between px-2 py-1.5 rounded text-[11px] font-semibold uppercase tracking-widest transition-colors"
+                        style="color: var(--text-secondary);"
+                        onmouseover="this.style.backgroundColor='color-mix(in srgb, var(--text-color) 4%, transparent)'"
+                        onmouseout="this.style.backgroundColor='transparent'"
+                    >
+                        <span class="opacity-60">{{ sec.label }}</span>
+                        <span class="opacity-50 text-[10px] transition-transform duration-200"
+                              :style="openSections[sec.key] ? 'transform: rotate(180deg)' : ''">▾</span>
+                    </button>
+
+                    <!-- Items de sección -->
+                    <div v-show="openSections[sec.key]" class="mt-0.5 space-y-0.5">
+                        <Link
+                            v-for="mod in sec.items"
+                            :key="mod.name"
+                            :href="route(mod.route)"
+                            @click="showMobileMenu = false"
+                            class="block px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 pl-5"
+                            :style="isActive(mod.activeUrls)
+                                ? 'background-color: color-mix(in srgb, var(--primary-color) 15%, transparent); color: var(--primary-color);'
+                                : 'color: var(--text-secondary);'"
+                        >
+                            {{ mod.name }}
+                        </Link>
+                    </div>
+                </div>
             </nav>
 
-            <!-- Perfil en footer -->
+            <!-- Footer usuario -->
             <div class="p-4 border-t shrink-0 relative" style="border-color: var(--border-color);">
                 <Transition
                     enter-active-class="transition ease-out duration-150"
@@ -118,9 +163,10 @@ const showUserMenu   = ref(false);
                     leave-to-class="opacity-0 translate-y-1"
                 >
                     <div v-if="showUserMenu" class="absolute bottom-full left-0 w-full px-4 mb-2 z-50">
-                        <div class="rounded-lg border py-1 shadow-sm" style="background-color: var(--card-bg); border-color: var(--border-color);">
+                        <div class="rounded-lg border py-1 shadow-sm"
+                             style="background-color: var(--card-bg); border-color: var(--border-color);">
                             <div class="px-4 py-2 border-b" style="border-color: var(--border-color);">
-                                <p class="text-xs" style="color: var(--text-secondary);">{{ user?.email }}</p>
+                                <p class="text-xs truncate" style="color: var(--text-secondary);">{{ user?.email }}</p>
                             </div>
                             <Link :href="route('profile.edit')"
                                 class="block px-4 py-2 text-sm transition-colors"
@@ -147,7 +193,7 @@ const showUserMenu   = ref(false);
                     <div class="flex items-center gap-3 flex-1 overflow-hidden">
                         <div class="flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold shrink-0"
                              style="background-color: var(--primary-color); color: var(--primary-text);">
-                            {{ (user?.name ?? 'P')[0].toUpperCase() }}
+                            {{ (user?.name ?? 'A')[0].toUpperCase() }}
                         </div>
                         <div class="flex-1 overflow-hidden">
                             <span class="block text-sm font-medium truncate" style="color: var(--text-color);">{{ user?.name }}</span>
@@ -168,7 +214,7 @@ const showUserMenu   = ref(false);
             <header class="h-16 flex items-center justify-between px-6 shrink-0 z-10 border-b shadow-sm"
                     style="background-color: var(--card-bg); border-color: var(--border-color);">
                 <div class="flex items-center gap-4 w-full">
-                    <button @click="showMobileMenu = true" class="lg:hidden text-sm font-medium tracking-wide" style="color: var(--text-secondary);">MENÚ</button>
+                    <button @click="showMobileMenu = true" class="lg:hidden text-sm font-medium" style="color: var(--text-secondary);">MENÚ</button>
                     <div class="flex-1 min-w-0 truncate pr-4">
                         <slot name="header" />
                     </div>

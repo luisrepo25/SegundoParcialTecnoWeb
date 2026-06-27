@@ -1,5 +1,5 @@
 <script setup>
-import DirectorLayout from '@/Layouts/DirectorLayout.vue';
+import AdminLayout from '@/Layouts/AdminLayout.vue';
 import ComboSelect from '@/Components/ComboSelect.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
@@ -170,7 +170,7 @@ function confirmarEliminarNivel() {
 <template>
     <Head :title="`Malla — ${carrera.nombre}`" />
 
-    <DirectorLayout>
+    <AdminLayout>
         <template #header>
             <div>
                 <h2 class="text-xl font-semibold leading-tight" style="color: var(--text-color);">
@@ -320,7 +320,7 @@ function confirmarEliminarNivel() {
 
             </div>
         </div>
-    </DirectorLayout>
+    </AdminLayout>
 
     <!-- ── Modal: Agregar Nivel ──────────────────────────────────────────────── -->
     <Teleport to="body">

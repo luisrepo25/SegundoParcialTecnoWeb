@@ -1,5 +1,5 @@
 <script setup>
-import PropietarioLayout from '@/Layouts/PropietarioLayout.vue';
+import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 
@@ -84,7 +84,7 @@ function tipoBadge(tipo) { return TIPO_BADGE[tipo] ?? { label: tipo, color: 'bad
 <template>
     <Head title="Gestión de Aulas" />
 
-    <PropietarioLayout>
+    <AdminLayout>
         <template #header>
             <h2 class="text-xl font-semibold leading-tight" style="color: var(--text-color);">
                 Gestión de Aulas
@@ -257,7 +257,7 @@ function tipoBadge(tipo) { return TIPO_BADGE[tipo] ?? { label: tipo, color: 'bad
                 </div>
             </div>
         </Teleport>
-    </PropietarioLayout>
+    </AdminLayout>
 </template>
 
 <style scoped>

@@ -7,10 +7,29 @@ import ThemeBar from '@/Components/ThemeBar.vue';
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 
-const modulos = [
-    { name: 'Dashboard',          route: 'dashboard.director',      activeUrls: ['/panel/director'] },
-    { name: 'Gestión de Carreras', route: 'director.carreras.index', activeUrls: ['/director/carreras'] },
-    { name: 'Gestión de Materias', route: 'director.materias.index', activeUrls: ['/director/materias'] },
+const secciones = [
+    {
+        label: 'Principal',
+        items: [
+            { name: 'Dashboard', route: 'dashboard.director', activeUrls: ['/panel/director'] },
+        ],
+    },
+    {
+        label: 'Académico',
+        items: [
+            { name: 'Gestión de Carreras', route: 'director.carreras.index',  activeUrls: ['/director/carreras'] },
+            { name: 'Gestión de Materias', route: 'director.materias.index',  activeUrls: ['/director/materias'] },
+        ],
+    },
+    {
+        label: 'Administrativo',
+        items: [
+            { name: 'Gestión de Usuarios',    route: 'propietario.usuarios.index',   activeUrls: ['/propietario/usuarios'] },
+            { name: 'Gestión de Aulas',       route: 'propietario.aulas.index',      activeUrls: ['/propietario/aulas'] },
+            { name: 'Gestión de Horarios',    route: 'propietario.horarios.index',   activeUrls: ['/propietario/horarios'] },
+            { name: 'Cronogramas',            route: 'secretaria.cronogramas.index', activeUrls: ['/secretaria/cronogramas'] },
+        ],
+    },
 ];
 
 const isRouteActive = (urls) => urls.some(url => page.url.startsWith(url));
@@ -57,21 +76,25 @@ const showUserMenu   = ref(false);
             </div>
 
             <!-- Nav -->
-            <nav class="flex-1 overflow-y-auto pt-5 px-4 space-y-1">
-                <p class="px-2 mb-3 text-[11px] font-semibold uppercase tracking-widest opacity-50" style="color: var(--text-secondary);">Principal</p>
-
-                <Link
-                    v-for="mod in modulos"
-                    :key="mod.name"
-                    :href="route(mod.route)"
-                    @click="showMobileMenu = false"
-                    class="block px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150"
-                    :style="isRouteActive(mod.activeUrls)
-                        ? 'background-color: color-mix(in srgb, var(--primary-color) 15%, transparent); color: var(--primary-color);'
-                        : 'color: var(--text-secondary);'"
-                >
-                    {{ mod.name }}
-                </Link>
+            <nav class="flex-1 overflow-y-auto pt-4 px-4 space-y-5">
+                <div v-for="sec in secciones" :key="sec.label">
+                    <p class="px-2 mb-1.5 text-[11px] font-semibold uppercase tracking-widest opacity-50"
+                       style="color: var(--text-secondary);">{{ sec.label }}</p>
+                    <div class="space-y-0.5">
+                        <Link
+                            v-for="mod in sec.items"
+                            :key="mod.name"
+                            :href="route(mod.route)"
+                            @click="showMobileMenu = false"
+                            class="block px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150"
+                            :style="isRouteActive(mod.activeUrls)
+                                ? 'background-color: color-mix(in srgb, var(--primary-color) 15%, transparent); color: var(--primary-color);'
+                                : 'color: var(--text-secondary);'"
+                        >
+                            {{ mod.name }}
+                        </Link>
+                    </div>
+                </div>
             </nav>
 
             <!-- Footer usuario -->

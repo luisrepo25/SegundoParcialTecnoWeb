@@ -1,5 +1,5 @@
 <script setup>
-import PropietarioLayout from '@/Layouts/PropietarioLayout.vue';
+import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 
@@ -85,7 +85,7 @@ function formatHora(t) { return t ? t.substring(0, 5) : '—'; }
 <template>
     <Head title="Gestión de Horarios" />
 
-    <PropietarioLayout>
+    <AdminLayout>
         <template #header>
             <h2 class="text-xl font-semibold leading-tight" style="color: var(--text-color);">
                 Gestión de Horarios
@@ -257,7 +257,7 @@ function formatHora(t) { return t ? t.substring(0, 5) : '—'; }
                 </div>
             </div>
         </Teleport>
-    </PropietarioLayout>
+    </AdminLayout>
 </template>
 
 <script>

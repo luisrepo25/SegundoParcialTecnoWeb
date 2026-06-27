@@ -1,5 +1,5 @@
 <script setup>
-import DirectorLayout from '@/Layouts/DirectorLayout.vue';
+import AdminLayout from '@/Layouts/AdminLayout.vue';
 import ComboSelect from '@/Components/ComboSelect.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
@@ -87,7 +87,7 @@ function formatCosto(val) {
 <template>
     <Head title="Gestión de Materias" />
 
-    <DirectorLayout>
+    <AdminLayout>
         <template #header>
             <h2 class="text-xl font-semibold leading-tight" style="color: var(--text-color);">
                 Gestión de Materias
@@ -273,7 +273,7 @@ function formatCosto(val) {
                 </div>
             </div>
         </Teleport>
-    </DirectorLayout>
+    </AdminLayout>
 </template>
 
 <style scoped>

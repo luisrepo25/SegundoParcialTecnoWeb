@@ -1,12 +1,12 @@
 <script setup>
-import SecretariaLayout from '@/Layouts/SecretariaLayout.vue';
+import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head } from '@inertiajs/vue3';
 </script>
 
 <template>
     <Head title="Caja y Pagos" />
 
-    <SecretariaLayout>
+    <AdminLayout>
         <template #header>
             <h2 class="text-xl font-semibold leading-tight" style="color: var(--text-color);">
                 Caja y Pagos
@@ -22,5 +22,5 @@ import { Head } from '@inertiajs/vue3';
                 </div>
             </div>
         </div>
-    </SecretariaLayout>
+    </AdminLayout>
 </template>

@@ -7,12 +7,25 @@ import ThemeBar from '@/Components/ThemeBar.vue';
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 
+const dashboardRoute = computed(() => {
+    const role = user.value?.role;
+    if (role === 'director')    return 'dashboard.director';
+    if (role === 'propietario') return 'dashboard.propietario';
+    return 'secretaria.dashboard';
+});
+
+const dashboardUrl = computed(() => {
+    const role = user.value?.role;
+    if (role === 'director')    return '/panel/director';
+    if (role === 'propietario') return '/panel/propietario';
+    return '/secretaria/panel';
+});
+
 const modulos = [
-    { name: 'Dashboard', route: 'secretaria.dashboard', activeUrls: ['/secretaria/panel'] },
-    { name: 'Gestión de Usuarios', route: 'propietario.usuarios.index', activeUrls: ['/propietario/usuarios'] },
-    { name: 'Cronogramas', route: 'secretaria.cronogramas.index', activeUrls: ['/secretaria/cronogramas'] },
-    { name: 'Inscripciones', route: 'secretaria.inscripciones.index', activeUrls: ['/secretaria/inscripciones'] },
-    { name: 'Caja y Pagos', route: 'secretaria.pagos.index', activeUrls: ['/secretaria/pagos'] }
+    { name: 'Gestión de Usuarios', route: 'propietario.usuarios.index',   activeUrls: ['/propietario/usuarios'] },
+    { name: 'Cronogramas',         route: 'secretaria.cronogramas.index', activeUrls: ['/secretaria/cronogramas'] },
+    { name: 'Inscripciones',       route: 'secretaria.inscripciones.index', activeUrls: ['/secretaria/inscripciones'] },
+    { name: 'Caja y Pagos',        route: 'secretaria.pagos.index',       activeUrls: ['/secretaria/pagos'] },
 ];
 
 const isRouteActive = (urls) => urls.some(url => page.url.startsWith(url));
@@ -40,7 +53,7 @@ const showUserMenu = ref(false);
             <!-- Logo / Cabecera -->
             <div class="h-16 flex items-center justify-between px-4 shrink-0 border-b" style="border-color: var(--border-color);">
                 <div class="flex items-center gap-3 w-full">
-                    <Link :href="route('secretaria.dashboard')" class="flex shrink-0 items-center" @click="showMobileMenu = false">
+                    <Link :href="route(dashboardRoute)" class="flex shrink-0 items-center" @click="showMobileMenu = false">
                         <InstituteLogo :size="38" />
                     </Link>
                     <div class="flex items-center gap-2.5 overflow-hidden">
@@ -63,9 +76,21 @@ const showUserMenu = ref(false);
             <!-- Navegación de Módulos (Solo texto, mucho padding) -->
             <nav class="flex-1 overflow-y-auto pt-6 px-4 space-y-1">
                 <p class="px-2 mb-3 text-[11px] font-semibold uppercase tracking-widest opacity-50" style="color: var(--text-secondary);">Principal</p>
-                
-                <Link 
-                    v-for="mod in modulos" 
+
+                <!-- Dashboard dinámico según rol -->
+                <Link
+                    :href="route(dashboardRoute)"
+                    @click="showMobileMenu = false"
+                    class="block px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150"
+                    :style="page.url.startsWith(dashboardUrl)
+                        ? 'background-color: color-mix(in srgb, var(--text-color) 8%, transparent); color: var(--text-color);'
+                        : 'color: var(--text-secondary);'"
+                >
+                    ← Volver al Dashboard
+                </Link>
+
+                <Link
+                    v-for="mod in modulos"
                     :key="mod.name"
                     :href="route(mod.route)"
                     @click="showMobileMenu = false"
@@ -98,7 +123,7 @@ const showUserMenu = ref(false);
                         <div class="rounded-lg border py-1 shadow-sm" 
                              style="background-color: var(--card-bg); border-color: var(--border-color);">
                             <div class="px-4 py-2 border-b" style="border-color: var(--border-color);">
-                                <p class="text-xs" style="color: var(--text-secondary);">{{ user.value?.email }}</p>
+                                <p class="text-xs" style="color: var(--text-secondary);">{{ user?.email }}</p>
                             </div>
                             <Link :href="route('profile.edit')" class="block px-4 py-2 text-sm transition-colors" 
                                 style="color: var(--text-color);"
@@ -124,10 +149,10 @@ const showUserMenu = ref(false);
                     <div class="flex items-center gap-3 flex-1 overflow-hidden">
                         <div class="flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold shrink-0 shadow-sm"
                             style="background-color: var(--primary-color); color: var(--primary-text);">
-                            {{ (user.value?.name ?? 'U')[0].toUpperCase() }}
+                            {{ (user?.name ?? 'U')[0].toUpperCase() }}
                         </div>
                         <div class="flex-1 overflow-hidden">
-                            <span class="block text-sm font-medium truncate" style="color: var(--text-color);">{{ user.value?.name }}</span>
+                            <span class="block text-sm font-medium truncate" style="color: var(--text-color);">{{ user?.name }}</span>
                             <span class="block text-[11px] truncate" style="color: var(--text-secondary);">Opciones de cuenta</span>
                         </div>
                     </div>
