@@ -16,7 +16,7 @@ Route::get('/dashboard', function () {
     return match ($user?->role) {
         'admin' => redirect()->route('dashboard.admin'),
         'director' => redirect()->route('dashboard.director'),
-        'secretary' => redirect()->route('dashboard.secretary'),
+        'secretary' => redirect()->route('secretaria.dashboard'),
         'teacher' => redirect()->route('dashboard.teacher'),
         default => redirect()->route('dashboard.student'),
     };
@@ -40,9 +40,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('Dashboard/Director');
     })->middleware('role:director')->name('dashboard.director');
 
-    Route::get('/panel/secretaria', function () {
-        return Inertia::render('Dashboard/Secretary');
-    })->middleware('role:secretary')->name('dashboard.secretary');
+    // Rutas operativas de Secretaría
+    Route::middleware('role:secretary')->prefix('secretaria')->name('secretaria.')->group(function () {
+        Route::get('/panel', function () {
+            return Inertia::render('Dashboard/Secretary');
+        })->name('dashboard');
+
+        // Módulo de Inscripciones
+        Route::get('/inscripciones', [\App\Http\Controllers\Secretaria\CU2Inscripciones\InscripcionController::class, 'index'])->name('inscripciones.index');
+        
+        // Módulo de Caja y Pagos
+        Route::get('/pagos', [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'index'])->name('pagos.index');
+    });
 
     Route::get('/panel/docente', function () {
         return Inertia::render('Dashboard/Teacher');

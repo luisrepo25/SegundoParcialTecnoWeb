@@ -63,7 +63,7 @@ class AuthenticatedSessionController extends Controller
         return match ($role) {
             'admin' => route('dashboard.admin', absolute: false),
             'director' => route('dashboard.director', absolute: false),
-            'secretary' => route('dashboard.secretary', absolute: false),
+            'secretary' => route('secretaria.dashboard', absolute: false),
             'teacher' => route('dashboard.teacher', absolute: false),
             default => route('dashboard.student', absolute: false),
         };
