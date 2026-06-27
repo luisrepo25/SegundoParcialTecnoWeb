@@ -18,7 +18,7 @@ defineProps({
         <div class="auth-shell">
             <section class="auth-visual">
                 <Link href="/" class="auth-brand">
-                    <span class="auth-brand-mark">ISP</span>
+                    <img src="/images/logo.png" alt="Logo Instituto San Pablo" class="auth-brand-logo" />
                     <span class="auth-brand-copy">
                         <strong>Instituto San Pablo del Oriente</strong>
                         <span>Acceso institucional por roles</span>
