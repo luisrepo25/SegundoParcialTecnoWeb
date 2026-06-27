@@ -1,12 +1,12 @@
 <script setup>
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import PropietarioLayout from '@/Layouts/PropietarioLayout.vue';
 import SecretariaLayout from '@/Layouts/SecretariaLayout.vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
 
 const page = usePage();
 const CurrentLayout = computed(() => {
-    return page.props.auth.user.role === 'secretary' ? SecretariaLayout : AuthenticatedLayout;
+    return page.props.auth.user.role === 'secretaria' ? SecretariaLayout : PropietarioLayout;
 });
 
 const props = defineProps({

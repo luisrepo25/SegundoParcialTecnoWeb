@@ -1,296 +1,4405 @@
--- ============================================================
--- ESQUEMA ACTUALIZADO DESDE LA BASE DE DATOS (Producción)
--- Fecha: 2026-06-27 03:04:28
--- ============================================================
+﻿--
+-- PostgreSQL database dump
+--
 
-CREATE TABLE afiliaciones_estudiante (
-    id_afiliacion             integer              NOT NULL   DEFAULT nextval('afiliaciones_estudiante_id_afiliacion_seq'::regclass),
-    id_estudiante             integer              NOT NULL   ,
-    id_carrera                integer              NULL       ,
-    tipo_programa             character varying(20) NOT NULL   ,
-    fecha_inicio              date                 NOT NULL   ,
-    fecha_fin                 date                 NULL       ,
-    estado                    character varying(15) NULL       DEFAULT 'activo'::character varying,
-    observaciones             text                 NULL       
+-- Dumped from database version 18.3
+-- Dumped by pg_dump version 18.4
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: public; Type: SCHEMA; Schema: -; Owner: postgres
+--
+
+-- *not* creating schema, since initdb creates it
+
+
+--
+-- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: postgres
+--
+
+--
+-- Name: actualizar_estado_inscripcion(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.actualizar_estado_inscripcion() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.aprobado = TRUE THEN
+        NEW.estado := 'aprobado';
+        NEW.fecha_aprobacion := CURRENT_DATE;
+    ELSIF NEW.aprobado = FALSE AND NEW.calificacion_final IS NOT NULL THEN
+        NEW.estado := 'reprobado';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.actualizar_estado_inscripcion() OWNER TO postgres;
+
+--
+-- Name: actualizar_vacantes_oferta(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.actualizar_vacantes_oferta() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        UPDATE grupos
+        SET vacantes_ocupadas = vacantes_ocupadas + 1
+        WHERE id_oferta = NEW.id_oferta;
+    ELSIF TG_OP = 'DELETE' THEN
+        UPDATE grupos
+        SET vacantes_ocupadas = vacantes_ocupadas - 1
+        WHERE id_oferta = OLD.id_oferta;
+    END IF;
+    RETURN NULL;
+END;
+$$;
+
+
+ALTER FUNCTION public.actualizar_vacantes_oferta() OWNER TO postgres;
+
+--
+-- Name: cerrar_calificacion_final(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.cerrar_calificacion_final() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    tiene_p1    INT;
+    tiene_p2    INT;
+    tiene_final INT;
+    tiene_otros INT;
+    suma_ponderada DECIMAL(5,2);
+BEGIN
+    SELECT
+        COUNT(*) FILTER (WHERE tipo = 'parcial1'),
+        COUNT(*) FILTER (WHERE tipo = 'parcial2'),
+        COUNT(*) FILTER (WHERE tipo = 'final'),
+        COUNT(*) FILTER (WHERE tipo = 'otros')
+    INTO tiene_p1, tiene_p2, tiene_final, tiene_otros
+    FROM evaluaciones
+    WHERE id_inscripcion = NEW.id_inscripcion;
+
+    IF tiene_p1 = 1 AND tiene_p2 = 1 AND tiene_final = 1 AND tiene_otros = 1 THEN
+        SELECT ROUND(
+            SUM(CASE WHEN tipo = 'parcial1' THEN calificacion * 0.25 ELSE 0 END) +
+            SUM(CASE WHEN tipo = 'parcial2' THEN calificacion * 0.25 ELSE 0 END) +
+            SUM(CASE WHEN tipo = 'final'    THEN calificacion * 0.40 ELSE 0 END) +
+            SUM(CASE WHEN tipo = 'otros'    THEN calificacion * 0.10 ELSE 0 END),
+        2)
+        INTO suma_ponderada
+        FROM evaluaciones
+        WHERE id_inscripcion = NEW.id_inscripcion;
+
+        UPDATE inscripciones
+        SET calificacion_final = suma_ponderada,
+            aprobado           = (suma_ponderada >= 51.00)
+        WHERE id_inscripcion = NEW.id_inscripcion;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.cerrar_calificacion_final() OWNER TO postgres;
+
+--
+-- Name: crear_cuotas_credito(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.crear_cuotas_credito() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    total_materias    INT;
+    costo_por_materia DECIMAL(10,2);
+    mat_cubiertas     INT;
+    mat_con_cuota     INT;
+    restante          DECIMAL(10,2);
+    monto_cuota       DECIMAL(10,2);
+    i                 INT;
+BEGIN
+    IF NEW.forma_pago = 'credito' THEN
+        SELECT COUNT(mc.id_malla) INTO total_materias
+        FROM malla_curricular mc WHERE mc.id_carrera = NEW.id_carrera;
+
+        IF total_materias IS NULL OR total_materias = 0 THEN
+            total_materias := 1;
+        END IF;
+
+        costo_por_materia := ROUND(NEW.monto_total / total_materias, 2);
+        mat_cubiertas := FLOOR(COALESCE(NEW.monto_pagado, 0) / costo_por_materia);
+        IF mat_cubiertas > total_materias THEN mat_cubiertas := total_materias; END IF;
+
+        mat_con_cuota := total_materias - mat_cubiertas;
+        restante      := NEW.monto_total - COALESCE(NEW.monto_pagado, 0);
+
+        IF mat_con_cuota > 0 AND restante > 0 THEN
+            monto_cuota := ROUND(restante / mat_con_cuota, 2);
+            FOR i IN 1..mat_con_cuota LOOP
+                INSERT INTO cuotas_carrera
+                    (id_pago_carrera, numero_cuota, monto, fecha_vencimiento, estado)
+                VALUES (NEW.id_pago_carrera, i, monto_cuota,
+                        CURRENT_DATE + (INTERVAL '1 month' * (mat_cubiertas + i)), 'pendiente');
+            END LOOP;
+        END IF;
+
+        UPDATE pago_carrera_completa
+        SET cuotas_total = mat_con_cuota, materias_cubiertas = mat_cubiertas
+        WHERE id_pago_carrera = NEW.id_pago_carrera;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.crear_cuotas_credito() OWNER TO postgres;
+
+--
+-- Name: crear_niveles_carrera(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.crear_niveles_carrera() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    i INT;
+BEGIN
+    FOR i IN 1..NEW.duracion_niveles LOOP
+        INSERT INTO niveles_carrera (id_carrera, numero_nivel, nombre)
+        VALUES (NEW.id_carrera, i, 'Año ' || i);
+    END LOOP;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.crear_niveles_carrera() OWNER TO postgres;
+
+--
+-- Name: crear_pago_inscripcion(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.crear_pago_inscripcion() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    carrera_pagada  BOOLEAN;
+    materia_actual  INT;
+    carrera_est     INT;
+    intentos_prev   INT;
+    pago_carrera_id INT;
+    costo_materia   DECIMAL(10,2);
+BEGIN
+    SELECT oa.id_materia INTO materia_actual
+    FROM oferta_academica oa WHERE oa.id_oferta = NEW.id_oferta;
+
+    SELECT costo_mensual INTO costo_materia
+    FROM materias WHERE id_materia = materia_actual;
+
+    SELECT e.id_carrera_actual INTO carrera_est
+    FROM estudiantes e WHERE e.id_estudiante = NEW.id_estudiante;
+
+    IF carrera_est IS NOT NULL THEN
+        SELECT EXISTS(
+            SELECT 1 FROM pago_carrera_completa pcc
+            WHERE pcc.id_estudiante = NEW.id_estudiante
+              AND pcc.id_carrera = carrera_est
+              AND pcc.estado = 'pagado'
+        ) INTO carrera_pagada;
+
+        IF carrera_pagada = TRUE THEN
+            SELECT pcc.id_pago_carrera INTO pago_carrera_id
+            FROM pago_carrera_completa pcc
+            WHERE pcc.id_estudiante = NEW.id_estudiante
+              AND pcc.id_carrera = carrera_est AND pcc.estado = 'pagado'
+            LIMIT 1;
+
+            SELECT COUNT(*) INTO intentos_prev
+            FROM consumo_materias_carrera
+            WHERE id_pago_carrera = pago_carrera_id AND id_materia = materia_actual;
+
+            IF intentos_prev >= 1 THEN
+                INSERT INTO pago_materia_suelta (id_inscripcion, monto_pagado, fecha_pago, estado)
+                VALUES (NEW.id_inscripcion, costo_materia, CURRENT_DATE, 'pendiente');
+                INSERT INTO consumo_materias_carrera
+                    (id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional)
+                VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, intentos_prev + 1, TRUE);
+            ELSE
+                INSERT INTO consumo_materias_carrera
+                    (id_pago_carrera, id_materia, id_inscripcion, intento_numero)
+                VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, 1);
+            END IF;
+            RETURN NEW;
+        END IF;
+    END IF;
+
+    INSERT INTO pago_materia_suelta (id_inscripcion, monto_pagado, fecha_pago, estado)
+    VALUES (NEW.id_inscripcion, costo_materia, CURRENT_DATE, 'pendiente');
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.crear_pago_inscripcion() OWNER TO postgres;
+
+--
+-- Name: fn_confirmar_pago_qr(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.fn_confirmar_pago_qr() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_id_inscripcion INT;
+    v_id_carrera     INT;
+    v_costo_total    DECIMAL(10,2);
+    v_costo_contado  DECIMAL(10,2);
+    v_monto_total_registrar DECIMAL(10,2);
+    v_forma_pago     VARCHAR(10);
+    v_estado_carrera VARCHAR(15);
+BEGIN
+    IF NEW.estado = 'pagado' AND OLD.estado = 'pendiente' THEN
+        NEW.fecha_pago := CURRENT_TIMESTAMP;
+
+        -- CASO 1: Cobro de Matrícula Única
+        IF NEW.concepto = 'matricula' THEN
+            INSERT INTO matricula_unica (id_estudiante, monto_pagado, comprobante, estado)
+            VALUES (NEW.id_estudiante, NEW.monto, NEW.payment_number, 'pagado')
+            ON CONFLICT (id_estudiante) DO NOTHING;
+
+        -- CASO 2: Cobro de Inscripción por Materia Suelta
+        ELSIF NEW.concepto = 'materia' THEN
+            IF NEW.id_inscripcion IS NOT NULL THEN
+                v_id_inscripcion := NEW.id_inscripcion;
+            ELSE
+                SELECT i.id_inscripcion INTO v_id_inscripcion
+                FROM inscripciones i
+                JOIN grupos g ON i.id_oferta = g.id_oferta
+                WHERE i.id_estudiante = NEW.id_estudiante
+                  AND g.codigo_grupo = NEW.codigo_grupo
+                  AND i.estado = 'pendiente_matricula'
+                LIMIT 1;
+            END IF;
+
+            IF v_id_inscripcion IS NOT NULL THEN
+                INSERT INTO pago_materia_suelta (id_inscripcion, monto_pagado, estado)
+                VALUES (v_id_inscripcion, NEW.monto, 'pagado')
+                ON CONFLICT (id_inscripcion) DO UPDATE
+                SET estado = 'pagado', fecha_pago = CURRENT_DATE;
+
+                UPDATE inscripciones SET estado = 'activo' WHERE id_inscripcion = v_id_inscripcion;
+            ELSE
+                RAISE NOTICE 'Advertencia: No se encontró inscripción pendiente para Estudiante % en Grupo %', NEW.id_estudiante, NEW.codigo_grupo;
+            END IF;
+
+        -- CASO 3: Pago de Carrera Completa (contado o parcial)
+        -- codigo_grupo contiene el código de la carrera (ej: 'TEC-PROG')
+        ELSIF NEW.concepto = 'carrera' THEN
+            SELECT id_carrera, costo_carrera_completa
+            INTO v_id_carrera, v_costo_total
+            FROM carreras
+            WHERE codigo = NEW.codigo_grupo;
+
+            IF v_id_carrera IS NOT NULL THEN
+                -- Descuento del 20% por pagar la carrera completa al contado (de una sola vez).
+                -- El minimo de 30% para credito (validado en Java antes de generar el QR) sigue
+                -- calculandose sobre el costo SIN descuento.
+                v_costo_contado := ROUND(v_costo_total * 0.80, 2);
+
+                IF NEW.monto >= v_costo_contado THEN
+                    v_forma_pago         := 'contado';
+                    v_estado_carrera     := 'pagado';
+                    -- Contado con descuento: el total contractual queda en lo realmente pagado (sin deuda).
+                    v_monto_total_registrar := NEW.monto;
+                ELSE
+                    v_forma_pago         := 'credito';
+                    v_estado_carrera     := 'parcial';
+                    -- Credito: el total a financiar sigue siendo el costo SIN descuento.
+                    v_monto_total_registrar := v_costo_total;
+                END IF;
+
+                INSERT INTO pago_carrera_completa
+                    (id_estudiante, id_carrera, monto_total, monto_pagado, forma_pago, estado, fecha_contrato)
+                VALUES
+                    (NEW.id_estudiante, v_id_carrera, v_monto_total_registrar, NEW.monto, v_forma_pago, v_estado_carrera, CURRENT_DATE)
+                ON CONFLICT (id_estudiante, id_carrera) DO NOTHING;
+            ELSE
+                RAISE NOTICE 'Advertencia: No se encontró carrera con código % para pago QR', NEW.codigo_grupo;
+            END IF;
+
+        -- CASO 4: Pago de Cuota de Carrera
+        -- id_inscripcion reutilizado como id_pago_carrera
+        -- codigo_grupo   reutilizado como numero_cuota (string numérico)
+        ELSIF NEW.concepto = 'cuota' THEN
+            UPDATE cuotas_carrera
+            SET    estado     = 'pagado',
+                   fecha_pago = CURRENT_DATE
+            WHERE  id_pago_carrera = NEW.id_inscripcion
+              AND  numero_cuota    = NEW.codigo_grupo::INT
+              AND  estado          = 'pendiente';
+
+            UPDATE pago_carrera_completa
+            SET estado = CASE
+                WHEN (SELECT COUNT(*) FROM cuotas_carrera
+                      WHERE id_pago_carrera = NEW.id_inscripcion
+                        AND estado = 'pendiente') = 0
+                     THEN 'pagado'
+                ELSE 'parcial'
+            END
+            WHERE id_pago_carrera = NEW.id_inscripcion;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.fn_confirmar_pago_qr() OWNER TO postgres;
+
+--
+-- Name: fn_sync_seguimiento(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.fn_sync_seguimiento() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.estado IN ('aprobado', 'reprobado') AND OLD.estado NOT IN ('aprobado', 'reprobado') THEN
+        INSERT INTO seguimiento_estudiante
+            (id_inscripcion, calificacion_final, estado_actual, fecha_aprobacion, created_at, updated_at)
+        VALUES (
+            NEW.id_inscripcion,
+            NEW.calificacion_final,
+            NEW.estado,
+            COALESCE(NEW.fecha_aprobacion, CURRENT_DATE),
+            NOW(), NOW()
+        )
+        ON CONFLICT (id_inscripcion) DO UPDATE
+        SET calificacion_final = EXCLUDED.calificacion_final,
+            estado_actual      = EXCLUDED.estado_actual,
+            fecha_aprobacion   = EXCLUDED.fecha_aprobacion,
+            updated_at         = NOW();
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.fn_sync_seguimiento() OWNER TO postgres;
+
+--
+-- Name: marcar_cuota_al_pagar_materia(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.marcar_cuota_al_pagar_materia() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    pago_carrera_id INT;
+BEGIN
+    IF NEW.estado = 'pagado' AND OLD.estado = 'pendiente' THEN
+        SELECT cmc.id_pago_carrera INTO pago_carrera_id
+        FROM consumo_materias_carrera cmc
+        WHERE cmc.id_inscripcion = NEW.id_inscripcion AND cmc.pagado_adicional = TRUE
+        LIMIT 1;
+
+        IF pago_carrera_id IS NOT NULL THEN
+            UPDATE cuotas_carrera
+            SET estado = 'pagado', fecha_pago = CURRENT_DATE
+            WHERE id_cuota = (
+                SELECT id_cuota FROM cuotas_carrera
+                WHERE id_pago_carrera = pago_carrera_id AND estado = 'pendiente'
+                ORDER BY numero_cuota ASC LIMIT 1
+            );
+
+            UPDATE pago_carrera_completa
+            SET estado = CASE
+                WHEN (SELECT COUNT(*) FROM cuotas_carrera
+                      WHERE id_pago_carrera = pago_carrera_id AND estado = 'pendiente') = 0
+                THEN 'pagado' ELSE 'parcial'
+            END
+            WHERE id_pago_carrera = pago_carrera_id;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.marcar_cuota_al_pagar_materia() OWNER TO postgres;
+
+--
+-- Name: sincronizar_carrera_actual(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.sincronizar_carrera_actual() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.tipo_programa = 'carrera' AND NEW.estado = 'activo' THEN
+        UPDATE estudiantes SET id_carrera_actual = NEW.id_carrera
+        WHERE id_estudiante = NEW.id_estudiante;
+    ELSIF OLD.tipo_programa = 'carrera' AND OLD.estado = 'activo' AND NEW.estado != 'activo' THEN
+        UPDATE estudiantes SET id_carrera_actual = (
+            SELECT id_carrera FROM afiliaciones_estudiante
+            WHERE id_estudiante = NEW.id_estudiante
+            AND tipo_programa = 'carrera' AND estado = 'activo'
+            LIMIT 1
+        ) WHERE id_estudiante = NEW.id_estudiante;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.sincronizar_carrera_actual() OWNER TO postgres;
+
+--
+-- Name: validar_afiliacion_activa(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.validar_afiliacion_activa() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    afiliacion_activa RECORD;
+    materia_ofertada  INT;
+    materia_en_malla  BOOLEAN;
+BEGIN
+    SELECT oa.id_materia INTO materia_ofertada
+    FROM oferta_academica oa WHERE oa.id_oferta = NEW.id_oferta;
+
+    SELECT * INTO afiliacion_activa
+    FROM afiliaciones_estudiante
+    WHERE id_estudiante = NEW.id_estudiante AND estado = 'activo'
+    ORDER BY fecha_inicio DESC LIMIT 1;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'El estudiante no tiene una afiliación activa. Use "usuario registrar_estudiante" primero.';
+    END IF;
+
+    IF afiliacion_activa.tipo_programa = 'carrera' THEN
+        SELECT EXISTS(
+            SELECT 1 FROM malla_curricular mc
+            JOIN ciclos c ON c.id_ciclos = mc.id_ciclo
+            WHERE c.id_carrera = afiliacion_activa.id_carrera
+              AND mc.id_materia = materia_ofertada
+        ) INTO materia_en_malla;
+
+        IF materia_en_malla = FALSE THEN
+            RAISE EXCEPTION 'Esta materia no pertenece a la malla de la carrera del estudiante.';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.validar_afiliacion_activa() OWNER TO postgres;
+
+--
+-- Name: validar_conflicto_profesor(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.validar_conflicto_profesor() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM grupos
+        WHERE id_profesor = NEW.id_profesor
+        AND id_periodo = NEW.id_periodo
+        AND id_horario = NEW.id_horario
+        AND id_oferta != COALESCE(NEW.id_oferta, -1)
+        AND activo = TRUE
+    ) THEN
+        RAISE EXCEPTION 'Error: Profesor ya tiene grupo en este horario y periodo';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.validar_conflicto_profesor() OWNER TO postgres;
+
+--
+-- Name: validar_inscripcion_segun_afiliacion(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.validar_inscripcion_segun_afiliacion() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    afiliacion_activa RECORD;
+    materia_ofertada INT;
+    materia_en_malla BOOLEAN;
+BEGIN
+    SELECT oa.id_materia INTO materia_ofertada
+    FROM grupos oa WHERE oa.id_oferta = NEW.id_oferta;
+    
+    SELECT * INTO afiliacion_activa
+    FROM afiliaciones_estudiante ae
+    WHERE ae.id_estudiante = NEW.id_estudiante
+    AND ae.estado = 'activo'
+    ORDER BY ae.fecha_inicio DESC LIMIT 1;
+    
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'No tiene una afiliación activa. Debe inscribirse a un programa.';
+    END IF;
+    
+    IF afiliacion_activa.tipo_programa = 'carrera' THEN
+        SELECT EXISTS(
+            SELECT 1 FROM malla_curricular mc
+            WHERE mc.id_carrera = afiliacion_activa.id_carrera
+            AND mc.id_materia = materia_ofertada
+        ) INTO materia_en_malla;
+        
+        IF materia_en_malla = FALSE THEN
+            RAISE EXCEPTION 'Esta materia no pertenece a su carrera.';
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.validar_inscripcion_segun_afiliacion() OWNER TO postgres;
+
+--
+-- Name: validar_materia_requisito(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.validar_materia_requisito() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.id_materia_requisito IS NOT NULL AND NEW.id_materia_requisito = NEW.id_materia THEN
+        RAISE EXCEPTION 'Una materia no puede ser requisito de sí misma';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.validar_materia_requisito() OWNER TO postgres;
+
+--
+-- Name: validar_matricula_unica_pagada(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.validar_matricula_unica_pagada() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    matricula_pagada BOOLEAN;
+BEGIN
+    SELECT EXISTS(
+        SELECT 1 FROM matricula_unica mu
+        WHERE mu.id_estudiante = NEW.id_estudiante
+        AND mu.estado = 'pagado'
+    ) INTO matricula_pagada;
+    
+    IF matricula_pagada = FALSE THEN
+        RAISE EXCEPTION 'El estudiante debe pagar la matrícula única del instituto antes de inscribirse a cualquier materia.';
+    END IF;
+    
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.validar_matricula_unica_pagada() OWNER TO postgres;
+
+--
+-- Name: validar_nivel_solo_carreras(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.validar_nivel_solo_carreras() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    tipo_carrera VARCHAR(20);
+BEGIN
+    SELECT tipo INTO tipo_carrera FROM carreras WHERE id_carrera = NEW.id_carrera;
+    IF tipo_carrera = 'curso_libre' THEN
+        RAISE EXCEPTION 'Los cursos libres no tienen niveles.';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.validar_nivel_solo_carreras() OWNER TO postgres;
+
+--
+-- Name: validar_pago_inscripcion(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.validar_pago_inscripcion() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    materia_actual      INT;
+    carrera_estudiante  INT;
+    intentos_previos    INT;
+    pago_carrera_id     INT;
+    costo_materia       DECIMAL(10,2);
+    costo_total_carrera DECIMAL(10,2);
+    total_materias      INT;
+    forma_pago_actual   VARCHAR(10);
+    consumos_actuales   INT;
+    mat_cubiertas       INT;
+BEGIN
+    SELECT oa.id_materia INTO materia_actual
+    FROM grupos oa WHERE oa.id_oferta = NEW.id_oferta;
+
+    SELECT e.id_carrera_actual INTO carrera_estudiante
+    FROM estudiantes e WHERE e.id_estudiante = NEW.id_estudiante;
+
+    IF carrera_estudiante IS NOT NULL THEN
+        SELECT pcc.id_pago_carrera, pcc.forma_pago
+        INTO pago_carrera_id, forma_pago_actual
+        FROM pago_carrera_completa pcc
+        WHERE pcc.id_estudiante = NEW.id_estudiante
+          AND pcc.id_carrera = carrera_estudiante
+        LIMIT 1;
+
+        IF pago_carrera_id IS NOT NULL THEN
+
+            IF forma_pago_actual = 'credito' THEN
+                SELECT COUNT(*) INTO consumos_actuales
+                FROM consumo_materias_carrera WHERE id_pago_carrera = pago_carrera_id;
+
+                SELECT materias_cubiertas INTO mat_cubiertas
+                FROM pago_carrera_completa WHERE id_pago_carrera = pago_carrera_id;
+
+                IF consumos_actuales < mat_cubiertas THEN
+                    -- GRATIS
+                    INSERT INTO consumo_materias_carrera
+                        (id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional)
+                    VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, 1, FALSE);
+                ELSE
+                    SELECT monto INTO costo_materia
+                    FROM cuotas_carrera
+                    WHERE id_pago_carrera = pago_carrera_id AND estado = 'pendiente'
+                    ORDER BY numero_cuota ASC LIMIT 1;
+
+                    IF costo_materia IS NOT NULL THEN
+                        INSERT INTO pago_materia_suelta
+                            (id_inscripcion, monto_pagado, fecha_pago, estado)
+                        VALUES (NEW.id_inscripcion, costo_materia, CURRENT_DATE, 'pendiente');
+                        INSERT INTO consumo_materias_carrera
+                            (id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional)
+                        VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, 1, TRUE);
+                    ELSE
+                        -- Sin cuotas pendientes: ya saldado, gratis
+                        INSERT INTO consumo_materias_carrera
+                            (id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional)
+                        VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, 1, FALSE);
+                    END IF;
+                END IF;
+
+            ELSE -- CONTADO
+                SELECT COUNT(*) INTO intentos_previos
+                FROM consumo_materias_carrera
+                WHERE id_pago_carrera = pago_carrera_id AND id_materia = materia_actual;
+
+                IF intentos_previos = 0 THEN
+                    INSERT INTO consumo_materias_carrera
+                        (id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional)
+                    VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, 1, FALSE);
+                ELSE
+                    SELECT c.costo_carrera_completa, COUNT(mc.id_malla)
+                    INTO costo_total_carrera, total_materias
+                    FROM carreras c LEFT JOIN malla_curricular mc ON mc.id_carrera = c.id_carrera
+                    WHERE c.id_carrera = carrera_estudiante GROUP BY c.costo_carrera_completa;
+
+                    IF costo_total_carrera IS NOT NULL AND total_materias > 0 THEN
+                        costo_materia := ROUND(costo_total_carrera / total_materias, 2);
+                    ELSE
+                        SELECT costo_mensual INTO costo_materia FROM materias WHERE id_materia = materia_actual;
+                    END IF;
+
+                    INSERT INTO pago_materia_suelta
+                        (id_inscripcion, monto_pagado, fecha_pago, estado)
+                    VALUES (NEW.id_inscripcion, costo_materia, CURRENT_DATE, 'pendiente');
+                    INSERT INTO consumo_materias_carrera
+                        (id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional)
+                    VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, intentos_previos + 1, TRUE);
+                END IF;
+            END IF;
+
+        ELSE -- Sin pago de carrera
+            SELECT c.costo_carrera_completa, COUNT(mc.id_malla)
+            INTO costo_total_carrera, total_materias
+            FROM carreras c LEFT JOIN malla_curricular mc ON mc.id_carrera = c.id_carrera
+            WHERE c.id_carrera = carrera_estudiante GROUP BY c.costo_carrera_completa;
+
+            IF costo_total_carrera IS NOT NULL AND total_materias > 0 THEN
+                costo_materia := ROUND(costo_total_carrera / total_materias, 2);
+            ELSE
+                SELECT costo_mensual INTO costo_materia FROM materias WHERE id_materia = materia_actual;
+            END IF;
+
+            INSERT INTO pago_materia_suelta
+                (id_inscripcion, monto_pagado, fecha_pago, estado)
+            VALUES (NEW.id_inscripcion, costo_materia, CURRENT_DATE, 'pendiente');
+        END IF;
+
+    ELSE
+        SELECT costo_mensual INTO costo_materia FROM materias WHERE id_materia = materia_actual;
+        INSERT INTO pago_materia_suelta
+            (id_inscripcion, monto_pagado, fecha_pago, estado)
+        VALUES (NEW.id_inscripcion, costo_materia, CURRENT_DATE, 'pendiente');
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.validar_pago_inscripcion() OWNER TO postgres;
+
+--
+-- Name: validar_requisito_aprobado(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.validar_requisito_aprobado() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    materia_requisito INT;
+    requisito_aprobado BOOLEAN;
+    nombre_requisito VARCHAR(150);
+    nombre_materia VARCHAR(150);
+BEGIN
+    SELECT m.id_materia_requisito, m2.nombre, m.nombre
+    INTO materia_requisito, nombre_requisito, nombre_materia
+    FROM grupos oa
+    JOIN materias m ON m.id_materia = oa.id_materia
+    LEFT JOIN materias m2 ON m2.id_materia = m.id_materia_requisito
+    WHERE oa.id_oferta = NEW.id_oferta;
+
+    IF materia_requisito IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    SELECT aprobado INTO requisito_aprobado
+    FROM inscripciones i
+    JOIN grupos oa ON oa.id_oferta = i.id_oferta
+    WHERE i.id_estudiante = NEW.id_estudiante
+    AND oa.id_materia = materia_requisito
+    AND i.aprobado = TRUE
+    ORDER BY i.id_inscripcion DESC
+    LIMIT 1;
+    
+    IF requisito_aprobado IS DISTINCT FROM TRUE THEN
+        RAISE EXCEPTION 'No puede inscribirse a "%". Debe aprobar primero "%"',
+                        nombre_materia, COALESCE(nombre_requisito, 'materia requisito');
+    END IF;
+    
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.validar_requisito_aprobado() OWNER TO postgres;
+
+--
+-- Name: validar_unica_materia_activa(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.validar_unica_materia_activa() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    materias_activas INT;
+BEGIN
+    SELECT COUNT(*) INTO materias_activas
+    FROM inscripciones i
+    WHERE i.id_estudiante = NEW.id_estudiante
+    AND i.estado IN ('pendiente_matricula', 'activo')
+    AND i.id_inscripcion != COALESCE(NEW.id_inscripcion, -1);
+    
+    IF materias_activas >= 1 THEN
+        RAISE EXCEPTION 'El estudiante solo puede cursar UNA materia a la vez. Actualmente tiene % materia(s) activa(s)', 
+                        materias_activas;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public.validar_unica_materia_activa() OWNER TO postgres;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: afiliaciones_estudiante; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.afiliaciones_estudiante (
+    id_afiliacion integer NOT NULL,
+    id_estudiante integer NOT NULL,
+    id_carrera integer,
+    tipo_programa character varying(20) NOT NULL,
+    fecha_inicio date NOT NULL,
+    fecha_fin date,
+    estado character varying(15) DEFAULT 'activo'::character varying,
+    observaciones text,
+    CONSTRAINT afiliaciones_estudiante_estado_check CHECK (((estado)::text = ANY ((ARRAY['activo'::character varying, 'completado'::character varying, 'abandonado'::character varying, 'suspendido'::character varying])::text[]))),
+    CONSTRAINT afiliaciones_estudiante_tipo_programa_check CHECK (((tipo_programa)::text = ANY ((ARRAY['carrera'::character varying, 'curso_libre'::character varying, 'ofertas_sueltas'::character varying])::text[]))),
+    CONSTRAINT check_carrera_requerida CHECK (((((tipo_programa)::text = 'carrera'::text) AND (id_carrera IS NOT NULL)) OR (((tipo_programa)::text <> 'carrera'::text) AND (id_carrera IS NULL))))
 );
 
-CREATE TABLE aulas (
-    id_aula                   integer              NOT NULL   DEFAULT nextval('aulas_id_aula_seq'::regclass),
-    nombre                    character varying(50) NOT NULL   ,
-    capacidad                 integer              NOT NULL   ,
-    ubicacion                 character varying(100) NULL       ,
-    tipo                      character varying(20) NULL       DEFAULT 'aula'::character varying,
-    activo                    boolean              NULL       DEFAULT true
+
+ALTER TABLE public.afiliaciones_estudiante OWNER TO postgres;
+
+--
+-- Name: afiliaciones_estudiante_id_afiliacion_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.afiliaciones_estudiante_id_afiliacion_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.afiliaciones_estudiante_id_afiliacion_seq OWNER TO postgres;
+
+--
+-- Name: afiliaciones_estudiante_id_afiliacion_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.afiliaciones_estudiante_id_afiliacion_seq OWNED BY public.afiliaciones_estudiante.id_afiliacion;
+
+
+--
+-- Name: aulas; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.aulas (
+    id_aula integer NOT NULL,
+    nombre character varying(50) NOT NULL,
+    capacidad integer NOT NULL,
+    ubicacion character varying(100),
+    tipo character varying(20) DEFAULT 'aula'::character varying,
+    activo boolean DEFAULT true,
+    CONSTRAINT aulas_tipo_check CHECK (((tipo)::text = ANY ((ARRAY['aula'::character varying, 'laboratorio'::character varying, 'sala'::character varying, 'auditorio'::character varying])::text[])))
 );
 
-CREATE TABLE cache (
-    key                       character varying(255) NOT NULL   ,
-    value                     text                 NOT NULL   ,
-    expiration                integer              NOT NULL   
+
+ALTER TABLE public.aulas OWNER TO postgres;
+
+--
+-- Name: aulas_id_aula_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.aulas_id_aula_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.aulas_id_aula_seq OWNER TO postgres;
+
+--
+-- Name: aulas_id_aula_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.aulas_id_aula_seq OWNED BY public.aulas.id_aula;
+
+
+--
+-- Name: cache; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.cache (
+    key character varying(255) NOT NULL,
+    value text NOT NULL,
+    expiration integer NOT NULL
 );
 
-CREATE TABLE cache_locks (
-    key                       character varying(255) NOT NULL   ,
-    owner                     character varying(255) NOT NULL   ,
-    expiration                integer              NOT NULL   
+
+ALTER TABLE public.cache OWNER TO postgres;
+
+--
+-- Name: cache_locks; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.cache_locks (
+    key character varying(255) NOT NULL,
+    owner character varying(255) NOT NULL,
+    expiration integer NOT NULL
 );
 
-CREATE TABLE carreras (
-    id_carrera                integer              NOT NULL   DEFAULT nextval('carreras_id_carrera_seq'::regclass),
-    codigo                    character varying(20) NOT NULL   ,
-    nombre                    character varying(150) NOT NULL   ,
-    descripcion               text                 NULL       ,
-    tipo                      character varying(20) NULL       DEFAULT 'tecnico_superior'::character varying,
-    duracion_niveles          integer              NOT NULL   ,
-    costo_carrera_completa    numeric              NULL       ,
-    activo                    boolean              NULL       DEFAULT true
+
+ALTER TABLE public.cache_locks OWNER TO postgres;
+
+--
+-- Name: carreras; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.carreras (
+    id_carrera integer NOT NULL,
+    codigo character varying(20) NOT NULL,
+    nombre character varying(150) NOT NULL,
+    descripcion text,
+    tipo character varying(20) DEFAULT 'tecnico_superior'::character varying,
+    duracion_niveles integer NOT NULL,
+    costo_carrera_completa numeric(10,2),
+    activo boolean DEFAULT true,
+    CONSTRAINT carreras_tipo_check CHECK (((tipo)::text = ANY ((ARRAY['tecnico'::character varying, 'tecnico_superior'::character varying, 'curso_libre'::character varying])::text[])))
 );
 
-CREATE TABLE consumo_materias_carrera (
-    id_consumo                integer              NOT NULL   DEFAULT nextval('consumo_materias_carrera_id_consumo_seq'::regclass),
-    id_pago_carrera           integer              NOT NULL   ,
-    id_materia                integer              NOT NULL   ,
-    id_inscripcion            integer              NOT NULL   ,
-    intento_numero            integer              NULL       DEFAULT 1,
-    pagado_adicional          boolean              NULL       DEFAULT false,
-    fecha_consumo             date                 NULL       DEFAULT CURRENT_DATE
+
+ALTER TABLE public.carreras OWNER TO postgres;
+
+--
+-- Name: carreras_id_carrera_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.carreras_id_carrera_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.carreras_id_carrera_seq OWNER TO postgres;
+
+--
+-- Name: carreras_id_carrera_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.carreras_id_carrera_seq OWNED BY public.carreras.id_carrera;
+
+
+--
+-- Name: consumo_materias_carrera; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.consumo_materias_carrera (
+    id_consumo integer NOT NULL,
+    id_pago_carrera integer NOT NULL,
+    id_materia integer NOT NULL,
+    id_inscripcion integer NOT NULL,
+    intento_numero integer DEFAULT 1,
+    pagado_adicional boolean DEFAULT false,
+    fecha_consumo date DEFAULT CURRENT_DATE
 );
 
-CREATE TABLE cronogramas (
-    id_cronograma             integer              NOT NULL   DEFAULT nextval('cronogramas_id_cronograma_seq'::regclass),
-    id_periodo                integer              NULL       ,
-    nombre                    character varying(50) NOT NULL   ,
-    tipo_periodo              character varying(20) NOT NULL   ,
-    fecha_inicio              date                 NOT NULL   ,
-    fecha_fin                 date                 NOT NULL   ,
-    activo                    boolean              NULL       DEFAULT true,
-    id_carrera                integer              NULL       
+
+ALTER TABLE public.consumo_materias_carrera OWNER TO postgres;
+
+--
+-- Name: consumo_materias_carrera_id_consumo_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.consumo_materias_carrera_id_consumo_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.consumo_materias_carrera_id_consumo_seq OWNER TO postgres;
+
+--
+-- Name: consumo_materias_carrera_id_consumo_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.consumo_materias_carrera_id_consumo_seq OWNED BY public.consumo_materias_carrera.id_consumo;
+
+
+--
+-- Name: cronogramas; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.cronogramas (
+    id_cronograma integer NOT NULL,
+    id_periodo integer,
+    nombre character varying(50) NOT NULL,
+    tipo_periodo character varying(20) NOT NULL,
+    fecha_inicio date NOT NULL,
+    fecha_fin date NOT NULL,
+    activo boolean DEFAULT true,
+    id_carrera integer,
+    CONSTRAINT cronogramas_tipo_periodo_check CHECK (((tipo_periodo)::text = ANY ((ARRAY['inscripcion'::character varying, 'clases'::character varying, 'examenes'::character varying, 'receso'::character varying])::text[])))
 );
 
-CREATE TABLE cuotas_carrera (
-    id_cuota                  integer              NOT NULL   DEFAULT nextval('cuotas_carrera_id_cuota_seq'::regclass),
-    id_pago_carrera           integer              NOT NULL   ,
-    numero_cuota              integer              NOT NULL   ,
-    monto                     numeric              NOT NULL   ,
-    fecha_vencimiento         date                 NOT NULL   ,
-    fecha_pago                date                 NULL       ,
-    estado                    character varying(10) NULL       DEFAULT 'pendiente'::character varying
+
+ALTER TABLE public.cronogramas OWNER TO postgres;
+
+--
+-- Name: cronogramas_id_cronograma_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.cronogramas_id_cronograma_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.cronogramas_id_cronograma_seq OWNER TO postgres;
+
+--
+-- Name: cronogramas_id_cronograma_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.cronogramas_id_cronograma_seq OWNED BY public.cronogramas.id_cronograma;
+
+
+--
+-- Name: cuotas_carrera; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.cuotas_carrera (
+    id_cuota integer NOT NULL,
+    id_pago_carrera integer NOT NULL,
+    numero_cuota integer NOT NULL,
+    monto numeric(10,2) NOT NULL,
+    fecha_vencimiento date NOT NULL,
+    fecha_pago date,
+    estado character varying(10) DEFAULT 'pendiente'::character varying,
+    CONSTRAINT cuotas_carrera_estado_check CHECK (((estado)::text = ANY ((ARRAY['pendiente'::character varying, 'pagado'::character varying, 'vencido'::character varying])::text[])))
 );
 
-CREATE TABLE estudiantes (
-    id_estudiante             integer              NOT NULL   DEFAULT nextval('estudiantes_id_estudiante_seq'::regclass),
-    id_usuario                integer              NOT NULL   ,
-    legajo                    character varying(20) NOT NULL   ,
-    fecha_inscripcion_inicial date                 NOT NULL   ,
-    tutor_nombre              character varying(100) NULL       ,
-    tutor_telefono            character varying(20) NULL       ,
-    observaciones             text                 NULL       ,
-    id_carrera_actual         integer              NULL       
+
+ALTER TABLE public.cuotas_carrera OWNER TO postgres;
+
+--
+-- Name: cuotas_carrera_id_cuota_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.cuotas_carrera_id_cuota_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.cuotas_carrera_id_cuota_seq OWNER TO postgres;
+
+--
+-- Name: cuotas_carrera_id_cuota_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.cuotas_carrera_id_cuota_seq OWNED BY public.cuotas_carrera.id_cuota;
+
+
+--
+-- Name: estudiantes; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.estudiantes (
+    id_estudiante integer NOT NULL,
+    id_usuario integer NOT NULL,
+    legajo character varying(20) NOT NULL,
+    fecha_inscripcion_inicial date NOT NULL,
+    tutor_nombre character varying(100),
+    tutor_telefono character varying(20),
+    observaciones text,
+    id_carrera_actual integer
 );
 
-CREATE TABLE evaluaciones (
-    id_evaluacion             integer              NOT NULL   DEFAULT nextval('evaluaciones_id_evaluacion_seq'::regclass),
-    id_inscripcion            integer              NOT NULL   ,
-    id_profesor               integer              NOT NULL   ,
-    tipo                      character varying(15) NOT NULL   ,
-    descripcion               character varying(150) NULL       ,
-    calificacion              numeric              NOT NULL   ,
-    porcentaje                numeric              NOT NULL   ,
-    fecha                     date                 NOT NULL   
+
+ALTER TABLE public.estudiantes OWNER TO postgres;
+
+--
+-- Name: estudiantes_id_estudiante_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.estudiantes_id_estudiante_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.estudiantes_id_estudiante_seq OWNER TO postgres;
+
+--
+-- Name: estudiantes_id_estudiante_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.estudiantes_id_estudiante_seq OWNED BY public.estudiantes.id_estudiante;
+
+
+--
+-- Name: evaluaciones; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.evaluaciones (
+    id_evaluacion integer NOT NULL,
+    id_inscripcion integer NOT NULL,
+    id_profesor integer NOT NULL,
+    tipo character varying(15) NOT NULL,
+    descripcion character varying(150),
+    calificacion numeric(5,2) NOT NULL,
+    porcentaje numeric(5,2) NOT NULL,
+    fecha date NOT NULL,
+    CONSTRAINT evaluaciones_tipo_check CHECK (((tipo)::text = ANY ((ARRAY['parcial1'::character varying, 'parcial2'::character varying, 'final'::character varying, 'otros'::character varying])::text[])))
 );
 
-CREATE TABLE grupos (
-    id_oferta                 integer              NOT NULL   DEFAULT nextval('oferta_academica_id_oferta_seq'::regclass),
-    id_materia                integer              NOT NULL   ,
-    id_aula                   integer              NOT NULL   ,
-    id_periodo                integer              NOT NULL   ,
-    id_profesor               integer              NOT NULL   ,
-    id_horario                integer              NOT NULL   ,
-    vacantes_max              integer              NOT NULL   ,
-    vacantes_ocupadas         integer              NULL       ,
-    activo                    boolean              NULL       DEFAULT true,
-    codigo_grupo              character varying(20) NULL       
+
+ALTER TABLE public.evaluaciones OWNER TO postgres;
+
+--
+-- Name: evaluaciones_id_evaluacion_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.evaluaciones_id_evaluacion_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.evaluaciones_id_evaluacion_seq OWNER TO postgres;
+
+--
+-- Name: evaluaciones_id_evaluacion_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.evaluaciones_id_evaluacion_seq OWNED BY public.evaluaciones.id_evaluacion;
+
+
+--
+-- Name: grupos; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.grupos (
+    id_oferta integer CONSTRAINT oferta_academica_id_oferta_not_null NOT NULL,
+    id_materia integer CONSTRAINT oferta_academica_id_materia_not_null NOT NULL,
+    id_aula integer CONSTRAINT oferta_academica_id_aula_not_null NOT NULL,
+    id_periodo integer CONSTRAINT oferta_academica_id_periodo_not_null NOT NULL,
+    id_profesor integer CONSTRAINT oferta_academica_id_profesor_not_null NOT NULL,
+    id_horario integer CONSTRAINT oferta_academica_id_horario_not_null NOT NULL,
+    vacantes_max integer CONSTRAINT oferta_academica_vacantes_max_not_null NOT NULL,
+    vacantes_ocupadas integer DEFAULT 0,
+    activo boolean DEFAULT true,
+    codigo_grupo character varying(20)
 );
 
-CREATE TABLE horarios (
-    id_horario                integer              NOT NULL   DEFAULT nextval('horarios_id_horario_seq'::regclass),
-    dia_semana                character varying(15) NOT NULL   ,
-    hora_inicio               time without time zone NOT NULL   ,
-    hora_fin                  time without time zone NOT NULL   ,
-    activo                    boolean              NULL       DEFAULT true
+
+ALTER TABLE public.grupos OWNER TO postgres;
+
+--
+-- Name: horarios; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.horarios (
+    id_horario integer NOT NULL,
+    dia_semana character varying(15) NOT NULL,
+    hora_inicio time without time zone NOT NULL,
+    hora_fin time without time zone NOT NULL,
+    activo boolean DEFAULT true,
+    CONSTRAINT horarios_dia_semana_check CHECK (((dia_semana)::text = ANY ((ARRAY['lunes'::character varying, 'martes'::character varying, 'miercoles'::character varying, 'jueves'::character varying, 'viernes'::character varying, 'sabado'::character varying, 'domingo'::character varying])::text[])))
 );
 
-CREATE TABLE inscripciones (
-    id_inscripcion            integer              NOT NULL   DEFAULT nextval('inscripciones_id_inscripcion_seq'::regclass),
-    id_estudiante             integer              NOT NULL   ,
-    id_oferta                 integer              NOT NULL   ,
-    fecha_inscripcion         timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP,
-    estado                    character varying(30) NULL       DEFAULT 'pendiente_matricula'::character varying,
-    calificacion_final        numeric              NULL       ,
-    aprobado                  boolean              NULL       ,
-    observaciones             text                 NULL       ,
-    fecha_aprobacion          date                 NULL       
+
+ALTER TABLE public.horarios OWNER TO postgres;
+
+--
+-- Name: horarios_id_horario_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.horarios_id_horario_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.horarios_id_horario_seq OWNER TO postgres;
+
+--
+-- Name: horarios_id_horario_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.horarios_id_horario_seq OWNED BY public.horarios.id_horario;
+
+
+--
+-- Name: inscripciones; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.inscripciones (
+    id_inscripcion integer NOT NULL,
+    id_estudiante integer NOT NULL,
+    id_oferta integer NOT NULL,
+    fecha_inscripcion timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    estado character varying(30) DEFAULT 'pendiente_matricula'::character varying,
+    calificacion_final numeric(5,2),
+    aprobado boolean,
+    observaciones text,
+    fecha_aprobacion date,
+    CONSTRAINT inscripciones_estado_check CHECK (((estado)::text = ANY ((ARRAY['pendiente_matricula'::character varying, 'activo'::character varying, 'aprobado'::character varying, 'reprobado'::character varying, 'retirado'::character varying])::text[])))
 );
 
-CREATE TABLE malla_curricular (
-    id_malla                  integer              NOT NULL   DEFAULT nextval('malla_curricular_id_malla_seq'::regclass),
-    id_carrera                integer              NOT NULL   ,
-    id_nivel                  integer              NOT NULL   ,
-    id_materia                integer              NOT NULL   ,
-    orden_en_nivel            integer              NULL       ,
-    obligatoria               boolean              NULL       DEFAULT true
+
+ALTER TABLE public.inscripciones OWNER TO postgres;
+
+--
+-- Name: inscripciones_id_inscripcion_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.inscripciones_id_inscripcion_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.inscripciones_id_inscripcion_seq OWNER TO postgres;
+
+--
+-- Name: inscripciones_id_inscripcion_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.inscripciones_id_inscripcion_seq OWNED BY public.inscripciones.id_inscripcion;
+
+
+--
+-- Name: malla_curricular; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.malla_curricular (
+    id_malla integer NOT NULL,
+    id_carrera integer NOT NULL,
+    id_nivel integer NOT NULL,
+    id_materia integer NOT NULL,
+    orden_en_nivel integer DEFAULT 0,
+    obligatoria boolean DEFAULT true
 );
 
-CREATE TABLE materias (
-    id_materia                integer              NOT NULL   DEFAULT nextval('materias_id_materia_seq'::regclass),
-    codigo                    character varying(20) NOT NULL   ,
-    nombre                    character varying(150) NOT NULL   ,
-    duracion_meses            integer              NULL       DEFAULT 1,
-    costo_mensual             numeric              NOT NULL   ,
-    creditos                  integer              NULL       ,
-    activo                    boolean              NULL       DEFAULT true,
-    id_materia_requisito      integer              NULL       
+
+ALTER TABLE public.malla_curricular OWNER TO postgres;
+
+--
+-- Name: malla_curricular_id_malla_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.malla_curricular_id_malla_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.malla_curricular_id_malla_seq OWNER TO postgres;
+
+--
+-- Name: malla_curricular_id_malla_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.malla_curricular_id_malla_seq OWNED BY public.malla_curricular.id_malla;
+
+
+--
+-- Name: materias; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.materias (
+    id_materia integer NOT NULL,
+    codigo character varying(20) NOT NULL,
+    nombre character varying(150) NOT NULL,
+    duracion_meses integer DEFAULT 1,
+    costo_mensual numeric(10,2) NOT NULL,
+    creditos integer DEFAULT 0,
+    activo boolean DEFAULT true,
+    id_materia_requisito integer
 );
 
-CREATE TABLE matricula_unica (
-    id_matricula              integer              NOT NULL   DEFAULT nextval('matricula_unica_id_matricula_seq'::regclass),
-    id_estudiante             integer              NOT NULL   ,
-    fecha_pago                date                 NOT NULL   DEFAULT CURRENT_DATE,
-    monto_pagado              numeric              NOT NULL   ,
-    comprobante               character varying(255) NULL       ,
-    estado                    character varying(10) NULL       DEFAULT 'pagado'::character varying
+
+ALTER TABLE public.materias OWNER TO postgres;
+
+--
+-- Name: materias_id_materia_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.materias_id_materia_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.materias_id_materia_seq OWNER TO postgres;
+
+--
+-- Name: materias_id_materia_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.materias_id_materia_seq OWNED BY public.materias.id_materia;
+
+
+--
+-- Name: matricula_unica; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.matricula_unica (
+    id_matricula integer NOT NULL,
+    id_estudiante integer NOT NULL,
+    fecha_pago date DEFAULT CURRENT_DATE NOT NULL,
+    monto_pagado numeric(10,2) NOT NULL,
+    comprobante character varying(255),
+    estado character varying(10) DEFAULT 'pagado'::character varying,
+    CONSTRAINT matricula_unica_estado_check CHECK (((estado)::text = ANY ((ARRAY['pagado'::character varying, 'reembolsado'::character varying, 'exonerado'::character varying])::text[])))
 );
 
-CREATE TABLE migrations (
-    id                        integer              NOT NULL   DEFAULT nextval('migrations_id_seq'::regclass),
-    migration                 character varying(255) NOT NULL   ,
-    batch                     integer              NOT NULL   
+
+ALTER TABLE public.matricula_unica OWNER TO postgres;
+
+--
+-- Name: matricula_unica_id_matricula_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.matricula_unica_id_matricula_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.matricula_unica_id_matricula_seq OWNER TO postgres;
+
+--
+-- Name: matricula_unica_id_matricula_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.matricula_unica_id_matricula_seq OWNED BY public.matricula_unica.id_matricula;
+
+
+--
+-- Name: migrations; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.migrations (
+    id integer NOT NULL,
+    migration character varying(255) NOT NULL,
+    batch integer NOT NULL
 );
 
-CREATE TABLE niveles_carrera (
-    id_nivel                  integer              NOT NULL   DEFAULT nextval('niveles_carrera_id_nivel_seq'::regclass),
-    id_carrera                integer              NOT NULL   ,
-    numero_nivel              integer              NOT NULL   ,
-    nombre                    character varying(50) NULL       ,
-    descripcion               text                 NULL       
+
+ALTER TABLE public.migrations OWNER TO postgres;
+
+--
+-- Name: migrations_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.migrations_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.migrations_id_seq OWNER TO postgres;
+
+--
+-- Name: migrations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.migrations_id_seq OWNED BY public.migrations.id;
+
+
+--
+-- Name: niveles_carrera; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.niveles_carrera (
+    id_nivel integer NOT NULL,
+    id_carrera integer NOT NULL,
+    numero_nivel integer NOT NULL,
+    nombre character varying(50),
+    descripcion text
 );
 
-CREATE TABLE pago_carrera_completa (
-    id_pago_carrera           integer              NOT NULL   DEFAULT nextval('pago_carrera_completa_id_pago_carrera_seq'::regclass),
-    id_estudiante             integer              NOT NULL   ,
-    id_carrera                integer              NOT NULL   ,
-    monto_total               numeric              NOT NULL   ,
-    forma_pago                character varying(10) NULL       ,
-    cuotas_total              integer              NULL       DEFAULT 1,
-    estado                    character varying(15) NULL       DEFAULT 'pendiente'::character varying,
-    fecha_contrato            date                 NOT NULL   ,
-    materias_cubiertas        integer              NULL       ,
-    monto_pagado              numeric              NULL       
+
+ALTER TABLE public.niveles_carrera OWNER TO postgres;
+
+--
+-- Name: niveles_carrera_id_nivel_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.niveles_carrera_id_nivel_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.niveles_carrera_id_nivel_seq OWNER TO postgres;
+
+--
+-- Name: niveles_carrera_id_nivel_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.niveles_carrera_id_nivel_seq OWNED BY public.niveles_carrera.id_nivel;
+
+
+--
+-- Name: oferta_academica_id_oferta_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.oferta_academica_id_oferta_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.oferta_academica_id_oferta_seq OWNER TO postgres;
+
+--
+-- Name: oferta_academica_id_oferta_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.oferta_academica_id_oferta_seq OWNED BY public.grupos.id_oferta;
+
+
+--
+-- Name: pago_carrera_completa; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.pago_carrera_completa (
+    id_pago_carrera integer NOT NULL,
+    id_estudiante integer NOT NULL,
+    id_carrera integer NOT NULL,
+    monto_total numeric(10,2) NOT NULL,
+    forma_pago character varying(10),
+    cuotas_total integer DEFAULT 1,
+    estado character varying(15) DEFAULT 'pendiente'::character varying,
+    fecha_contrato date NOT NULL,
+    materias_cubiertas integer DEFAULT 0,
+    monto_pagado numeric(10,2) DEFAULT 0,
+    CONSTRAINT pago_carrera_completa_estado_check CHECK (((estado)::text = ANY ((ARRAY['pendiente'::character varying, 'parcial'::character varying, 'pagado'::character varying])::text[]))),
+    CONSTRAINT pago_carrera_completa_forma_pago_check CHECK (((forma_pago)::text = ANY ((ARRAY['contado'::character varying, 'credito'::character varying])::text[])))
 );
 
-CREATE TABLE pago_materia_suelta (
-    id_pago_materia           integer              NOT NULL   DEFAULT nextval('pago_materia_suelta_id_pago_materia_seq'::regclass),
-    id_inscripcion            integer              NOT NULL   ,
-    monto_pagado              numeric              NOT NULL   ,
-    fecha_pago                date                 NOT NULL   DEFAULT CURRENT_DATE,
-    estado                    character varying(10) NULL       DEFAULT 'pagado'::character varying
+
+ALTER TABLE public.pago_carrera_completa OWNER TO postgres;
+
+--
+-- Name: pago_carrera_completa_id_pago_carrera_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.pago_carrera_completa_id_pago_carrera_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.pago_carrera_completa_id_pago_carrera_seq OWNER TO postgres;
+
+--
+-- Name: pago_carrera_completa_id_pago_carrera_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.pago_carrera_completa_id_pago_carrera_seq OWNED BY public.pago_carrera_completa.id_pago_carrera;
+
+
+--
+-- Name: pago_materia_suelta; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.pago_materia_suelta (
+    id_pago_materia integer NOT NULL,
+    id_inscripcion integer NOT NULL,
+    monto_pagado numeric(10,2) NOT NULL,
+    fecha_pago date DEFAULT CURRENT_DATE NOT NULL,
+    estado character varying(10) DEFAULT 'pagado'::character varying,
+    CONSTRAINT pago_materia_suelta_estado_check CHECK (((estado)::text = ANY ((ARRAY['pagado'::character varying, 'pendiente'::character varying, 'reembolsado'::character varying])::text[])))
 );
 
-CREATE TABLE pagofacil_transacciones (
-    id_transaccion_pf         integer              NOT NULL   DEFAULT nextval('pagofacil_transacciones_id_transaccion_pf_seq'::regclass),
-    transaction_id_api        bigint               NOT NULL   ,
-    payment_number            character varying(50) NOT NULL   ,
-    id_estudiante             integer              NOT NULL   ,
-    monto                     numeric              NOT NULL   ,
-    concepto                  character varying(20) NOT NULL   ,
-    codigo_grupo              character varying(20) NULL       ,
-    id_inscripcion            integer              NULL       ,
-    estado                    character varying(20) NULL       DEFAULT 'pendiente'::character varying,
-    fecha_generacion          timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP,
-    fecha_pago                timestamp without time zone NULL       
+
+ALTER TABLE public.pago_materia_suelta OWNER TO postgres;
+
+--
+-- Name: pago_materia_suelta_id_pago_materia_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.pago_materia_suelta_id_pago_materia_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.pago_materia_suelta_id_pago_materia_seq OWNER TO postgres;
+
+--
+-- Name: pago_materia_suelta_id_pago_materia_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.pago_materia_suelta_id_pago_materia_seq OWNED BY public.pago_materia_suelta.id_pago_materia;
+
+
+--
+-- Name: pagofacil_transacciones; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.pagofacil_transacciones (
+    id_transaccion_pf integer NOT NULL,
+    transaction_id_api bigint NOT NULL,
+    payment_number character varying(50) NOT NULL,
+    id_estudiante integer NOT NULL,
+    monto numeric(10,2) NOT NULL,
+    concepto character varying(20) NOT NULL,
+    codigo_grupo character varying(20),
+    id_inscripcion integer,
+    estado character varying(20) DEFAULT 'pendiente'::character varying,
+    fecha_generacion timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    fecha_pago timestamp without time zone,
+    CONSTRAINT pagofacil_transacciones_concepto_check CHECK (((concepto)::text = ANY ((ARRAY['matricula'::character varying, 'materia'::character varying, 'carrera'::character varying, 'cuota'::character varying])::text[]))),
+    CONSTRAINT pagofacil_transacciones_estado_check CHECK (((estado)::text = ANY ((ARRAY['pendiente'::character varying, 'pagado'::character varying, 'expirado'::character varying, 'cancelado'::character varying])::text[])))
 );
 
-CREATE TABLE periodos_dictado (
-    id_periodo                integer              NOT NULL   DEFAULT nextval('periodos_dictado_id_periodo_seq'::regclass),
-    nombre                    character varying(50) NOT NULL   ,
-    tipo_periodo              character varying(20) NULL       DEFAULT 'semestral'::character varying,
-    fecha_inicio              date                 NOT NULL   ,
-    fecha_fin                 date                 NOT NULL   ,
-    id_nivel                  integer              NULL       ,
-    activo                    boolean              NULL       DEFAULT true
+
+ALTER TABLE public.pagofacil_transacciones OWNER TO postgres;
+
+--
+-- Name: pagofacil_transacciones_id_transaccion_pf_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.pagofacil_transacciones_id_transaccion_pf_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.pagofacil_transacciones_id_transaccion_pf_seq OWNER TO postgres;
+
+--
+-- Name: pagofacil_transacciones_id_transaccion_pf_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.pagofacil_transacciones_id_transaccion_pf_seq OWNED BY public.pagofacil_transacciones.id_transaccion_pf;
+
+
+--
+-- Name: periodos_dictado; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.periodos_dictado (
+    id_periodo integer NOT NULL,
+    nombre character varying(50) NOT NULL,
+    tipo_periodo character varying(20) DEFAULT 'semestral'::character varying,
+    fecha_inicio date NOT NULL,
+    fecha_fin date NOT NULL,
+    id_nivel integer,
+    activo boolean DEFAULT true,
+    CONSTRAINT periodos_dictado_tipo_periodo_check CHECK (((tipo_periodo)::text = ANY ((ARRAY['mensual'::character varying, 'semestral'::character varying, 'anual'::character varying, 'intensivo'::character varying])::text[])))
 );
 
-CREATE TABLE personal_administrativo (
-    id_personal               integer              NOT NULL   DEFAULT nextval('personal_administrativo_id_personal_seq'::regclass),
-    id_usuario                integer              NOT NULL   ,
-    legajo_personal           character varying(20) NOT NULL   ,
-    cargo                     character varying(100) NOT NULL   ,
-    fecha_ingreso             date                 NOT NULL   ,
-    oficina                   character varying(50) NULL       ,
-    sueldo_base               numeric              NULL       ,
-    observaciones             text                 NULL       
+
+ALTER TABLE public.periodos_dictado OWNER TO postgres;
+
+--
+-- Name: periodos_dictado_id_periodo_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.periodos_dictado_id_periodo_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.periodos_dictado_id_periodo_seq OWNER TO postgres;
+
+--
+-- Name: periodos_dictado_id_periodo_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.periodos_dictado_id_periodo_seq OWNED BY public.periodos_dictado.id_periodo;
+
+
+--
+-- Name: personal_administrativo; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.personal_administrativo (
+    id_personal integer NOT NULL,
+    id_usuario integer NOT NULL,
+    legajo_personal character varying(20) NOT NULL,
+    cargo character varying(100) NOT NULL,
+    fecha_ingreso date NOT NULL,
+    oficina character varying(50),
+    sueldo_base numeric(10,2),
+    observaciones text
 );
 
-CREATE TABLE profesores (
-    id_profesor               integer              NOT NULL   DEFAULT nextval('profesores_id_profesor_seq'::regclass),
-    id_usuario                integer              NOT NULL   ,
-    legajo_profesor           character varying(20) NOT NULL   ,
-    especialidad              character varying(100) NOT NULL   ,
-    titulo_maximo             character varying(150) NULL       ,
-    fecha_contratacion        date                 NOT NULL   ,
-    sueldo_base               numeric              NULL       ,
-    observaciones             text                 NULL       
+
+ALTER TABLE public.personal_administrativo OWNER TO postgres;
+
+--
+-- Name: personal_administrativo_id_personal_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.personal_administrativo_id_personal_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.personal_administrativo_id_personal_seq OWNER TO postgres;
+
+--
+-- Name: personal_administrativo_id_personal_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.personal_administrativo_id_personal_seq OWNED BY public.personal_administrativo.id_personal;
+
+
+--
+-- Name: profesores; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.profesores (
+    id_profesor integer NOT NULL,
+    id_usuario integer NOT NULL,
+    legajo_profesor character varying(20) NOT NULL,
+    especialidad character varying(100) NOT NULL,
+    titulo_maximo character varying(150),
+    fecha_contratacion date NOT NULL,
+    sueldo_base numeric(10,2),
+    observaciones text
 );
 
-CREATE TABLE roles (
-    id_rol                    integer              NOT NULL   DEFAULT nextval('roles_id_rol_seq'::regclass),
-    nombre_rol                character varying(50) NOT NULL   ,
-    descripcion               character varying(255) NULL       ,
-    activo                    boolean              NULL       DEFAULT true
+
+ALTER TABLE public.profesores OWNER TO postgres;
+
+--
+-- Name: profesores_id_profesor_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.profesores_id_profesor_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.profesores_id_profesor_seq OWNER TO postgres;
+
+--
+-- Name: profesores_id_profesor_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.profesores_id_profesor_seq OWNED BY public.profesores.id_profesor;
+
+
+--
+-- Name: usuarios; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.usuarios (
+    id_usuario integer NOT NULL,
+    nombre character varying(100) NOT NULL,
+    apellido character varying(100) NOT NULL,
+    email character varying(150) NOT NULL,
+    password_hash character varying(255) NOT NULL,
+    dni character varying(20) NOT NULL,
+    telefono character varying(20),
+    direccion text,
+    id_rol integer NOT NULL,
+    foto_perfil character varying(255),
+    activo boolean DEFAULT true,
+    bloqueado boolean DEFAULT false,
+    fecha_registro timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE seguimiento_estudiante (
-    id_seguimiento            integer              NOT NULL   DEFAULT nextval('seguimiento_estudiante_id_seguimiento_seq'::regclass),
-    id_inscripcion            integer              NOT NULL   ,
-    calificacion_final        numeric              NULL       ,
-    estado_actual             character varying(20) NULL       DEFAULT 'en_curso'::character varying,
-    observaciones             text                 NULL       ,
-    fecha_aprobacion          date                 NULL       ,
-    created_at                timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP,
-    updated_at                timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
+ALTER TABLE public.usuarios OWNER TO postgres;
+
+--
+-- Name: resumen_academico_estudiante; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.resumen_academico_estudiante AS
+ SELECT e.id_estudiante,
+    u.nombre,
+    u.apellido,
+    e.legajo,
+    c.nombre AS carrera,
+    count(
+        CASE
+            WHEN ((i.estado)::text = 'aprobado'::text) THEN 1
+            ELSE NULL::integer
+        END) AS cant_aprobadas,
+    count(
+        CASE
+            WHEN ((i.estado)::text = 'reprobado'::text) THEN 1
+            ELSE NULL::integer
+        END) AS cant_reprobadas,
+    count(
+        CASE
+            WHEN ((i.estado)::text = ANY ((ARRAY['activo'::character varying, 'pendiente_matricula'::character varying])::text[])) THEN 1
+            ELSE NULL::integer
+        END) AS cant_en_curso,
+    count(
+        CASE
+            WHEN ((i.estado)::text = 'retirado'::text) THEN 1
+            ELSE NULL::integer
+        END) AS cant_retiradas,
+    count(i.id_inscripcion) AS cant_total_inscriptas,
+    round(avg(
+        CASE
+            WHEN ((i.estado)::text = 'aprobado'::text) THEN i.calificacion_final
+            ELSE NULL::numeric
+        END), 2) AS promedio_aprobadas,
+    round(avg(
+        CASE
+            WHEN (i.calificacion_final IS NOT NULL) THEN i.calificacion_final
+            ELSE NULL::numeric
+        END), 2) AS promedio_general,
+    round(((100.0 * (count(
+        CASE
+            WHEN ((i.estado)::text = 'aprobado'::text) THEN 1
+            ELSE NULL::integer
+        END))::numeric) / (NULLIF(count(
+        CASE
+            WHEN ((i.estado)::text = ANY ((ARRAY['aprobado'::character varying, 'reprobado'::character varying])::text[])) THEN 1
+            ELSE NULL::integer
+        END), 0))::numeric), 2) AS tasa_aprobacion
+   FROM ((((public.estudiantes e
+     JOIN public.usuarios u ON ((e.id_usuario = u.id_usuario)))
+     LEFT JOIN public.afiliaciones_estudiante ae ON (((ae.id_estudiante = e.id_estudiante) AND ((ae.tipo_programa)::text = 'carrera'::text) AND ((ae.estado)::text = 'activo'::text))))
+     LEFT JOIN public.carreras c ON ((c.id_carrera = ae.id_carrera)))
+     LEFT JOIN public.inscripciones i ON ((i.id_estudiante = e.id_estudiante)))
+  GROUP BY e.id_estudiante, u.nombre, u.apellido, e.legajo, c.nombre;
+
+
+ALTER VIEW public.resumen_academico_estudiante OWNER TO postgres;
+
+--
+-- Name: roles; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.roles (
+    id_rol integer NOT NULL,
+    nombre_rol character varying(50) NOT NULL,
+    descripcion character varying(255),
+    activo boolean DEFAULT true
 );
 
-CREATE TABLE seguimiento_log (
-    id_log                    integer              NOT NULL   DEFAULT nextval('seguimiento_log_id_log_seq'::regclass),
-    id_usuario                integer              NOT NULL   ,
-    accion                    character varying(100) NOT NULL   ,
-    descripcion               text                 NULL       ,
-    ip_origen                 character varying(45) NULL       ,
-    fecha_hora                timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
+ALTER TABLE public.roles OWNER TO postgres;
+
+--
+-- Name: roles_id_rol_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.roles_id_rol_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.roles_id_rol_seq OWNER TO postgres;
+
+--
+-- Name: roles_id_rol_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.roles_id_rol_seq OWNED BY public.roles.id_rol;
+
+
+--
+-- Name: seguimiento_estudiante; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.seguimiento_estudiante (
+    id_seguimiento integer NOT NULL,
+    id_inscripcion integer NOT NULL,
+    calificacion_final numeric(5,2),
+    estado_actual character varying(20) DEFAULT 'en_curso'::character varying,
+    observaciones text,
+    fecha_aprobacion date,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT seguimiento_estudiante_estado_actual_check CHECK (((estado_actual)::text = ANY ((ARRAY['en_curso'::character varying, 'aprobado'::character varying, 'reprobado'::character varying])::text[])))
 );
 
-CREATE TABLE sessions (
-    id                        character varying(255) NOT NULL   ,
-    user_id                   bigint               NULL       ,
-    ip_address                character varying(45) NULL       ,
-    user_agent                text                 NULL       ,
-    payload                   text                 NOT NULL   ,
-    last_activity             integer              NOT NULL   
+
+ALTER TABLE public.seguimiento_estudiante OWNER TO postgres;
+
+--
+-- Name: seguimiento_estudiante_id_seguimiento_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.seguimiento_estudiante_id_seguimiento_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.seguimiento_estudiante_id_seguimiento_seq OWNER TO postgres;
+
+--
+-- Name: seguimiento_estudiante_id_seguimiento_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.seguimiento_estudiante_id_seguimiento_seq OWNED BY public.seguimiento_estudiante.id_seguimiento;
+
+
+--
+-- Name: seguimiento_log; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.seguimiento_log (
+    id_log integer NOT NULL,
+    id_usuario integer NOT NULL,
+    accion character varying(100) NOT NULL,
+    descripcion text,
+    ip_origen character varying(45),
+    fecha_hora timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE usuarios (
-    id_usuario                integer              NOT NULL   DEFAULT nextval('usuarios_id_usuario_seq'::regclass),
-    nombre                    character varying(100) NOT NULL   ,
-    apellido                  character varying(100) NOT NULL   ,
-    email                     character varying(150) NOT NULL   ,
-    password_hash             character varying(255) NOT NULL   ,
-    dni                       character varying(20) NOT NULL   ,
-    telefono                  character varying(20) NULL       ,
-    direccion                 text                 NULL       ,
-    id_rol                    integer              NOT NULL   ,
-    foto_perfil               character varying(255) NULL       ,
-    activo                    boolean              NULL       DEFAULT true,
-    bloqueado                 boolean              NULL       DEFAULT false,
-    fecha_registro            timestamp without time zone NULL       DEFAULT CURRENT_TIMESTAMP
+
+ALTER TABLE public.seguimiento_log OWNER TO postgres;
+
+--
+-- Name: seguimiento_log_id_log_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.seguimiento_log_id_log_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.seguimiento_log_id_log_seq OWNER TO postgres;
+
+--
+-- Name: seguimiento_log_id_log_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.seguimiento_log_id_log_seq OWNED BY public.seguimiento_log.id_log;
+
+
+--
+-- Name: sessions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.sessions (
+    id character varying(255) NOT NULL,
+    user_id bigint,
+    ip_address character varying(45),
+    user_agent text,
+    payload text NOT NULL,
+    last_activity integer NOT NULL
 );
+
+
+ALTER TABLE public.sessions OWNER TO postgres;
+
+--
+-- Name: usuarios_id_usuario_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.usuarios_id_usuario_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.usuarios_id_usuario_seq OWNER TO postgres;
+
+--
+-- Name: usuarios_id_usuario_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.usuarios_id_usuario_seq OWNED BY public.usuarios.id_usuario;
+
+
+--
+-- Name: v_deuda_estudiante; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.v_deuda_estudiante AS
+ SELECT e.id_estudiante,
+    (((u.nombre)::text || ' '::text) || (u.apellido)::text) AS estudiante,
+    COALESCE(sum(pms.monto_pagado), (0)::numeric) AS total_adeudado
+   FROM (((public.estudiantes e
+     JOIN public.usuarios u ON ((u.id_usuario = e.id_usuario)))
+     LEFT JOIN public.inscripciones i ON ((i.id_estudiante = e.id_estudiante)))
+     LEFT JOIN public.pago_materia_suelta pms ON (((pms.id_inscripcion = i.id_inscripcion) AND ((pms.estado)::text = 'pendiente'::text))))
+  GROUP BY e.id_estudiante, u.nombre, u.apellido;
+
+
+ALTER VIEW public.v_deuda_estudiante OWNER TO postgres;
+
+--
+-- Name: v_kardex_estudiante; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.v_kardex_estudiante AS
+ SELECT e.legajo,
+    (((u.nombre)::text || ' '::text) || (u.apellido)::text) AS estudiante,
+    m.nombre AS materia,
+    pd.nombre AS periodo,
+    i.calificacion_final,
+    i.aprobado,
+    i.estado,
+    i.fecha_aprobacion
+   FROM (((((public.inscripciones i
+     JOIN public.estudiantes e ON ((e.id_estudiante = i.id_estudiante)))
+     JOIN public.usuarios u ON ((u.id_usuario = e.id_usuario)))
+     JOIN public.grupos oa ON ((oa.id_oferta = i.id_oferta)))
+     JOIN public.materias m ON ((m.id_materia = oa.id_materia)))
+     JOIN public.periodos_dictado pd ON ((pd.id_periodo = oa.id_periodo)));
+
+
+ALTER VIEW public.v_kardex_estudiante OWNER TO postgres;
+
+--
+-- Name: v_materia_actual_estudiante; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.v_materia_actual_estudiante AS
+ SELECT DISTINCT ON (e.id_estudiante) e.id_estudiante,
+    (((u.nombre)::text || ' '::text) || (u.apellido)::text) AS estudiante,
+    m.nombre AS materia_actual,
+    i.estado,
+    i.fecha_inscripcion,
+    pd.nombre AS periodo
+   FROM (((((public.inscripciones i
+     JOIN public.estudiantes e ON ((e.id_estudiante = i.id_estudiante)))
+     JOIN public.usuarios u ON ((u.id_usuario = e.id_usuario)))
+     JOIN public.grupos oa ON ((oa.id_oferta = i.id_oferta)))
+     JOIN public.materias m ON ((m.id_materia = oa.id_materia)))
+     JOIN public.periodos_dictado pd ON ((pd.id_periodo = oa.id_periodo)))
+  WHERE ((i.estado)::text = ANY ((ARRAY['pendiente_matricula'::character varying, 'activo'::character varying])::text[]))
+  ORDER BY e.id_estudiante, i.fecha_inscripcion DESC;
+
+
+ALTER VIEW public.v_materia_actual_estudiante OWNER TO postgres;
+
+--
+-- Name: v_progreso_carrera; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.v_progreso_carrera AS
+ SELECT e.id_estudiante,
+    (((u.nombre)::text || ' '::text) || (u.apellido)::text) AS estudiante,
+    c.nombre AS carrera,
+    count(DISTINCT
+        CASE
+            WHEN (i.aprobado = true) THEN oa.id_materia
+            ELSE NULL::integer
+        END) AS materias_aprobadas,
+    count(DISTINCT mc.id_materia) AS total_materias_carrera,
+    round(((100.0 * (count(DISTINCT
+        CASE
+            WHEN (i.aprobado = true) THEN oa.id_materia
+            ELSE NULL::integer
+        END))::numeric) / (NULLIF(count(DISTINCT mc.id_materia), 0))::numeric), 2) AS porcentaje_avance
+   FROM ((((((public.estudiantes e
+     JOIN public.usuarios u ON ((u.id_usuario = e.id_usuario)))
+     LEFT JOIN public.afiliaciones_estudiante ae ON (((ae.id_estudiante = e.id_estudiante) AND ((ae.tipo_programa)::text = 'carrera'::text) AND ((ae.estado)::text = 'activo'::text))))
+     LEFT JOIN public.carreras c ON ((c.id_carrera = ae.id_carrera)))
+     LEFT JOIN public.malla_curricular mc ON ((mc.id_carrera = c.id_carrera)))
+     LEFT JOIN public.inscripciones i ON ((i.id_estudiante = e.id_estudiante)))
+     LEFT JOIN public.grupos oa ON ((oa.id_oferta = i.id_oferta)))
+  GROUP BY e.id_estudiante, u.nombre, u.apellido, c.nombre;
+
+
+ALTER VIEW public.v_progreso_carrera OWNER TO postgres;
+
+--
+-- Name: vista_historial_estudiante; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.vista_historial_estudiante AS
+ SELECT se.id_seguimiento,
+    e.id_estudiante,
+    pd.nombre AS periodo_nombre,
+    pd.fecha_inicio AS periodo_inicio,
+    pd.fecha_fin AS periodo_fin,
+    m.codigo AS materia_codigo,
+    m.nombre AS materia_nombre,
+    (((u_prof.nombre)::text || ' '::text) || (u_prof.apellido)::text) AS profesor_nombre,
+    se.estado_actual,
+        CASE se.estado_actual
+            WHEN 'aprobado'::text THEN 'APROBADO'::text
+            WHEN 'reprobado'::text THEN 'REPROBADO'::text
+            ELSE 'EN CURSO'::text
+        END AS estado_display,
+    se.calificacion_final,
+    1 AS numero_intento
+   FROM (((((((public.seguimiento_estudiante se
+     JOIN public.inscripciones i ON ((se.id_inscripcion = i.id_inscripcion)))
+     JOIN public.estudiantes e ON ((i.id_estudiante = e.id_estudiante)))
+     JOIN public.grupos g ON ((i.id_oferta = g.id_oferta)))
+     JOIN public.materias m ON ((g.id_materia = m.id_materia)))
+     JOIN public.periodos_dictado pd ON ((g.id_periodo = pd.id_periodo)))
+     JOIN public.profesores p ON ((g.id_profesor = p.id_profesor)))
+     JOIN public.usuarios u_prof ON ((p.id_usuario = u_prof.id_usuario)));
+
+
+ALTER VIEW public.vista_historial_estudiante OWNER TO postgres;
+
+--
+-- Name: afiliaciones_estudiante id_afiliacion; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.afiliaciones_estudiante ALTER COLUMN id_afiliacion SET DEFAULT nextval('public.afiliaciones_estudiante_id_afiliacion_seq'::regclass);
+
+
+--
+-- Name: aulas id_aula; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.aulas ALTER COLUMN id_aula SET DEFAULT nextval('public.aulas_id_aula_seq'::regclass);
+
+
+--
+-- Name: carreras id_carrera; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.carreras ALTER COLUMN id_carrera SET DEFAULT nextval('public.carreras_id_carrera_seq'::regclass);
+
+
+--
+-- Name: consumo_materias_carrera id_consumo; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.consumo_materias_carrera ALTER COLUMN id_consumo SET DEFAULT nextval('public.consumo_materias_carrera_id_consumo_seq'::regclass);
+
+
+--
+-- Name: cronogramas id_cronograma; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.cronogramas ALTER COLUMN id_cronograma SET DEFAULT nextval('public.cronogramas_id_cronograma_seq'::regclass);
+
+
+--
+-- Name: cuotas_carrera id_cuota; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.cuotas_carrera ALTER COLUMN id_cuota SET DEFAULT nextval('public.cuotas_carrera_id_cuota_seq'::regclass);
+
+
+--
+-- Name: estudiantes id_estudiante; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.estudiantes ALTER COLUMN id_estudiante SET DEFAULT nextval('public.estudiantes_id_estudiante_seq'::regclass);
+
+
+--
+-- Name: evaluaciones id_evaluacion; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.evaluaciones ALTER COLUMN id_evaluacion SET DEFAULT nextval('public.evaluaciones_id_evaluacion_seq'::regclass);
+
+
+--
+-- Name: grupos id_oferta; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.grupos ALTER COLUMN id_oferta SET DEFAULT nextval('public.oferta_academica_id_oferta_seq'::regclass);
+
+
+--
+-- Name: horarios id_horario; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.horarios ALTER COLUMN id_horario SET DEFAULT nextval('public.horarios_id_horario_seq'::regclass);
+
+
+--
+-- Name: inscripciones id_inscripcion; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.inscripciones ALTER COLUMN id_inscripcion SET DEFAULT nextval('public.inscripciones_id_inscripcion_seq'::regclass);
+
+
+--
+-- Name: malla_curricular id_malla; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.malla_curricular ALTER COLUMN id_malla SET DEFAULT nextval('public.malla_curricular_id_malla_seq'::regclass);
+
+
+--
+-- Name: materias id_materia; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.materias ALTER COLUMN id_materia SET DEFAULT nextval('public.materias_id_materia_seq'::regclass);
+
+
+--
+-- Name: matricula_unica id_matricula; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.matricula_unica ALTER COLUMN id_matricula SET DEFAULT nextval('public.matricula_unica_id_matricula_seq'::regclass);
+
+
+--
+-- Name: migrations id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.migrations ALTER COLUMN id SET DEFAULT nextval('public.migrations_id_seq'::regclass);
+
+
+--
+-- Name: niveles_carrera id_nivel; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.niveles_carrera ALTER COLUMN id_nivel SET DEFAULT nextval('public.niveles_carrera_id_nivel_seq'::regclass);
+
+
+--
+-- Name: pago_carrera_completa id_pago_carrera; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pago_carrera_completa ALTER COLUMN id_pago_carrera SET DEFAULT nextval('public.pago_carrera_completa_id_pago_carrera_seq'::regclass);
+
+
+--
+-- Name: pago_materia_suelta id_pago_materia; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pago_materia_suelta ALTER COLUMN id_pago_materia SET DEFAULT nextval('public.pago_materia_suelta_id_pago_materia_seq'::regclass);
+
+
+--
+-- Name: pagofacil_transacciones id_transaccion_pf; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pagofacil_transacciones ALTER COLUMN id_transaccion_pf SET DEFAULT nextval('public.pagofacil_transacciones_id_transaccion_pf_seq'::regclass);
+
+
+--
+-- Name: periodos_dictado id_periodo; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.periodos_dictado ALTER COLUMN id_periodo SET DEFAULT nextval('public.periodos_dictado_id_periodo_seq'::regclass);
+
+
+--
+-- Name: personal_administrativo id_personal; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.personal_administrativo ALTER COLUMN id_personal SET DEFAULT nextval('public.personal_administrativo_id_personal_seq'::regclass);
+
+
+--
+-- Name: profesores id_profesor; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.profesores ALTER COLUMN id_profesor SET DEFAULT nextval('public.profesores_id_profesor_seq'::regclass);
+
+
+--
+-- Name: roles id_rol; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.roles ALTER COLUMN id_rol SET DEFAULT nextval('public.roles_id_rol_seq'::regclass);
+
+
+--
+-- Name: seguimiento_estudiante id_seguimiento; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.seguimiento_estudiante ALTER COLUMN id_seguimiento SET DEFAULT nextval('public.seguimiento_estudiante_id_seguimiento_seq'::regclass);
+
+
+--
+-- Name: seguimiento_log id_log; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.seguimiento_log ALTER COLUMN id_log SET DEFAULT nextval('public.seguimiento_log_id_log_seq'::regclass);
+
+
+--
+-- Name: usuarios id_usuario; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.usuarios ALTER COLUMN id_usuario SET DEFAULT nextval('public.usuarios_id_usuario_seq'::regclass);
+
+
+--
+-- Data for Name: afiliaciones_estudiante; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.afiliaciones_estudiante (id_afiliacion, id_estudiante, id_carrera, tipo_programa, fecha_inicio, fecha_fin, estado, observaciones) FROM stdin;
+12	3	18	carrera	2026-06-16	\N	activo	\N
+13	4	19	carrera	2026-06-16	\N	activo	\N
+14	5	17	carrera	2026-02-01	\N	activo	\N
+15	6	17	carrera	2026-02-01	\N	activo	\N
+16	7	17	carrera	2026-02-01	\N	activo	\N
+17	8	18	carrera	2026-02-01	\N	activo	\N
+18	9	18	carrera	2026-02-01	\N	activo	\N
+19	10	18	carrera	2026-02-01	\N	activo	\N
+20	11	19	carrera	2026-02-01	\N	activo	\N
+21	12	19	carrera	2026-02-01	\N	activo	\N
+22	13	20	carrera	2026-02-01	\N	activo	\N
+23	14	20	carrera	2026-02-01	\N	activo	\N
+24	15	21	carrera	2026-02-01	\N	activo	\N
+25	16	\N	curso_libre	2026-02-01	\N	activo	\N
+26	17	17	carrera	2026-06-18	\N	activo	\N
+\.
+
+
+--
+-- Data for Name: aulas; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.aulas (id_aula, nombre, capacidad, ubicacion, tipo, activo) FROM stdin;
+1	Lab Programación 1	30	2do Piso Bloque A	laboratorio	t
+2	Lab Programación 2	30	2do Piso Bloque A	laboratorio	t
+3	Lab Circuitos	25	3er Piso Bloque C	laboratorio	t
+4	Lab Telecomunicaciones	20	3er Piso Bloque C	laboratorio	t
+5	Lab Sistemas	35	4to Piso Bloque D	laboratorio	t
+6	Aula A-06	45	1er Piso Bloque A	aula	t
+7	Aula B-06	45	1er Piso Bloque B	aula	t
+8	Aula C-06	45	1er Piso Bloque C	aula	t
+9	Aula A-07	45	1er Piso Bloque A	aula	t
+10	Aula B-07	45	1er Piso Bloque B	aula	t
+11	Aula C-07	45	1er Piso Bloque C	aula	t
+12	Aula A-08	45	1er Piso Bloque A	aula	t
+13	Aula B-08	45	1er Piso Bloque B	aula	t
+14	Aula C-08	45	1er Piso Bloque C	aula	t
+15	Aula A-09	45	1er Piso Bloque A	aula	t
+16	Aula B-09	45	1er Piso Bloque B	aula	t
+17	Aula C-09	45	1er Piso Bloque C	aula	t
+18	Aula A-10	45	1er Piso Bloque A	aula	t
+19	Aula B-10	45	1er Piso Bloque B	aula	t
+20	Aula C-10	45	1er Piso Bloque C	aula	t
+21	Auditorio Magna	120	2do Piso Bloque B	auditorio	t
+22	Auditorio Ampliado	80	3er Piso Bloque A	auditorio	t
+23	Sala Seminarios	60	2do Piso Bloque D	auditorio	t
+24	Sala Práctica 8	30	Piso 1 Bloque	sala	t
+25	Sala Práctica 9	30	Piso 2 Bloque	sala	t
+26	Sala Práctica 10	30	Piso 3 Bloque	sala	t
+27	Sala Práctica 11	30	Piso 4 Bloque	sala	t
+28	Sala Práctica 12	30	Piso 1 Bloque	sala	t
+29	Sala Práctica 13	30	Piso 2 Bloque	sala	t
+30	Sala Práctica 14	30	Piso 3 Bloque	sala	t
+31	aula prueba	12	piesoPB	sala	t
+\.
+
+
+--
+-- Data for Name: cache; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.cache (key, value, expiration) FROM stdin;
+\.
+
+
+--
+-- Data for Name: cache_locks; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.cache_locks (key, owner, expiration) FROM stdin;
+\.
+
+
+--
+-- Data for Name: carreras; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.carreras (id_carrera, codigo, nombre, descripcion, tipo, duracion_niveles, costo_carrera_completa, activo) FROM stdin;
+17	TEC-PROG	Técnico Programación	\N	tecnico_superior	4	20000.00	t
+18	TEC-CONT	Técnico Contabilidad	\N	tecnico_superior	4	15000.00	t
+19	TEC-ADM	Técnico Administración	\N	tecnico_superior	4	16000.00	t
+20	TM-RED	Técnico Redes	\N	tecnico	2	12000.00	t
+21	TM-ELECT	Técnico Electrónica	\N	tecnico	2	13000.00	t
+22	CUR-WEB	Desarrollo Web	\N	curso_libre	0	\N	t
+23	CUR-OFIM	Ofimática	\N	curso_libre	0	\N	t
+24	CUR-DSGN	Diseño Gráfico	\N	curso_libre	0	\N	t
+\.
+
+
+--
+-- Data for Name: consumo_materias_carrera; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.consumo_materias_carrera (id_consumo, id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional, fecha_consumo) FROM stdin;
+1	6	79	1	1	f	2026-06-16
+2	7	68	2	1	f	2026-06-18
+3	7	69	3	1	f	2026-06-18
+4	8	68	4	1	f	2026-06-18
+5	8	69	5	1	f	2026-06-18
+6	9	68	6	1	f	2026-06-18
+7	9	69	7	1	f	2026-06-18
+8	10	79	8	1	f	2026-06-18
+9	10	80	9	1	f	2026-06-18
+10	11	79	10	1	f	2026-06-18
+11	11	80	11	1	f	2026-06-18
+12	12	79	12	1	f	2026-06-18
+13	12	79	13	2	t	2026-06-18
+14	13	79	14	1	f	2026-06-18
+15	13	80	15	1	f	2026-06-18
+16	14	79	16	1	f	2026-06-18
+17	14	80	17	1	f	2026-06-18
+18	15	68	18	1	f	2026-06-18
+19	15	69	19	1	f	2026-06-18
+20	16	66	20	1	f	2026-06-18
+21	17	66	21	1	f	2026-06-18
+22	17	82	22	1	f	2026-06-18
+23	17	83	23	1	f	2026-06-18
+\.
+
+
+--
+-- Data for Name: cronogramas; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.cronogramas (id_cronograma, id_periodo, nombre, tipo_periodo, fecha_inicio, fecha_fin, activo, id_carrera) FROM stdin;
+1	58	Inscripciones Enero 2026	inscripcion	2026-06-16	2026-06-19	t	\N
+2	58	Clases Semestre 1 2026	clases	2026-06-22	2026-06-30	t	\N
+3	58	Evaluaciones Semestre 1 2026	examenes	2026-06-16	2026-06-30	t	\N
+\.
+
+
+--
+-- Data for Name: cuotas_carrera; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.cuotas_carrera (id_cuota, id_pago_carrera, numero_cuota, monto, fecha_vencimiento, fecha_pago, estado) FROM stdin;
+6	8	1	1481.48	2026-11-18	\N	pendiente
+7	8	2	1481.48	2026-12-18	\N	pendiente
+8	8	3	1481.48	2027-01-18	\N	pendiente
+9	8	4	1481.48	2027-02-18	\N	pendiente
+10	8	5	1481.48	2027-03-18	\N	pendiente
+11	8	6	1481.48	2027-04-18	\N	pendiente
+12	8	7	1481.48	2027-05-18	\N	pendiente
+13	8	8	1481.48	2027-06-18	\N	pendiente
+14	8	9	1481.48	2027-07-18	\N	pendiente
+15	11	1	1500.00	2026-11-18	\N	pendiente
+16	11	2	1500.00	2026-12-18	\N	pendiente
+17	11	3	1500.00	2027-01-18	\N	pendiente
+18	11	4	1500.00	2027-02-18	\N	pendiente
+19	11	5	1500.00	2027-03-18	\N	pendiente
+20	8	1	6666.67	2026-03-01	2026-03-01	pagado
+21	8	2	6666.67	2026-05-01	\N	pendiente
+22	8	3	6666.66	2026-07-01	\N	pendiente
+23	11	1	7500.00	2026-04-01	2026-04-01	pagado
+24	11	2	7500.00	2026-06-01	\N	pendiente
+\.
+
+
+--
+-- Data for Name: estudiantes; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.estudiantes (id_estudiante, id_usuario, legajo, fecha_inscripcion_inicial, tutor_nombre, tutor_telefono, observaciones, id_carrera_actual) FROM stdin;
+3	11	EST-003	2026-06-16	\N	\N	\N	18
+4	12	EST-004	2026-06-16	\N	\N	\N	19
+16	24	EST-016	2026-02-01	\N	\N	\N	\N
+5	13	EST-005	2026-02-01	\N	\N	\N	17
+6	14	EST-006	2026-02-01	\N	\N	\N	17
+7	15	EST-007	2026-02-01	\N	\N	\N	17
+8	16	EST-008	2026-02-01	\N	\N	\N	18
+9	17	EST-009	2026-02-01	\N	\N	\N	18
+10	18	EST-010	2026-02-01	\N	\N	\N	18
+11	19	EST-011	2026-02-01	\N	\N	\N	19
+12	20	EST-012	2026-02-01	\N	\N	\N	19
+13	21	EST-013	2026-02-01	\N	\N	\N	20
+14	22	EST-014	2026-02-01	\N	\N	\N	20
+15	23	EST-015	2026-02-01	\N	\N	\N	21
+17	28	EST-017	2026-06-18	\N	\N	\N	17
+\.
+
+
+--
+-- Data for Name: evaluaciones; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.evaluaciones (id_evaluacion, id_inscripcion, id_profesor, tipo, descripcion, calificacion, porcentaje, fecha) FROM stdin;
+1	2	1	parcial1	Parcial 1	78.00	30.00	2026-03-15
+2	2	1	parcial2	Parcial 2	76.00	30.00	2026-04-30
+3	2	1	final	Final	84.00	40.00	2026-06-10
+4	3	3	parcial1	Parcial 1	72.00	30.00	2026-03-15
+5	3	3	parcial2	Parcial 2	70.00	30.00	2026-04-30
+6	3	3	final	Final	78.00	40.00	2026-06-10
+7	4	2	parcial1	Parcial 1	73.00	30.00	2026-03-15
+8	4	2	parcial2	Parcial 2	71.00	30.00	2026-04-30
+9	4	2	final	Final	79.00	40.00	2026-06-10
+10	6	3	parcial1	Parcial 1	86.00	30.00	2026-03-15
+11	6	3	parcial2	Parcial 2	88.00	30.00	2026-04-30
+12	6	3	final	Final	91.00	40.00	2026-06-10
+13	8	2	parcial1	Parcial 1	68.00	30.00	2026-03-15
+14	8	2	parcial2	Parcial 2	70.00	30.00	2026-04-30
+15	8	2	final	Final	74.00	40.00	2026-06-10
+16	10	1	parcial1	Parcial 1	75.00	30.00	2026-03-15
+17	10	1	parcial2	Parcial 2	77.00	30.00	2026-04-30
+18	10	1	final	Final	81.00	40.00	2026-06-10
+19	12	2	parcial1	Parcial 1	42.00	30.00	2026-03-15
+20	12	2	parcial2	Parcial 2	40.00	30.00	2026-04-30
+21	12	2	final	Final	50.00	40.00	2026-06-10
+22	14	2	parcial1	Parcial 1	86.00	30.00	2026-03-15
+23	14	2	parcial2	Parcial 2	87.00	30.00	2026-04-30
+24	14	2	final	Final	91.00	40.00	2026-06-10
+25	16	3	parcial1	Parcial 1	68.00	30.00	2026-03-15
+26	16	3	parcial2	Parcial 2	65.00	30.00	2026-04-30
+27	16	3	final	Final	75.00	40.00	2026-06-10
+28	18	1	parcial1	Parcial 1	80.00	30.00	2026-03-15
+29	18	1	parcial2	Parcial 2	78.00	30.00	2026-04-30
+30	18	1	final	Final	86.00	40.00	2026-06-10
+31	20	2	parcial1	Parcial 1	65.00	30.00	2026-03-15
+32	20	2	parcial2	Parcial 2	64.00	30.00	2026-04-30
+33	20	2	final	Final	72.00	40.00	2026-06-10
+34	21	1	parcial1	Parcial 1	76.00	30.00	2026-03-15
+35	21	1	parcial2	Parcial 2	78.00	30.00	2026-04-30
+36	21	1	final	Final	82.00	40.00	2026-06-10
+37	22	2	parcial1	Parcial 1	74.00	30.00	2026-03-15
+38	22	2	parcial2	Parcial 2	72.00	30.00	2026-04-30
+39	22	2	final	Final	80.00	40.00	2026-06-10
+40	24	3	parcial1	Parcial 1	84.00	30.00	2026-03-15
+41	24	3	parcial2	Parcial 2	85.00	30.00	2026-04-30
+42	24	3	final	Final	88.00	40.00	2026-06-10
+43	25	2	parcial1	Parcial 1	71.00	30.00	2026-03-15
+44	25	2	parcial2	Parcial 2	70.00	30.00	2026-04-30
+45	25	2	final	Final	78.00	40.00	2026-06-10
+\.
+
+
+--
+-- Data for Name: grupos; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.grupos (id_oferta, id_materia, id_aula, id_periodo, id_profesor, id_horario, vacantes_max, vacantes_ocupadas, activo, codigo_grupo) FROM stdin;
+56	69	9	58	2	27	30	1	t	PROG-101-C
+20	79	19	58	2	37	30	2	t	ADM-101-A
+14	80	20	58	2	38	30	1	t	ADM-102-A
+71	79	17	58	1	17	30	1	t	ADM-101-B
+100	79	18	58	2	6	30	2	t	ADM-101-C
+74	80	18	58	1	18	30	1	t	ADM-102-C
+107	79	20	58	3	26	30	2	t	ADM-101-D
+69	80	19	58	2	7	30	2	t	ADM-102-B
+102	68	7	58	1	37	30	1	t	PROG-100-D
+106	69	8	58	1	38	30	1	t	PROG-101-D
+18	66	6	58	2	24	30	1	t	FIS-101-A
+58	66	4	58	1	4	30	1	t	FIS-101-C
+37	82	22	58	2	40	30	1	t	ELEC-101-A
+44	83	22	58	2	10	30	1	t	ELEC-102-A
+22	85	25	58	3	1	30	1	t	WEB-101-A
+33	86	25	58	2	13	30	1	t	WEB-102-A
+34	87	27	58	3	3	30	1	t	WEB-103-A
+26	68	6	58	1	6	30	1	t	PROG-100-A
+16	69	10	58	3	16	30	1	t	PROG-101-A
+57	68	8	58	2	26	30	1	t	PROG-100-B
+54	69	7	58	1	7	30	1	t	PROG-101-B
+30	63	3	58	2	21	30	0	t	MAT-101-A
+62	63	1	58	1	1	30	0	t	MAT-101-B
+104	63	2	58	1	32	30	0	t	MAT-101-C
+118	63	4	58	3	10	30	0	t	MAT-101-D
+70	64	3	58	1	33	30	0	t	MAT-102-A
+84	64	2	58	1	2	30	0	t	MAT-102-B
+87	64	4	58	2	22	30	0	t	MAT-102-C
+110	64	5	58	3	11	30	0	t	MAT-102-D
+40	65	3	58	1	3	30	0	t	MAT-103-A
+77	65	4	58	1	34	30	0	t	MAT-103-B
+93	65	5	58	2	23	30	0	t	MAT-103-C
+120	65	6	58	3	12	30	0	t	MAT-103-D
+47	66	5	58	1	35	30	0	t	FIS-101-B
+82	66	7	58	3	13	30	0	t	FIS-101-D
+28	67	8	58	3	14	30	0	t	FIS-102-A
+59	67	6	58	1	36	30	0	t	FIS-102-B
+60	67	7	58	2	25	30	0	t	FIS-102-C
+121	67	5	58	1	5	30	0	t	FIS-102-D
+27	70	8	58	1	8	30	0	t	PROG-102-A
+66	70	9	58	1	39	30	0	t	PROG-102-B
+109	70	11	58	3	17	30	0	t	PROG-102-C
+114	70	10	58	2	28	30	0	t	PROG-102-D
+50	71	9	58	1	9	30	0	t	PROG-103-A
+99	71	11	58	2	29	30	0	t	PROG-103-B
+112	71	10	58	1	40	30	0	t	PROG-103-C
+117	71	12	58	3	18	30	0	t	PROG-103-D
+24	72	11	58	1	41	30	0	t	PROG-104-A
+76	72	10	58	1	10	30	0	t	PROG-104-B
+85	72	13	58	3	19	30	0	t	PROG-104-C
+113	72	12	58	2	30	30	0	t	PROG-104-D
+19	73	12	58	1	42	30	0	t	PROG-105-A
+51	73	13	58	2	31	30	0	t	PROG-105-B
+67	73	11	58	1	11	30	0	t	PROG-105-C
+97	73	14	58	3	20	30	0	t	PROG-105-D
+17	74	14	58	2	32	30	0	t	PROG-106-A
+75	74	12	58	1	12	30	0	t	PROG-106-B
+81	74	15	58	3	21	30	0	t	PROG-106-C
+86	74	13	58	2	1	30	0	t	PROG-106-D
+23	75	16	58	3	22	30	0	t	CONT-101-A
+39	75	14	58	2	2	30	0	t	CONT-101-B
+48	75	15	58	2	33	30	0	t	CONT-101-C
+115	75	13	58	1	13	30	0	t	CONT-101-D
+15	76	17	58	3	23	30	0	t	CONT-102-A
+45	76	14	58	1	14	30	0	t	CONT-102-B
+46	76	16	58	2	34	30	0	t	CONT-102-C
+83	76	15	58	2	3	30	0	t	CONT-102-D
+80	77	17	58	2	35	30	0	t	CONT-103-A
+90	77	16	58	2	4	30	0	t	CONT-103-B
+96	77	18	58	3	24	30	0	t	CONT-103-C
+111	77	15	58	1	15	30	0	t	CONT-103-D
+29	78	17	58	2	5	30	0	t	CONT-104-A
+55	78	16	58	1	16	30	0	t	CONT-104-B
+91	78	18	58	2	36	30	0	t	CONT-104-C
+108	78	19	58	3	25	30	0	t	CONT-104-D
+52	81	21	58	2	39	30	0	t	ADM-103-A
+103	81	19	58	1	19	30	0	t	ADM-103-B
+119	81	20	58	2	8	30	0	t	ADM-103-C
+72	82	21	58	2	9	30	0	t	ELEC-101-B
+88	82	20	58	1	20	30	0	t	ELEC-101-C
+98	83	23	58	2	41	30	0	t	ELEC-102-B
+122	83	21	58	1	21	30	0	t	ELEC-102-C
+53	84	23	58	2	11	30	0	t	ELEC-103-A
+63	84	22	58	1	22	30	0	t	ELEC-103-B
+101	84	24	58	2	42	30	0	t	ELEC-103-C
+42	85	24	58	2	12	30	0	t	WEB-101-B
+61	85	23	58	1	23	30	0	t	WEB-101-C
+105	86	24	58	1	24	30	0	t	WEB-102-B
+116	86	26	58	3	2	30	0	t	WEB-102-C
+78	87	26	58	2	14	30	0	t	WEB-103-B
+92	87	25	58	1	25	30	0	t	WEB-103-C
+13	88	28	58	3	4	30	0	t	OFFICE-101-A
+35	88	27	58	2	15	30	0	t	OFFICE-101-B
+89	88	26	58	1	26	30	0	t	OFFICE-101-C
+79	89	29	58	3	5	30	0	t	OFFICE-102-A
+94	89	28	58	2	16	30	0	t	OFFICE-102-B
+95	89	27	58	1	27	30	0	t	OFFICE-102-C
+32	90	28	58	1	28	30	0	t	OFFICE-103-A
+49	90	29	58	2	17	30	0	t	OFFICE-103-B
+65	90	30	58	3	6	30	0	t	OFFICE-103-C
+25	91	29	58	1	29	30	0	t	DESIGN-101-A
+68	68	9	58	3	15	30	1	t	PROG-100-C
+36	91	1	58	3	7	30	0	t	DESIGN-101-B
+41	91	30	58	2	18	30	0	t	DESIGN-101-C
+21	92	1	58	2	19	30	0	t	DESIGN-102-A
+31	92	30	58	1	30	30	0	t	DESIGN-102-B
+43	92	2	58	3	8	30	0	t	DESIGN-102-C
+38	93	3	58	3	9	30	0	t	DESIGN-103-A
+64	93	2	58	2	20	30	0	t	DESIGN-103-B
+73	93	1	58	1	31	30	0	t	DESIGN-103-C
+\.
+
+
+--
+-- Data for Name: horarios; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.horarios (id_horario, dia_semana, hora_inicio, hora_fin, activo) FROM stdin;
+1	lunes	07:00:00	09:00:00	t
+2	lunes	09:15:00	11:15:00	t
+3	lunes	11:30:00	13:30:00	t
+4	lunes	14:00:00	16:00:00	t
+5	lunes	16:15:00	18:15:00	t
+6	lunes	18:30:00	20:30:00	t
+7	martes	07:00:00	09:00:00	t
+8	martes	09:15:00	11:15:00	t
+9	martes	11:30:00	13:30:00	t
+10	martes	14:00:00	16:00:00	t
+11	martes	16:15:00	18:15:00	t
+12	martes	18:30:00	20:30:00	t
+13	miercoles	07:00:00	09:00:00	t
+14	miercoles	09:15:00	11:15:00	t
+15	miercoles	11:30:00	13:30:00	t
+16	miercoles	14:00:00	16:00:00	t
+17	miercoles	16:15:00	18:15:00	t
+18	miercoles	18:30:00	20:30:00	t
+19	jueves	07:00:00	09:00:00	t
+20	jueves	09:15:00	11:15:00	t
+21	jueves	11:30:00	13:30:00	t
+22	jueves	14:00:00	16:00:00	t
+23	jueves	16:15:00	18:15:00	t
+24	jueves	18:30:00	20:30:00	t
+25	viernes	07:00:00	09:00:00	t
+26	viernes	09:15:00	11:15:00	t
+27	viernes	11:30:00	13:30:00	t
+28	viernes	14:00:00	16:00:00	t
+29	viernes	16:15:00	18:15:00	t
+30	viernes	18:30:00	20:30:00	t
+31	sabado	07:00:00	09:00:00	t
+32	sabado	09:15:00	11:15:00	t
+33	sabado	11:30:00	13:30:00	t
+34	sabado	14:00:00	16:00:00	t
+35	sabado	16:15:00	18:15:00	t
+36	sabado	18:30:00	20:30:00	t
+37	domingo	07:00:00	09:00:00	t
+38	domingo	09:15:00	11:15:00	t
+39	domingo	11:30:00	13:30:00	t
+40	domingo	14:00:00	16:00:00	t
+41	domingo	16:15:00	18:15:00	t
+42	domingo	18:30:00	20:30:00	t
+\.
+
+
+--
+-- Data for Name: inscripciones; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.inscripciones (id_inscripcion, id_estudiante, id_oferta, fecha_inscripcion, estado, calificacion_final, aprobado, observaciones, fecha_aprobacion) FROM stdin;
+1	4	20	2026-06-16 23:47:29.512758	activo	\N	\N	\N	\N
+2	5	26	2026-02-10 08:00:00	aprobado	80.00	t	\N	2026-06-15
+3	5	16	2026-02-10 08:00:00	aprobado	74.00	t	\N	2026-06-15
+4	6	57	2026-02-10 08:00:00	aprobado	75.00	t	\N	2026-06-15
+5	6	54	2026-02-10 08:00:00	activo	\N	\N	\N	\N
+6	7	68	2026-02-10 08:00:00	aprobado	88.00	t	\N	2026-06-15
+7	7	56	2026-02-10 08:00:00	activo	\N	\N	\N	\N
+8	8	20	2026-02-10 08:00:00	aprobado	71.00	t	\N	2026-06-15
+9	8	14	2026-02-10 08:00:00	activo	\N	\N	\N	\N
+10	9	71	2026-02-10 08:00:00	aprobado	78.00	t	\N	2026-06-15
+11	9	69	2026-02-10 08:00:00	activo	\N	\N	\N	\N
+12	10	100	2026-02-10 08:00:00	reprobado	45.00	f	\N	\N
+13	10	107	2026-02-10 08:00:00	activo	\N	\N	\N	\N
+14	11	100	2026-02-10 08:00:00	aprobado	88.00	t	\N	2026-06-15
+15	11	74	2026-02-10 08:00:00	activo	\N	\N	\N	\N
+16	12	107	2026-02-10 08:00:00	aprobado	70.00	t	\N	2026-06-15
+17	12	69	2026-02-10 08:00:00	activo	\N	\N	\N	\N
+18	13	102	2026-02-10 08:00:00	aprobado	82.00	t	\N	2026-06-15
+19	13	106	2026-02-10 08:00:00	activo	\N	\N	\N	\N
+20	14	18	2026-02-10 08:00:00	aprobado	68.00	t	\N	2026-06-15
+21	15	58	2026-02-10 08:00:00	aprobado	79.00	t	\N	2026-06-15
+22	15	37	2026-02-10 08:00:00	aprobado	76.00	t	\N	2026-06-15
+23	15	44	2026-02-10 08:00:00	activo	\N	\N	\N	\N
+24	16	22	2026-02-10 08:00:00	aprobado	86.00	t	\N	2026-06-15
+25	16	33	2026-02-10 08:00:00	aprobado	74.00	t	\N	2026-06-15
+26	16	34	2026-02-10 08:00:00	activo	\N	\N	\N	\N
+\.
+
+
+--
+-- Data for Name: malla_curricular; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.malla_curricular (id_malla, id_carrera, id_nivel, id_materia, orden_en_nivel, obligatoria) FROM stdin;
+81	17	33	63	1	t
+82	17	33	64	1	t
+83	17	33	65	1	t
+84	17	33	68	1	t
+85	17	33	69	1	t
+86	17	33	66	1	t
+87	17	34	70	1	t
+88	17	34	71	1	t
+89	17	34	72	1	t
+90	17	35	73	1	t
+91	17	35	74	1	t
+92	17	36	82	1	t
+93	17	36	83	1	t
+94	18	37	63	1	t
+95	18	37	64	1	t
+96	18	37	75	1	t
+97	18	38	76	1	t
+98	18	38	77	1	t
+99	18	38	79	1	t
+100	18	39	78	1	t
+101	18	39	80	1	t
+102	18	40	81	1	t
+103	19	41	63	1	t
+104	19	41	79	1	t
+105	19	41	75	1	t
+106	19	42	80	1	t
+107	19	42	81	1	t
+108	19	42	76	1	t
+109	19	43	77	1	t
+110	19	44	64	1	t
+111	20	45	68	1	t
+112	20	45	74	1	t
+113	20	45	66	1	t
+114	20	46	63	1	t
+115	20	46	69	1	t
+116	21	47	66	1	t
+117	21	47	82	1	t
+118	21	47	63	1	t
+119	21	48	83	1	t
+120	21	48	84	1	t
+\.
+
+
+--
+-- Data for Name: materias; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.materias (id_materia, codigo, nombre, duracion_meses, costo_mensual, creditos, activo, id_materia_requisito) FROM stdin;
+64	MAT-102	Cálculo I	1	160.00	3	t	63
+65	MAT-103	Cálculo II	1	160.00	3	t	64
+66	FIS-101	Física General	1	170.00	3	t	\N
+67	FIS-102	Electromagnetismo	1	180.00	3	t	66
+68	PROG-100	Intro a Programación	1	150.00	2	t	\N
+69	PROG-101	Algorítmica	1	160.00	3	t	68
+70	PROG-102	POO I	1	170.00	3	t	69
+71	PROG-103	POO II	1	170.00	3	t	70
+72	PROG-104	Bases de Datos I	1	180.00	3	t	71
+73	PROG-105	Bases de Datos II	1	180.00	3	t	72
+74	PROG-106	Redes y Comunicaciones	1	160.00	3	t	73
+76	CONT-102	Contabilidad Intermedia	1	160.00	3	t	75
+77	CONT-103	Tributación	1	170.00	3	t	76
+78	CONT-104	Costos y Presupuestos	1	170.00	3	t	77
+79	ADM-101	Administración General	1	150.00	3	t	\N
+80	ADM-102	Marketing	1	160.00	3	t	79
+81	ADM-103	RRHH	1	160.00	3	t	80
+82	ELEC-101	Electrónica Básica	1	160.00	3	t	66
+83	ELEC-102	Electrónica Digital	1	170.00	3	t	82
+84	ELEC-103	Microprocesadores	1	180.00	3	t	83
+85	WEB-101	HTML y CSS	1	120.00	2	t	\N
+86	WEB-102	JavaScript Básico	1	130.00	2	t	85
+87	WEB-103	Frameworks Web	1	150.00	3	t	86
+88	OFFICE-101	Word Profesional	1	100.00	2	t	\N
+89	OFFICE-102	Excel Básico	1	110.00	2	t	88
+90	OFFICE-103	Excel Avanzado	1	130.00	2	t	89
+91	DESIGN-101	Fundamentos Diseño	1	130.00	2	t	\N
+92	DESIGN-102	Photoshop	1	150.00	3	t	91
+93	DESIGN-103	Diseño Digital	1	160.00	3	t	92
+75	CONT-101	Contabilidad Básica	1	150.00	3	t	81
+63	MAT-101	Matemática Básica	1	150.00	3	t	77
+\.
+
+
+--
+-- Data for Name: matricula_unica; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.matricula_unica (id_matricula, id_estudiante, fecha_pago, monto_pagado, comprobante, estado) FROM stdin;
+12	3	2026-06-16	500.00	MAT-3-1781656358357	pagado
+13	4	2026-06-16	500.00	MAT-4-1781665402712	pagado
+14	5	2026-02-01	500.00	MAT-5-202602010001	pagado
+15	6	2026-02-01	500.00	MAT-6-202602010002	pagado
+16	7	2026-02-01	500.00	MAT-7-202602010003	pagado
+17	8	2026-02-01	500.00	MAT-8-202602010004	pagado
+18	9	2026-02-01	500.00	MAT-9-202602010005	pagado
+19	10	2026-02-01	500.00	MAT-10-202602010006	pagado
+20	11	2026-02-01	500.00	MAT-11-202602010007	pagado
+21	12	2026-02-01	500.00	MAT-12-202602010008	pagado
+22	13	2026-02-01	500.00	MAT-13-202602010009	pagado
+23	14	2026-02-01	500.00	MAT-14-202602010010	pagado
+24	15	2026-02-01	500.00	MAT-15-202602010011	pagado
+25	16	2026-02-01	500.00	MAT-16-202602010012	pagado
+26	17	2026-06-18	500.00	MAT-17-1781800390569	pagado
+\.
+
+
+--
+-- Data for Name: migrations; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.migrations (id, migration, batch) FROM stdin;
+\.
+
+
+--
+-- Data for Name: niveles_carrera; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.niveles_carrera (id_nivel, id_carrera, numero_nivel, nombre, descripcion) FROM stdin;
+33	17	1	Año 1	\N
+34	17	2	Año 2	\N
+35	17	3	Año 3	\N
+36	17	4	Año 4	\N
+37	18	1	Año 1	\N
+38	18	2	Año 2	\N
+39	18	3	Año 3	\N
+40	18	4	Año 4	\N
+41	19	1	Año 1	\N
+42	19	2	Año 2	\N
+43	19	3	Año 3	\N
+44	19	4	Año 4	\N
+45	20	1	Año 1	\N
+46	20	2	Año 2	\N
+47	21	1	Año 1	\N
+48	21	2	Año 2	\N
+\.
+
+
+--
+-- Data for Name: pago_carrera_completa; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.pago_carrera_completa (id_pago_carrera, id_estudiante, id_carrera, monto_total, forma_pago, cuotas_total, estado, fecha_contrato, materias_cubiertas, monto_pagado) FROM stdin;
+5	3	18	12000.00	contado	1	pagado	2026-06-16	0	12000.00
+6	4	19	12800.00	contado	1	pagado	2026-06-16	0	12800.00
+7	5	17	20000.00	contado	1	pagado	2026-02-01	0	20000.00
+9	7	17	20000.00	contado	1	pagado	2026-02-01	0	20000.00
+10	8	18	15000.00	contado	1	pagado	2026-02-01	0	15000.00
+12	10	18	15000.00	contado	1	pagado	2026-02-01	0	15000.00
+13	11	19	16000.00	contado	1	pagado	2026-02-01	0	16000.00
+14	12	19	16000.00	contado	1	pagado	2026-02-01	0	16000.00
+15	13	20	12000.00	contado	1	pagado	2026-02-01	0	12000.00
+16	14	20	12000.00	contado	1	pagado	2026-02-01	0	12000.00
+17	15	21	13000.00	contado	1	pagado	2026-02-01	0	13000.00
+8	6	17	20000.00	credito	9	parcial	2026-02-01	4	6666.67
+11	9	18	15000.00	credito	5	parcial	2026-02-01	4	7500.00
+\.
+
+
+--
+-- Data for Name: pago_materia_suelta; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.pago_materia_suelta (id_pago_materia, id_inscripcion, monto_pagado, fecha_pago, estado) FROM stdin;
+7	13	1666.67	2026-06-18	pendiente
+8	24	120.00	2026-06-18	pendiente
+9	25	130.00	2026-06-18	pendiente
+10	26	150.00	2026-06-18	pendiente
+\.
+
+
+--
+-- Data for Name: pagofacil_transacciones; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.pagofacil_transacciones (id_transaccion_pf, transaction_id_api, payment_number, id_estudiante, monto, concepto, codigo_grupo, id_inscripcion, estado, fecha_generacion, fecha_pago) FROM stdin;
+13	10070328	MAT-3-1781656358357	3	500.00	matricula	\N	\N	pagado	2026-06-16 20:32:42.788218	2026-06-16 20:33:49.043924
+14	10075510	CARRERA-3-1781663110136	3	12000.00	carrera	TEC-CONT	\N	pagado	2026-06-16 22:25:15.687766	2026-06-16 22:26:06.093023
+15	10076667	MAT-4-1781665402712	4	500.00	matricula	\N	\N	pagado	2026-06-16 23:03:28.297946	2026-06-16 23:04:42.30513
+16	10077568	CARRERA-4-1781667406124	4	12800.00	carrera	TEC-ADM	\N	pagado	2026-06-16 23:36:51.659951	2026-06-16 23:38:57.190947
+17	10118932	MAT-17-1781800144119	17	500.00	matricula	\N	\N	pendiente	2026-06-18 12:29:08.925243	\N
+18	10119022	MAT-17-1781800390569	17	500.00	matricula	\N	\N	pagado	2026-06-18 12:33:14.418764	2026-06-18 12:37:47.607559
+\.
+
+
+--
+-- Data for Name: periodos_dictado; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.periodos_dictado (id_periodo, nombre, tipo_periodo, fecha_inicio, fecha_fin, id_nivel, activo) FROM stdin;
+58	Período 1 - 2026	semestral	2026-02-01	2026-06-30	\N	t
+59	Período 2 - 2026	semestral	2026-08-01	2026-12-15	\N	t
+\.
+
+
+--
+-- Data for Name: personal_administrativo; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.personal_administrativo (id_personal, id_usuario, legajo_personal, cargo, fecha_ingreso, oficina, sueldo_base, observaciones) FROM stdin;
+1	27	DIR-003	director	2026-06-18	\N	0.00	\N
+2	12	ADM-DIR-001	Director	2026-01-01	Dirección General	2000.00	\N
+\.
+
+
+--
+-- Data for Name: profesores; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.profesores (id_profesor, id_usuario, legajo_profesor, especialidad, titulo_maximo, fecha_contratacion, sueldo_base, observaciones) FROM stdin;
+1	5	PROF-001	Programación	Licenciatura	2026-06-16	5000.00	\N
+2	6	PROF-002	Matemática	Licenciatura	2026-06-16	5000.00	\N
+3	7	PROF-003	Electrónica	Licenciatura	2026-06-16	5000.00	\N
+4	8	PROF-004	Administración	Licenciatura	2026-06-16	5000.00	\N
+5	9	PROF-005	Redes	Licenciatura	2026-06-16	5000.00	\N
+7	26	PROF-101	Informatica	Licenciatura	2026-06-18	5000.00	\N
+\.
+
+
+--
+-- Data for Name: roles; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.roles (id_rol, nombre_rol, descripcion, activo) FROM stdin;
+1	propietario	dueño del instituto	t
+2	director	Director del instituto	t
+3	secretaria	Secretaria de la institución	t
+4	profesor	Docente de la institución	t
+5	estudiante	Estudiante de la institución	t
+\.
+
+
+--
+-- Data for Name: seguimiento_estudiante; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.seguimiento_estudiante (id_seguimiento, id_inscripcion, calificacion_final, estado_actual, observaciones, fecha_aprobacion, created_at, updated_at) FROM stdin;
+1	1	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+2	2	80.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+3	3	74.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+4	4	75.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+5	5	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+6	6	88.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+7	7	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+8	8	71.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+9	9	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+10	10	78.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+11	11	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+12	12	45.00	reprobado	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+13	13	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+14	14	88.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+15	15	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+16	16	70.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+17	17	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+18	18	82.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+19	19	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+20	20	68.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+21	21	79.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+22	22	76.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+23	23	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+24	24	86.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+25	25	74.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+26	26	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
+\.
+
+
+--
+-- Data for Name: seguimiento_log; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.seguimiento_log (id_log, id_usuario, accion, descripcion, ip_origen, fecha_hora) FROM stdin;
+1	11	PAGO_QR_GENERADO	matricula | 500.00 Bs | MAT-3-1781656358357	127.0.0.1	2026-06-16 20:32:47.312818
+2	11	PAGO_QR_GENERADO	carrera TEC-CONT | 12000 Bs | CARRERA-3-1781663110136	127.0.0.1	2026-06-16 22:25:19.93196
+3	12	PAGO_QR_GENERADO	matricula | 500.00 Bs | MAT-4-1781665402712	127.0.0.1	2026-06-16 23:03:32.563516
+4	12	PAGO_QR_GENERADO	carrera TEC-ADM | 12800 Bs | CARRERA-4-1781667406124	127.0.0.1	2026-06-16 23:36:56.019137
+5	28	PAGO_QR_GENERADO	matricula | 500.00 Bs | MAT-17-1781800144119	127.0.0.1	2026-06-18 12:29:13.84322
+6	28	PAGO_QR_GENERADO	matricula | 500.00 Bs | MAT-17-1781800390569	127.0.0.1	2026-06-18 12:33:19.280609
+\.
+
+
+--
+-- Data for Name: sessions; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.sessions (id, user_id, ip_address, user_agent, payload, last_activity) FROM stdin;
+Bv8Mch4K4C9AOh3nIPxidv0xqXQSHGinSx1sOhrJ	\N	127.0.0.1	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36	YTozOntzOjY6Il90b2tlbiI7czo0MDoiQmhhSnZuQ3FiUTVWWWE5QXJOZGJIMnVlWFVGRlRJbFE4SVFocTBqUSI7czo5OiJfcHJldmlvdXMiO2E6Mjp7czozOiJ1cmwiO3M6Mjc6Imh0dHA6Ly8xMjcuMC4wLjE6ODAwMC9sb2dpbiI7czo1OiJyb3V0ZSI7czo1OiJsb2dpbiI7fXM6NjoiX2ZsYXNoIjthOjI6e3M6Mzoib2xkIjthOjA6e31zOjM6Im5ldyI7YTowOnt9fX0=	1780500015
+peB75qXEEL2NBuDjOQL3V911BH55c3zTSEu5trsY	16	127.0.0.1	Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0	YTo0OntzOjY6Il90b2tlbiI7czo0MDoiNW9oUVFrRGZVZTdWRHFIRW5FREV4bHVuTWpLZGRHYlIzUm1NaWJaYSI7czo5OiJfcHJldmlvdXMiO2E6Mjp7czozOiJ1cmwiO3M6MjE6Imh0dHA6Ly8xMjcuMC4wLjE6ODAwMCI7czo1OiJyb3V0ZSI7Tjt9czo2OiJfZmxhc2giO2E6Mjp7czozOiJvbGQiO2E6MDp7fXM6MzoibmV3IjthOjA6e319czozOiJ1cmwiO2E6MTp7czo4OiJpbnRlbmRlZCI7czozMToiaHR0cDovLzEyNy4wLjAuMTo4MDAwL2Rhc2hib2FyZCI7fX0=	1780500239
+\.
+
+
+--
+-- Data for Name: usuarios; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.usuarios (id_usuario, nombre, apellido, email, password_hash, dni, telefono, direccion, id_rol, foto_perfil, activo, bloqueado, fecha_registro) FROM stdin;
+13	Maria	Rodriguez Torrez	maria.rodriguez@test.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	11223344	71100013	\N	5	\N	t	f	2026-06-18 09:38:59.501775
+14	Carlos	Mamani Condori	carlos.mamani@test.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	22334455	71100014	\N	5	\N	t	f	2026-06-18 09:38:59.501775
+15	Sofia	Gutierrez Aguilar	sofia.gutierrez@test.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	33445566	71100015	\N	5	\N	t	f	2026-06-18 09:38:59.501775
+16	Diego	Flores Quispe	diego.flores@test.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	44556677	71100016	\N	5	\N	t	f	2026-06-18 09:38:59.501775
+17	Patricia	Mendez Vargas	patricia.mendez@test.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	55667788	71100017	\N	5	\N	t	f	2026-06-18 09:38:59.501775
+18	Roberto	Vargas Choque	roberto.vargas@test.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	66778899	71100018	\N	5	\N	t	f	2026-06-18 09:38:59.501775
+19	Sandra	Choque Mamani	sandra.choque@test.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	77889900	71100019	\N	5	\N	t	f	2026-06-18 09:38:59.501775
+20	Fernando	Quispe Rocha	fernando.quispe@test.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	88990011	71100020	\N	5	\N	t	f	2026-06-18 09:38:59.501775
+21	Claudia	Rocha Salinas	claudia.rocha@test.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	99001122	71100021	\N	5	\N	t	f	2026-06-18 09:38:59.501775
+22	Miguel	Aranda Montano	miguel.aranda@test.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	10112233	71100022	\N	5	\N	t	f	2026-06-18 09:38:59.501775
+23	Valeria	Montano Cruz	valeria.montano@test.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	20223344	71100023	\N	5	\N	t	f	2026-06-18 09:38:59.501775
+24	Jorge	Salinas Perez	jorge.salinas@test.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	30334455	71100024	\N	5	\N	t	f	2026-06-18 09:38:59.501775
+26	Juan	Perez	jp1@gmail.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	556267788	79222222	\N	4	\N	t	f	2026-06-18 10:44:03.027134
+27	Evanz	Valcazar	evansbv1@gmail.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	09679565	89898989	\N	2	\N	t	f	2026-06-18 11:41:40.500586
+28	Evans	Balcazar Veizaga	evansbalcazar@uagrm.edu.bo	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	123456789	72107856	\N	5	\N	t	f	2026-06-18 12:26:42.405217
+2	Roly	Hernandez	roly.hernandez@ficct.uagrm.edu.bo	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	234567445	70000002	\N	2	\N	t	f	2026-06-16 01:05:49.18209
+4	Roly	Lijeron	lijeronhr10@gmail.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	99999765	70000099	\N	1	\N	t	f	2026-06-16 01:05:49.18209
+1	hebert	Suarez Burgos	suarezburgoshebert@gmail.com	$2y$12$ZFuC61uCTEl7SHEma48OR.vUwiEf.cwXpXEoAWu.gNR0EIwMbp/zq	10000001	70000001	\N	1	\N	t	f	2026-06-16 01:05:49.18209
+3	hebert	Suarez	hebertsuarezb@gmail.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	345678332	70000003	\N	2	\N	t	f	2026-06-16 01:05:49.18209
+5	Juan	Perez	juan.perez@mail.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	5566778	70123456	\N	4	\N	t	f	2026-06-16 01:06:43.765348
+6	María	García	maria.garcia@mail.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	6677777	70234567	\N	4	\N	t	f	2026-06-16 01:06:43.765348
+7	Carlos	López	carlos.lopez@mail.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	7788878	70345678	\N	4	\N	t	f	2026-06-16 01:06:43.765348
+8	Ana	Rodríguez	ana.rodriguez@mail.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	8899000	70456789	\N	4	\N	t	f	2026-06-16 01:06:43.765348
+9	Luis	Martínez	luis.martinez@mail.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	9900111	70567890	\N	4	\N	t	f	2026-06-16 01:06:43.765348
+11	luis fernando	blanco bautista	blancobautistaluisfernando@gmail.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	9760600	75695707	\N	5	\N	t	f	2026-06-16 20:25:16.580601
+29	Ana	Gomez (Secretaria)	secretaria@institutosanpablo.edu.bo	$2y$12$4CfOjCXYoEZKxs82VkHs4.l5Ft2NWDhjMM8FhPR.I.R32ESWbVS16	12345678	77712345	Av. Principal #123	3	\N	t	f	2026-06-26 22:55:53.05549
+12	Hebert	Suarez Burgos	hebertsb08@gmail.com	$2y$12$pCGhi3X1ePcydaA7RX9p/e5S89eRrBqTDqmDBDlpIProNq0EbfQYO	4534546	75345444	Santa Cruz, Bolivia	2	\N	t	f	2026-06-16 23:00:11.084215
+\.
+
+
+--
+-- Name: afiliaciones_estudiante_id_afiliacion_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.afiliaciones_estudiante_id_afiliacion_seq', 26, true);
+
+
+--
+-- Name: aulas_id_aula_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.aulas_id_aula_seq', 31, true);
+
+
+--
+-- Name: carreras_id_carrera_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.carreras_id_carrera_seq', 24, true);
+
+
+--
+-- Name: consumo_materias_carrera_id_consumo_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.consumo_materias_carrera_id_consumo_seq', 23, true);
+
+
+--
+-- Name: cronogramas_id_cronograma_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.cronogramas_id_cronograma_seq', 3, true);
+
+
+--
+-- Name: cuotas_carrera_id_cuota_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.cuotas_carrera_id_cuota_seq', 24, true);
+
+
+--
+-- Name: estudiantes_id_estudiante_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.estudiantes_id_estudiante_seq', 17, true);
+
+
+--
+-- Name: evaluaciones_id_evaluacion_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.evaluaciones_id_evaluacion_seq', 45, true);
+
+
+--
+-- Name: horarios_id_horario_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.horarios_id_horario_seq', 42, true);
+
+
+--
+-- Name: inscripciones_id_inscripcion_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.inscripciones_id_inscripcion_seq', 26, true);
+
+
+--
+-- Name: malla_curricular_id_malla_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.malla_curricular_id_malla_seq', 120, true);
+
+
+--
+-- Name: materias_id_materia_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.materias_id_materia_seq', 93, true);
+
+
+--
+-- Name: matricula_unica_id_matricula_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.matricula_unica_id_matricula_seq', 26, true);
+
+
+--
+-- Name: migrations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.migrations_id_seq', 1, false);
+
+
+--
+-- Name: niveles_carrera_id_nivel_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.niveles_carrera_id_nivel_seq', 48, true);
+
+
+--
+-- Name: oferta_academica_id_oferta_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.oferta_academica_id_oferta_seq', 122, true);
+
+
+--
+-- Name: pago_carrera_completa_id_pago_carrera_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.pago_carrera_completa_id_pago_carrera_seq', 6, true);
+
+
+--
+-- Name: pago_materia_suelta_id_pago_materia_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.pago_materia_suelta_id_pago_materia_seq', 8, true);
+
+
+--
+-- Name: pagofacil_transacciones_id_transaccion_pf_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.pagofacil_transacciones_id_transaccion_pf_seq', 18, true);
+
+
+--
+-- Name: periodos_dictado_id_periodo_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.periodos_dictado_id_periodo_seq', 59, true);
+
+
+--
+-- Name: personal_administrativo_id_personal_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.personal_administrativo_id_personal_seq', 2, true);
+
+
+--
+-- Name: profesores_id_profesor_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.profesores_id_profesor_seq', 7, true);
+
+
+--
+-- Name: roles_id_rol_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.roles_id_rol_seq', 5, true);
+
+
+--
+-- Name: seguimiento_estudiante_id_seguimiento_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.seguimiento_estudiante_id_seguimiento_seq', 26, true);
+
+
+--
+-- Name: seguimiento_log_id_log_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.seguimiento_log_id_log_seq', 6, true);
+
+
+--
+-- Name: usuarios_id_usuario_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.usuarios_id_usuario_seq', 31, true);
+
+
+--
+-- Name: afiliaciones_estudiante afiliaciones_estudiante_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.afiliaciones_estudiante
+    ADD CONSTRAINT afiliaciones_estudiante_pkey PRIMARY KEY (id_afiliacion);
+
+
+--
+-- Name: aulas aulas_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.aulas
+    ADD CONSTRAINT aulas_pkey PRIMARY KEY (id_aula);
+
+
+--
+-- Name: cache_locks cache_locks_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.cache_locks
+    ADD CONSTRAINT cache_locks_pkey PRIMARY KEY (key);
+
+
+--
+-- Name: cache cache_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.cache
+    ADD CONSTRAINT cache_pkey PRIMARY KEY (key);
+
+
+--
+-- Name: carreras carreras_codigo_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.carreras
+    ADD CONSTRAINT carreras_codigo_key UNIQUE (codigo);
+
+
+--
+-- Name: carreras carreras_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.carreras
+    ADD CONSTRAINT carreras_pkey PRIMARY KEY (id_carrera);
+
+
+--
+-- Name: consumo_materias_carrera consumo_materias_carrera_id_pago_carrera_id_materia_intento_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.consumo_materias_carrera
+    ADD CONSTRAINT consumo_materias_carrera_id_pago_carrera_id_materia_intento_key UNIQUE (id_pago_carrera, id_materia, intento_numero);
+
+
+--
+-- Name: consumo_materias_carrera consumo_materias_carrera_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.consumo_materias_carrera
+    ADD CONSTRAINT consumo_materias_carrera_pkey PRIMARY KEY (id_consumo);
+
+
+--
+-- Name: cronogramas cronogramas_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.cronogramas
+    ADD CONSTRAINT cronogramas_pkey PRIMARY KEY (id_cronograma);
+
+
+--
+-- Name: cuotas_carrera cuotas_carrera_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.cuotas_carrera
+    ADD CONSTRAINT cuotas_carrera_pkey PRIMARY KEY (id_cuota);
+
+
+--
+-- Name: estudiantes estudiantes_id_usuario_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.estudiantes
+    ADD CONSTRAINT estudiantes_id_usuario_key UNIQUE (id_usuario);
+
+
+--
+-- Name: estudiantes estudiantes_legajo_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.estudiantes
+    ADD CONSTRAINT estudiantes_legajo_key UNIQUE (legajo);
+
+
+--
+-- Name: estudiantes estudiantes_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.estudiantes
+    ADD CONSTRAINT estudiantes_pkey PRIMARY KEY (id_estudiante);
+
+
+--
+-- Name: evaluaciones evaluaciones_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.evaluaciones
+    ADD CONSTRAINT evaluaciones_pkey PRIMARY KEY (id_evaluacion);
+
+
+--
+-- Name: grupos grupos_codigo_grupo_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.grupos
+    ADD CONSTRAINT grupos_codigo_grupo_key UNIQUE (codigo_grupo);
+
+
+--
+-- Name: horarios horarios_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.horarios
+    ADD CONSTRAINT horarios_pkey PRIMARY KEY (id_horario);
+
+
+--
+-- Name: inscripciones inscripciones_id_estudiante_id_oferta_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.inscripciones
+    ADD CONSTRAINT inscripciones_id_estudiante_id_oferta_key UNIQUE (id_estudiante, id_oferta);
+
+
+--
+-- Name: inscripciones inscripciones_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.inscripciones
+    ADD CONSTRAINT inscripciones_pkey PRIMARY KEY (id_inscripcion);
+
+
+--
+-- Name: malla_curricular malla_curricular_id_carrera_id_materia_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.malla_curricular
+    ADD CONSTRAINT malla_curricular_id_carrera_id_materia_key UNIQUE (id_carrera, id_materia);
+
+
+--
+-- Name: malla_curricular malla_curricular_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.malla_curricular
+    ADD CONSTRAINT malla_curricular_pkey PRIMARY KEY (id_malla);
+
+
+--
+-- Name: materias materias_codigo_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.materias
+    ADD CONSTRAINT materias_codigo_key UNIQUE (codigo);
+
+
+--
+-- Name: materias materias_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.materias
+    ADD CONSTRAINT materias_pkey PRIMARY KEY (id_materia);
+
+
+--
+-- Name: matricula_unica matricula_unica_id_estudiante_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.matricula_unica
+    ADD CONSTRAINT matricula_unica_id_estudiante_key UNIQUE (id_estudiante);
+
+
+--
+-- Name: matricula_unica matricula_unica_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.matricula_unica
+    ADD CONSTRAINT matricula_unica_pkey PRIMARY KEY (id_matricula);
+
+
+--
+-- Name: migrations migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.migrations
+    ADD CONSTRAINT migrations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: niveles_carrera niveles_carrera_id_carrera_numero_nivel_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.niveles_carrera
+    ADD CONSTRAINT niveles_carrera_id_carrera_numero_nivel_key UNIQUE (id_carrera, numero_nivel);
+
+
+--
+-- Name: niveles_carrera niveles_carrera_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.niveles_carrera
+    ADD CONSTRAINT niveles_carrera_pkey PRIMARY KEY (id_nivel);
+
+
+--
+-- Name: grupos oferta_academica_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.grupos
+    ADD CONSTRAINT oferta_academica_pkey PRIMARY KEY (id_oferta);
+
+
+--
+-- Name: pago_carrera_completa pago_carrera_completa_id_estudiante_id_carrera_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pago_carrera_completa
+    ADD CONSTRAINT pago_carrera_completa_id_estudiante_id_carrera_key UNIQUE (id_estudiante, id_carrera);
+
+
+--
+-- Name: pago_carrera_completa pago_carrera_completa_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pago_carrera_completa
+    ADD CONSTRAINT pago_carrera_completa_pkey PRIMARY KEY (id_pago_carrera);
+
+
+--
+-- Name: pago_materia_suelta pago_materia_suelta_id_inscripcion_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pago_materia_suelta
+    ADD CONSTRAINT pago_materia_suelta_id_inscripcion_key UNIQUE (id_inscripcion);
+
+
+--
+-- Name: pago_materia_suelta pago_materia_suelta_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pago_materia_suelta
+    ADD CONSTRAINT pago_materia_suelta_pkey PRIMARY KEY (id_pago_materia);
+
+
+--
+-- Name: pagofacil_transacciones pagofacil_transacciones_payment_number_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pagofacil_transacciones
+    ADD CONSTRAINT pagofacil_transacciones_payment_number_key UNIQUE (payment_number);
+
+
+--
+-- Name: pagofacil_transacciones pagofacil_transacciones_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pagofacil_transacciones
+    ADD CONSTRAINT pagofacil_transacciones_pkey PRIMARY KEY (id_transaccion_pf);
+
+
+--
+-- Name: pagofacil_transacciones pagofacil_transacciones_transaction_id_api_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pagofacil_transacciones
+    ADD CONSTRAINT pagofacil_transacciones_transaction_id_api_key UNIQUE (transaction_id_api);
+
+
+--
+-- Name: periodos_dictado periodos_dictado_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.periodos_dictado
+    ADD CONSTRAINT periodos_dictado_pkey PRIMARY KEY (id_periodo);
+
+
+--
+-- Name: personal_administrativo personal_administrativo_id_usuario_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.personal_administrativo
+    ADD CONSTRAINT personal_administrativo_id_usuario_key UNIQUE (id_usuario);
+
+
+--
+-- Name: personal_administrativo personal_administrativo_legajo_personal_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.personal_administrativo
+    ADD CONSTRAINT personal_administrativo_legajo_personal_key UNIQUE (legajo_personal);
+
+
+--
+-- Name: personal_administrativo personal_administrativo_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.personal_administrativo
+    ADD CONSTRAINT personal_administrativo_pkey PRIMARY KEY (id_personal);
+
+
+--
+-- Name: profesores profesores_id_usuario_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.profesores
+    ADD CONSTRAINT profesores_id_usuario_key UNIQUE (id_usuario);
+
+
+--
+-- Name: profesores profesores_legajo_profesor_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.profesores
+    ADD CONSTRAINT profesores_legajo_profesor_key UNIQUE (legajo_profesor);
+
+
+--
+-- Name: profesores profesores_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.profesores
+    ADD CONSTRAINT profesores_pkey PRIMARY KEY (id_profesor);
+
+
+--
+-- Name: roles roles_nombre_rol_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.roles
+    ADD CONSTRAINT roles_nombre_rol_key UNIQUE (nombre_rol);
+
+
+--
+-- Name: roles roles_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.roles
+    ADD CONSTRAINT roles_pkey PRIMARY KEY (id_rol);
+
+
+--
+-- Name: seguimiento_estudiante seguimiento_estudiante_id_inscripcion_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.seguimiento_estudiante
+    ADD CONSTRAINT seguimiento_estudiante_id_inscripcion_key UNIQUE (id_inscripcion);
+
+
+--
+-- Name: seguimiento_estudiante seguimiento_estudiante_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.seguimiento_estudiante
+    ADD CONSTRAINT seguimiento_estudiante_pkey PRIMARY KEY (id_seguimiento);
+
+
+--
+-- Name: seguimiento_log seguimiento_log_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.seguimiento_log
+    ADD CONSTRAINT seguimiento_log_pkey PRIMARY KEY (id_log);
+
+
+--
+-- Name: sessions sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.sessions
+    ADD CONSTRAINT sessions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: grupos uq_profesor_periodo_horario; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.grupos
+    ADD CONSTRAINT uq_profesor_periodo_horario UNIQUE (id_profesor, id_periodo, id_horario);
+
+
+--
+-- Name: usuarios usuarios_dni_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.usuarios
+    ADD CONSTRAINT usuarios_dni_key UNIQUE (dni);
+
+
+--
+-- Name: usuarios usuarios_email_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.usuarios
+    ADD CONSTRAINT usuarios_email_key UNIQUE (email);
+
+
+--
+-- Name: usuarios usuarios_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.usuarios
+    ADD CONSTRAINT usuarios_pkey PRIMARY KEY (id_usuario);
+
+
+--
+-- Name: cache_expiration_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX cache_expiration_index ON public.cache USING btree (expiration);
+
+
+--
+-- Name: cache_locks_expiration_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX cache_locks_expiration_index ON public.cache_locks USING btree (expiration);
+
+
+--
+-- Name: idx_afiliacion_carrera; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_afiliacion_carrera ON public.afiliaciones_estudiante USING btree (id_carrera);
+
+
+--
+-- Name: idx_afiliacion_estudiante; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_afiliacion_estudiante ON public.afiliaciones_estudiante USING btree (id_estudiante, estado);
+
+
+--
+-- Name: idx_consumo_materia; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_consumo_materia ON public.consumo_materias_carrera USING btree (id_materia);
+
+
+--
+-- Name: idx_consumo_pago_carrera; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_consumo_pago_carrera ON public.consumo_materias_carrera USING btree (id_pago_carrera);
+
+
+--
+-- Name: idx_cronograma_periodo; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_cronograma_periodo ON public.cronogramas USING btree (id_periodo);
+
+
+--
+-- Name: idx_cronograma_tipo; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_cronograma_tipo ON public.cronogramas USING btree (tipo_periodo, fecha_inicio);
+
+
+--
+-- Name: idx_estudiantes_carrera_actual; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_estudiantes_carrera_actual ON public.estudiantes USING btree (id_carrera_actual);
+
+
+--
+-- Name: idx_estudiantes_legajo; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_estudiantes_legajo ON public.estudiantes USING btree (legajo);
+
+
+--
+-- Name: idx_evaluacion_inscripcion; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_evaluacion_inscripcion ON public.evaluaciones USING btree (id_inscripcion);
+
+
+--
+-- Name: idx_inscripcion_aprobado; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_inscripcion_aprobado ON public.inscripciones USING btree (aprobado);
+
+
+--
+-- Name: idx_inscripcion_estado; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_inscripcion_estado ON public.inscripciones USING btree (estado);
+
+
+--
+-- Name: idx_inscripcion_estudiante; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_inscripcion_estudiante ON public.inscripciones USING btree (id_estudiante);
+
+
+--
+-- Name: idx_inscripcion_oferta; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_inscripcion_oferta ON public.inscripciones USING btree (id_oferta);
+
+
+--
+-- Name: idx_log_fecha; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_log_fecha ON public.seguimiento_log USING btree (fecha_hora);
+
+
+--
+-- Name: idx_log_usuario; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_log_usuario ON public.seguimiento_log USING btree (id_usuario);
+
+
+--
+-- Name: idx_malla_carrera; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_malla_carrera ON public.malla_curricular USING btree (id_carrera);
+
+
+--
+-- Name: idx_malla_materia; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_malla_materia ON public.malla_curricular USING btree (id_materia);
+
+
+--
+-- Name: idx_malla_nivel; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_malla_nivel ON public.malla_curricular USING btree (id_nivel);
+
+
+--
+-- Name: idx_materias_codigo; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_materias_codigo ON public.materias USING btree (codigo);
+
+
+--
+-- Name: idx_materias_requisito; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_materias_requisito ON public.materias USING btree (id_materia_requisito);
+
+
+--
+-- Name: idx_matricula_unica_estudiante; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_matricula_unica_estudiante ON public.matricula_unica USING btree (id_estudiante);
+
+
+--
+-- Name: idx_nivel_carrera; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_nivel_carrera ON public.niveles_carrera USING btree (id_carrera);
+
+
+--
+-- Name: idx_oferta_aula; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_oferta_aula ON public.grupos USING btree (id_aula);
+
+
+--
+-- Name: idx_oferta_horario; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_oferta_horario ON public.grupos USING btree (id_horario);
+
+
+--
+-- Name: idx_oferta_materia; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_oferta_materia ON public.grupos USING btree (id_materia);
+
+
+--
+-- Name: idx_oferta_periodo; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_oferta_periodo ON public.grupos USING btree (id_periodo);
+
+
+--
+-- Name: idx_oferta_profesor; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_oferta_profesor ON public.grupos USING btree (id_profesor);
+
+
+--
+-- Name: idx_pago_carrera_carrera; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_pago_carrera_carrera ON public.pago_carrera_completa USING btree (id_carrera);
+
+
+--
+-- Name: idx_pago_carrera_estudiante; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_pago_carrera_estudiante ON public.pago_carrera_completa USING btree (id_estudiante);
+
+
+--
+-- Name: idx_pago_materia_inscripcion; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_pago_materia_inscripcion ON public.pago_materia_suelta USING btree (id_inscripcion);
+
+
+--
+-- Name: idx_periodo_fechas; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_periodo_fechas ON public.periodos_dictado USING btree (fecha_inicio, fecha_fin);
+
+
+--
+-- Name: idx_periodo_nivel; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_periodo_nivel ON public.periodos_dictado USING btree (id_nivel);
+
+
+--
+-- Name: idx_pf_transacciones_api; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_pf_transacciones_api ON public.pagofacil_transacciones USING btree (transaction_id_api);
+
+
+--
+-- Name: idx_seguimiento_inscripcion; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_seguimiento_inscripcion ON public.seguimiento_estudiante USING btree (id_inscripcion);
+
+
+--
+-- Name: idx_usuarios_bloqueado; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_usuarios_bloqueado ON public.usuarios USING btree (bloqueado);
+
+
+--
+-- Name: idx_usuarios_dni; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_usuarios_dni ON public.usuarios USING btree (dni);
+
+
+--
+-- Name: idx_usuarios_email; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_usuarios_email ON public.usuarios USING btree (email);
+
+
+--
+-- Name: idx_usuarios_rol; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_usuarios_rol ON public.usuarios USING btree (id_rol);
+
+
+--
+-- Name: sessions_last_activity_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX sessions_last_activity_index ON public.sessions USING btree (last_activity);
+
+
+--
+-- Name: sessions_user_id_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX sessions_user_id_index ON public.sessions USING btree (user_id);
+
+
+--
+-- Name: inscripciones trg_actualizar_estado_aprobacion; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_actualizar_estado_aprobacion BEFORE UPDATE OF aprobado, calificacion_final ON public.inscripciones FOR EACH ROW EXECUTE FUNCTION public.actualizar_estado_inscripcion();
+
+
+--
+-- Name: inscripciones trg_actualizar_vacantes; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_actualizar_vacantes AFTER INSERT OR DELETE ON public.inscripciones FOR EACH ROW EXECUTE FUNCTION public.actualizar_vacantes_oferta();
+
+
+--
+-- Name: evaluaciones trg_cerrar_calificacion_final; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_cerrar_calificacion_final AFTER INSERT ON public.evaluaciones FOR EACH ROW EXECUTE FUNCTION public.cerrar_calificacion_final();
+
+
+--
+-- Name: pago_carrera_completa trg_crear_cuotas_credito; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_crear_cuotas_credito AFTER INSERT ON public.pago_carrera_completa FOR EACH ROW EXECUTE FUNCTION public.crear_cuotas_credito();
+
+
+--
+-- Name: carreras trg_crear_niveles_carrera; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_crear_niveles_carrera AFTER INSERT ON public.carreras FOR EACH ROW EXECUTE FUNCTION public.crear_niveles_carrera();
+
+
+--
+-- Name: pago_materia_suelta trg_marcar_cuota_al_pagar_materia; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_marcar_cuota_al_pagar_materia AFTER UPDATE OF estado ON public.pago_materia_suelta FOR EACH ROW EXECUTE FUNCTION public.marcar_cuota_al_pagar_materia();
+
+
+--
+-- Name: pagofacil_transacciones trg_pagofacil_confirmacion; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_pagofacil_confirmacion BEFORE UPDATE ON public.pagofacil_transacciones FOR EACH ROW EXECUTE FUNCTION public.fn_confirmar_pago_qr();
+
+
+--
+-- Name: afiliaciones_estudiante trg_sincronizar_carrera_actual; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_sincronizar_carrera_actual AFTER INSERT OR UPDATE ON public.afiliaciones_estudiante FOR EACH ROW EXECUTE FUNCTION public.sincronizar_carrera_actual();
+
+
+--
+-- Name: inscripciones trg_sync_seguimiento; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_sync_seguimiento AFTER UPDATE OF estado ON public.inscripciones FOR EACH ROW EXECUTE FUNCTION public.fn_sync_seguimiento();
+
+
+--
+-- Name: grupos trg_validar_conflicto_profesor_insert; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_validar_conflicto_profesor_insert BEFORE INSERT ON public.grupos FOR EACH ROW EXECUTE FUNCTION public.validar_conflicto_profesor();
+
+
+--
+-- Name: grupos trg_validar_conflicto_profesor_update; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_validar_conflicto_profesor_update BEFORE UPDATE ON public.grupos FOR EACH ROW WHEN (((old.id_profesor <> new.id_profesor) OR (old.id_periodo <> new.id_periodo) OR (old.id_horario <> new.id_horario))) EXECUTE FUNCTION public.validar_conflicto_profesor();
+
+
+--
+-- Name: inscripciones trg_validar_inscripcion_segun_afiliacion; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_validar_inscripcion_segun_afiliacion BEFORE INSERT ON public.inscripciones FOR EACH ROW EXECUTE FUNCTION public.validar_inscripcion_segun_afiliacion();
+
+
+--
+-- Name: materias trg_validar_materia_requisito; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_validar_materia_requisito BEFORE INSERT OR UPDATE ON public.materias FOR EACH ROW EXECUTE FUNCTION public.validar_materia_requisito();
+
+
+--
+-- Name: inscripciones trg_validar_matricula_unica; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_validar_matricula_unica BEFORE INSERT ON public.inscripciones FOR EACH ROW EXECUTE FUNCTION public.validar_matricula_unica_pagada();
+
+
+--
+-- Name: niveles_carrera trg_validar_nivel_solo_carreras; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_validar_nivel_solo_carreras BEFORE INSERT ON public.niveles_carrera FOR EACH ROW EXECUTE FUNCTION public.validar_nivel_solo_carreras();
+
+
+--
+-- Name: inscripciones trg_validar_pago_inscripcion; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_validar_pago_inscripcion AFTER INSERT ON public.inscripciones FOR EACH ROW EXECUTE FUNCTION public.validar_pago_inscripcion();
+
+
+--
+-- Name: inscripciones trg_validar_requisito_antes_inscribir; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_validar_requisito_antes_inscribir BEFORE INSERT ON public.inscripciones FOR EACH ROW EXECUTE FUNCTION public.validar_requisito_aprobado();
+
+
+--
+-- Name: inscripciones trg_validar_unica_materia_antes_insert; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_validar_unica_materia_antes_insert BEFORE INSERT ON public.inscripciones FOR EACH ROW WHEN (((new.estado)::text = ANY ((ARRAY['pendiente_matricula'::character varying, 'activo'::character varying])::text[]))) EXECUTE FUNCTION public.validar_unica_materia_activa();
+
+
+--
+-- Name: inscripciones trg_validar_unica_materia_antes_update; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER trg_validar_unica_materia_antes_update BEFORE UPDATE OF estado ON public.inscripciones FOR EACH ROW WHEN (((new.estado)::text = ANY ((ARRAY['pendiente_matricula'::character varying, 'activo'::character varying])::text[]))) EXECUTE FUNCTION public.validar_unica_materia_activa();
+
+
+--
+-- Name: afiliaciones_estudiante afiliaciones_estudiante_id_carrera_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.afiliaciones_estudiante
+    ADD CONSTRAINT afiliaciones_estudiante_id_carrera_fkey FOREIGN KEY (id_carrera) REFERENCES public.carreras(id_carrera);
+
+
+--
+-- Name: afiliaciones_estudiante afiliaciones_estudiante_id_estudiante_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.afiliaciones_estudiante
+    ADD CONSTRAINT afiliaciones_estudiante_id_estudiante_fkey FOREIGN KEY (id_estudiante) REFERENCES public.estudiantes(id_estudiante);
+
+
+--
+-- Name: consumo_materias_carrera consumo_materias_carrera_id_inscripcion_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.consumo_materias_carrera
+    ADD CONSTRAINT consumo_materias_carrera_id_inscripcion_fkey FOREIGN KEY (id_inscripcion) REFERENCES public.inscripciones(id_inscripcion);
+
+
+--
+-- Name: consumo_materias_carrera consumo_materias_carrera_id_materia_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.consumo_materias_carrera
+    ADD CONSTRAINT consumo_materias_carrera_id_materia_fkey FOREIGN KEY (id_materia) REFERENCES public.materias(id_materia);
+
+
+--
+-- Name: consumo_materias_carrera consumo_materias_carrera_id_pago_carrera_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.consumo_materias_carrera
+    ADD CONSTRAINT consumo_materias_carrera_id_pago_carrera_fkey FOREIGN KEY (id_pago_carrera) REFERENCES public.pago_carrera_completa(id_pago_carrera);
+
+
+--
+-- Name: cronogramas cronogramas_id_carrera_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.cronogramas
+    ADD CONSTRAINT cronogramas_id_carrera_fkey FOREIGN KEY (id_carrera) REFERENCES public.carreras(id_carrera);
+
+
+--
+-- Name: cronogramas cronogramas_id_periodo_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.cronogramas
+    ADD CONSTRAINT cronogramas_id_periodo_fkey FOREIGN KEY (id_periodo) REFERENCES public.periodos_dictado(id_periodo);
+
+
+--
+-- Name: cuotas_carrera cuotas_carrera_id_pago_carrera_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.cuotas_carrera
+    ADD CONSTRAINT cuotas_carrera_id_pago_carrera_fkey FOREIGN KEY (id_pago_carrera) REFERENCES public.pago_carrera_completa(id_pago_carrera);
+
+
+--
+-- Name: estudiantes estudiantes_id_carrera_actual_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.estudiantes
+    ADD CONSTRAINT estudiantes_id_carrera_actual_fkey FOREIGN KEY (id_carrera_actual) REFERENCES public.carreras(id_carrera);
+
+
+--
+-- Name: estudiantes estudiantes_id_usuario_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.estudiantes
+    ADD CONSTRAINT estudiantes_id_usuario_fkey FOREIGN KEY (id_usuario) REFERENCES public.usuarios(id_usuario) ON DELETE CASCADE;
+
+
+--
+-- Name: evaluaciones evaluaciones_id_inscripcion_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.evaluaciones
+    ADD CONSTRAINT evaluaciones_id_inscripcion_fkey FOREIGN KEY (id_inscripcion) REFERENCES public.inscripciones(id_inscripcion);
+
+
+--
+-- Name: evaluaciones evaluaciones_id_profesor_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.evaluaciones
+    ADD CONSTRAINT evaluaciones_id_profesor_fkey FOREIGN KEY (id_profesor) REFERENCES public.profesores(id_profesor);
+
+
+--
+-- Name: inscripciones inscripciones_id_estudiante_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.inscripciones
+    ADD CONSTRAINT inscripciones_id_estudiante_fkey FOREIGN KEY (id_estudiante) REFERENCES public.estudiantes(id_estudiante);
+
+
+--
+-- Name: inscripciones inscripciones_id_oferta_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.inscripciones
+    ADD CONSTRAINT inscripciones_id_oferta_fkey FOREIGN KEY (id_oferta) REFERENCES public.grupos(id_oferta);
+
+
+--
+-- Name: malla_curricular malla_curricular_id_carrera_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.malla_curricular
+    ADD CONSTRAINT malla_curricular_id_carrera_fkey FOREIGN KEY (id_carrera) REFERENCES public.carreras(id_carrera);
+
+
+--
+-- Name: malla_curricular malla_curricular_id_materia_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.malla_curricular
+    ADD CONSTRAINT malla_curricular_id_materia_fkey FOREIGN KEY (id_materia) REFERENCES public.materias(id_materia);
+
+
+--
+-- Name: malla_curricular malla_curricular_id_nivel_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.malla_curricular
+    ADD CONSTRAINT malla_curricular_id_nivel_fkey FOREIGN KEY (id_nivel) REFERENCES public.niveles_carrera(id_nivel);
+
+
+--
+-- Name: materias materias_id_materia_requisito_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.materias
+    ADD CONSTRAINT materias_id_materia_requisito_fkey FOREIGN KEY (id_materia_requisito) REFERENCES public.materias(id_materia) ON DELETE SET NULL;
+
+
+--
+-- Name: matricula_unica matricula_unica_id_estudiante_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.matricula_unica
+    ADD CONSTRAINT matricula_unica_id_estudiante_fkey FOREIGN KEY (id_estudiante) REFERENCES public.estudiantes(id_estudiante);
+
+
+--
+-- Name: niveles_carrera niveles_carrera_id_carrera_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.niveles_carrera
+    ADD CONSTRAINT niveles_carrera_id_carrera_fkey FOREIGN KEY (id_carrera) REFERENCES public.carreras(id_carrera);
+
+
+--
+-- Name: grupos oferta_academica_id_aula_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.grupos
+    ADD CONSTRAINT oferta_academica_id_aula_fkey FOREIGN KEY (id_aula) REFERENCES public.aulas(id_aula);
+
+
+--
+-- Name: grupos oferta_academica_id_horario_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.grupos
+    ADD CONSTRAINT oferta_academica_id_horario_fkey FOREIGN KEY (id_horario) REFERENCES public.horarios(id_horario);
+
+
+--
+-- Name: grupos oferta_academica_id_materia_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.grupos
+    ADD CONSTRAINT oferta_academica_id_materia_fkey FOREIGN KEY (id_materia) REFERENCES public.materias(id_materia);
+
+
+--
+-- Name: grupos oferta_academica_id_periodo_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.grupos
+    ADD CONSTRAINT oferta_academica_id_periodo_fkey FOREIGN KEY (id_periodo) REFERENCES public.periodos_dictado(id_periodo);
+
+
+--
+-- Name: grupos oferta_academica_id_profesor_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.grupos
+    ADD CONSTRAINT oferta_academica_id_profesor_fkey FOREIGN KEY (id_profesor) REFERENCES public.profesores(id_profesor);
+
+
+--
+-- Name: pago_carrera_completa pago_carrera_completa_id_carrera_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pago_carrera_completa
+    ADD CONSTRAINT pago_carrera_completa_id_carrera_fkey FOREIGN KEY (id_carrera) REFERENCES public.carreras(id_carrera);
+
+
+--
+-- Name: pago_carrera_completa pago_carrera_completa_id_estudiante_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pago_carrera_completa
+    ADD CONSTRAINT pago_carrera_completa_id_estudiante_fkey FOREIGN KEY (id_estudiante) REFERENCES public.estudiantes(id_estudiante);
+
+
+--
+-- Name: pago_materia_suelta pago_materia_suelta_id_inscripcion_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pago_materia_suelta
+    ADD CONSTRAINT pago_materia_suelta_id_inscripcion_fkey FOREIGN KEY (id_inscripcion) REFERENCES public.inscripciones(id_inscripcion);
+
+
+--
+-- Name: pagofacil_transacciones pagofacil_transacciones_id_estudiante_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pagofacil_transacciones
+    ADD CONSTRAINT pagofacil_transacciones_id_estudiante_fkey FOREIGN KEY (id_estudiante) REFERENCES public.estudiantes(id_estudiante) ON DELETE CASCADE;
+
+
+--
+-- Name: pagofacil_transacciones pagofacil_transacciones_id_inscripcion_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.pagofacil_transacciones
+    ADD CONSTRAINT pagofacil_transacciones_id_inscripcion_fkey FOREIGN KEY (id_inscripcion) REFERENCES public.inscripciones(id_inscripcion) ON DELETE SET NULL;
+
+
+--
+-- Name: periodos_dictado periodos_dictado_id_nivel_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.periodos_dictado
+    ADD CONSTRAINT periodos_dictado_id_nivel_fkey FOREIGN KEY (id_nivel) REFERENCES public.niveles_carrera(id_nivel);
+
+
+--
+-- Name: personal_administrativo personal_administrativo_id_usuario_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.personal_administrativo
+    ADD CONSTRAINT personal_administrativo_id_usuario_fkey FOREIGN KEY (id_usuario) REFERENCES public.usuarios(id_usuario) ON DELETE CASCADE;
+
+
+--
+-- Name: profesores profesores_id_usuario_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.profesores
+    ADD CONSTRAINT profesores_id_usuario_fkey FOREIGN KEY (id_usuario) REFERENCES public.usuarios(id_usuario) ON DELETE CASCADE;
+
+
+--
+-- Name: seguimiento_estudiante seguimiento_estudiante_id_inscripcion_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.seguimiento_estudiante
+    ADD CONSTRAINT seguimiento_estudiante_id_inscripcion_fkey FOREIGN KEY (id_inscripcion) REFERENCES public.inscripciones(id_inscripcion) ON DELETE CASCADE;
+
+
+--
+-- Name: seguimiento_log seguimiento_log_id_usuario_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.seguimiento_log
+    ADD CONSTRAINT seguimiento_log_id_usuario_fkey FOREIGN KEY (id_usuario) REFERENCES public.usuarios(id_usuario);
+
+
+--
+-- Name: usuarios usuarios_id_rol_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.usuarios
+    ADD CONSTRAINT usuarios_id_rol_fkey FOREIGN KEY (id_rol) REFERENCES public.roles(id_rol);
+
+
+--
+-- Name: SCHEMA public; Type: ACL; Schema: -; Owner: postgres
+--
+
+--
+-- PostgreSQL database dump complete
+--
+
+
 

@@ -170,3 +170,12 @@
 | Desactivar/reactivar cualquier usuario | Solo Director comparte este permiso |
 | Ver reporte de auditoría del sistema | Nadie más puede |
 | Eliminar registros de seguimiento | Nadie más puede |
+
+
+
+--------------
+listar_mios — ver grupos propios (más útil para profesor, pero propietario también puede)
+listar_disponibles — ver oferta filtrada para inscribirse   , esto es estudiante
+En inscripciones faltó:
+
+listar_oferta(id_oferta) — ver todos los inscriptos en un grupo específico

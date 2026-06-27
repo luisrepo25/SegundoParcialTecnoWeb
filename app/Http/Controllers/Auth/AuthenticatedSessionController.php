@@ -61,11 +61,11 @@ class AuthenticatedSessionController extends Controller
     private function redirectToRoleDashboard(?string $role): string
     {
         return match ($role) {
-            'admin' => route('dashboard.admin', absolute: false),
-            'director' => route('dashboard.director', absolute: false),
-            'secretary' => route('secretaria.dashboard', absolute: false),
-            'teacher' => route('dashboard.teacher', absolute: false),
-            default => route('dashboard.student', absolute: false),
+            'propietario' => route('dashboard.propietario', absolute: false),
+            'director'    => route('dashboard.director', absolute: false),
+            'secretaria'  => route('secretaria.dashboard', absolute: false),
+            'profesor'    => route('dashboard.profesor', absolute: false),
+            default       => route('dashboard.estudiante', absolute: false),
         };
     }
 

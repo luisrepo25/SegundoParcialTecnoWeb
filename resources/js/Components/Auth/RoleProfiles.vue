@@ -1,9 +1,9 @@
 <script setup>
 const roles = [
     {
-        key: 'admin',
-        code: 'AD',
-        title: 'Administrador',
+        key: 'propietario',
+        code: 'PR',
+        title: 'Propietario',
         description: 'Controla configuración, acceso y estructura del sistema.',
         items: ['Usuarios y permisos', 'Catálogos generales', 'Auditoría y seguridad'],
     },
@@ -15,21 +15,21 @@ const roles = [
         items: ['Reportes académicos', 'Seguimiento institucional', 'Cohortes y avance'],
     },
     {
-        key: 'secretary',
+        key: 'secretaria',
         code: 'SE',
         title: 'Secretaría',
         description: 'Gestiona matrículas, registros y atención operativa.',
         items: ['Inscripciones', 'Pagos y comprobantes', 'Registro de estudiantes'],
     },
     {
-        key: 'teacher',
+        key: 'profesor',
         code: 'DO',
         title: 'Docente',
         description: 'Administra evaluaciones, grupos y desempeño de las materias.',
         items: ['Evaluaciones', 'Asistencia y notas', 'Seguimiento del grupo'],
     },
     {
-        key: 'student',
+        key: 'estudiante',
         code: 'ES',
         title: 'Estudiante',
         description: 'Consulta su progreso, pagos y estado académico.',

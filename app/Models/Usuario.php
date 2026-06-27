@@ -106,24 +106,24 @@ class Usuario extends Authenticatable implements JWTSubject
     public function getRoleAttribute(): string
     {
         return match ($this->id_rol ?? null) {
-            1 => 'admin',
+            1 => 'propietario',
             2 => 'director',
-            3 => 'secretary',
-            4 => 'teacher',
-            5 => 'student',
-            default => 'student',
+            3 => 'secretaria',
+            4 => 'profesor',
+            5 => 'estudiante',
+            default => 'estudiante',
         };
     }
 
     public function setRoleAttribute($value)
     {
         $this->attributes['id_rol'] = match ($value) {
-            'admin' => 1,
-            'director' => 2,
-            'secretary' => 3,
-            'teacher' => 4,
-            'student' => 5,
-            default => 5,
+            'propietario' => 1,
+            'director'    => 2,
+            'secretaria'  => 3,
+            'profesor'    => 4,
+            'estudiante'  => 5,
+            default       => 5,
         };
     }
 
