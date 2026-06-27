@@ -1,7 +1,13 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, router, useForm } from '@inertiajs/vue3';
+import SecretariaLayout from '@/Layouts/SecretariaLayout.vue';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
+
+const page = usePage();
+const CurrentLayout = computed(() => {
+    return page.props.auth.user.role === 'secretary' ? SecretariaLayout : AuthenticatedLayout;
+});
 
 const props = defineProps({
     usuarios: Object,
@@ -126,7 +132,7 @@ function toggleActivo(u) {
 <template>
     <Head title="Gestión de Usuarios" />
 
-    <AuthenticatedLayout>
+    <component :is="CurrentLayout">
         <template #header>
             <h2 class="text-xl font-semibold leading-tight" style="color: var(--text-color);">
                 Gestión de Usuarios
@@ -432,7 +438,7 @@ function toggleActivo(u) {
                 </div>
             </div>
         </Teleport>
-    </AuthenticatedLayout>
+    </component>
 </template>
 
 <style scoped>
