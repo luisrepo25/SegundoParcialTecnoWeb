@@ -12,7 +12,22 @@
 | Región   | South America (São Paulo)                    |
 | URL      | https://epbvzdstchkqvgbcwmwe.supabase.co     |
 
-## .env (bloque DB)
+---
+
+## .env — Connection Pooler IPv4 (RECOMENDADO para todos)
+
+Usar este si la conexión directa falla (redes sin IPv6):
+
+```env
+DB_CONNECTION=pgsql
+DB_HOST=aws-1-sa-east-1.pooler.supabase.com
+DB_PORT=6543
+DB_DATABASE=postgres
+DB_USERNAME=postgres.epbvzdstchkqvgbcwmwe
+DB_PASSWORD=2do_ParcialTecnoWeb
+```
+
+## .env — Conexión directa IPv6 (solo si tu red soporta IPv6)
 
 ```env
 DB_CONNECTION=pgsql
@@ -23,18 +38,22 @@ DB_USERNAME=postgres
 DB_PASSWORD=2do_ParcialTecnoWeb
 ```
 
-## Subir backup a Supabase
+## Después de cambiar .env
 
 ```powershell
-& "C:\Program Files\PostgreSQL\17\bin\psql.exe" "postgresql://postgres:2do_ParcialTecnoWeb@db.epbvzdstchkqvgbcwmwe.supabase.co:5432/postgres" -f "C:\Users\USUARIO\backup_supabase.sql"
+php artisan config:clear && php artisan cache:clear
 ```
 
 ## Verificar conexión desde Laravel
 
 ```powershell
-php artisan config:clear && php artisan cache:clear
-
 php artisan tinker --execute="echo DB::table('carreras')->count() . ' carreras | ' . DB::table('materias')->count() . ' materias | ' . DB::table('usuarios')->count() . ' usuarios';"
+```
+
+## Subir backup a Supabase (conexión directa IPv6)
+
+```powershell
+& "C:\Program Files\PostgreSQL\17\bin\psql.exe" "postgresql://postgres:2do_ParcialTecnoWeb@db.epbvzdstchkqvgbcwmwe.supabase.co:5432/postgres" -f "C:\Users\USUARIO\backup_supabase.sql"
 ```
 
 ## Regenerar backup limpio (si cambia la BD origen)

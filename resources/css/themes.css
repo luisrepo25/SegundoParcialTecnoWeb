@@ -16,16 +16,16 @@
     --border-width: 1px;
 }
 
-/* Jóvenes — Noche verde institucional suave */
+/* Jóvenes — Verde oscuro con contraste claro entre fondo y cards */
 html[data-theme="youth"] {
-    --bg-color: #111c15;
-    --card-bg: #192b1f;
-    --text-color: #ddeee4;
-    --text-secondary: #6a9b7a;
-    --nav-bg: #0e1812;
-    --border-color: #253d2d;
-    --primary-color: #2d9e5c;
-    --primary-hover: #3ab870;
+    --bg-color: #111f17;
+    --card-bg: #2a4a35;
+    --text-color: #e4f2e8;
+    --text-secondary: #85b898;
+    --nav-bg: #0d1a11;
+    --border-color: #355c42;
+    --primary-color: #34c26a;
+    --primary-hover: #2dab5c;
     --primary-text: #ffffff;
     --font-family: 'Outfit', 'Inter', system-ui, sans-serif;
     --border-radius: 0.5rem;
