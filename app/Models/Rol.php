@@ -11,4 +11,8 @@ class Rol extends Model
     public $timestamps = false;
 
     protected $fillable = ['nombre_rol', 'descripcion', 'activo'];
+
+    protected $casts = [
+        'activo' => 'boolean',
+    ];
 }

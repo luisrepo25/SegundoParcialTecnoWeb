@@ -48,7 +48,7 @@ class UsuarioController extends Controller
 
         $usuarios = $query->paginate(10)->withQueryString();
 
-        $roles = Rol::where('activo', true)->get();
+        $roles = Rol::where('activo', 'true')->get();
 
         return Inertia::render('Propietario/CU1Usuarios/Index', [
             'usuarios'        => $usuarios,
