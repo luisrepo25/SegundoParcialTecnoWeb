@@ -159,7 +159,7 @@ function toggleActivo(u) {
                             class="flex-1 min-w-[200px] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
                             style="background-color: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color); focus-ring-color: var(--primary-color);" />
                         <select v-model="rolFiltro"
-                            class="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                            class="rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:ring-2"
                             style="background-color: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color);">
                             <option value="">Todos los roles</option>
                             <option v-for="r in roles" :key="r.id_rol" :value="r.id_rol">{{ r.nombre_rol }}</option>
