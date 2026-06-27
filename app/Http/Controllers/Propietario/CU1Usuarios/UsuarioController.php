@@ -46,7 +46,7 @@ class UsuarioController extends Controller
             });
         }
 
-        $usuarios = $query->paginate(20)->withQueryString();
+        $usuarios = $query->paginate(10)->withQueryString();
 
         $roles = Rol::where('activo', true)->get();
 

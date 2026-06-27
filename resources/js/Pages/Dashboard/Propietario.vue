@@ -11,7 +11,14 @@ const cus = [
         ruta: 'propietario.usuarios.index',
         color: 'from-indigo-500 to-indigo-700',
     },
-    // Próximos CUs se agregan aquí
+    {
+        numero: 'CU2',
+        titulo: 'Gestión de Aulas',
+        descripcion: 'Registrar, editar y administrar aulas, laboratorios, talleres y salas.',
+        icono: '🏫',
+        ruta: 'propietario.aulas.index',
+        color: 'from-blue-500 to-blue-700',
+    },
 ];
 </script>
 
@@ -20,7 +27,7 @@ const cus = [
 
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">
+            <h2 class="text-xl font-semibold leading-tight" style="color: var(--text-color);">
                 Panel Propietario
             </h2>
         </template>
@@ -28,7 +35,7 @@ const cus = [
         <div class="py-8">
             <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 
-                <p class="mb-6 text-sm text-gray-500">
+                <p class="mb-6 text-sm" style="color: var(--text-secondary);">
                     Seleccione una función para gestionar el sistema.
                 </p>
 
@@ -37,24 +44,25 @@ const cus = [
                         v-for="cu in cus"
                         :key="cu.numero"
                         :href="route(cu.ruta)"
-                        class="group relative overflow-hidden rounded-2xl bg-white shadow hover:shadow-lg transition-shadow duration-200"
+                        class="group relative overflow-hidden rounded-2xl shadow hover:shadow-lg transition-shadow duration-200"
+                        style="background-color: var(--card-bg); border: 1px solid var(--border-color);"
                     >
                         <div :class="['absolute inset-x-0 top-0 h-1 bg-gradient-to-r', cu.color]" />
                         <div class="p-6">
                             <div class="mb-3 flex items-center gap-3">
                                 <span class="text-3xl">{{ cu.icono }}</span>
-                                <span class="text-xs font-bold tracking-widest text-gray-400 uppercase">
+                                <span class="text-xs font-bold tracking-widest uppercase" style="color: var(--text-secondary);">
                                     {{ cu.numero }}
                                 </span>
                             </div>
-                            <h3 class="mb-1 text-base font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                            <h3 class="mb-1 text-base font-semibold transition-colors" style="color: var(--text-color);">
                                 {{ cu.titulo }}
                             </h3>
-                            <p class="text-sm text-gray-500 leading-snug">
+                            <p class="text-sm leading-snug" style="color: var(--text-secondary);">
                                 {{ cu.descripcion }}
                             </p>
                         </div>
-                        <div class="absolute bottom-4 right-4 text-gray-300 group-hover:text-indigo-400 transition-colors">
+                        <div class="absolute bottom-4 right-4 transition-colors" style="color: var(--text-secondary);">
                             →
                         </div>
                     </Link>
