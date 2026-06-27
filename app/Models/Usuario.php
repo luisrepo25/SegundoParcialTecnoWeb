@@ -2,42 +2,45 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Tymon\JWTAuth\Contracts\JWTSubject;
 
 class Usuario extends Authenticatable implements JWTSubject
 {
-    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
     protected $table = 'usuarios';
     protected $primaryKey = 'id_usuario';
     public $timestamps = false;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
-        'name',
-        'email',
-        'password',
-        'role',
-        'nombre',
-        'apellido',
-        'password_hash',
-        'dni',
-        'telefono',
-        'direccion',
-        'id_rol',
-        'activo',
-        'bloqueado',
+        'nombre', 'apellido', 'email', 'password_hash',
+        'dni', 'telefono', 'direccion', 'id_rol',
+        'activo', 'bloqueado', 'foto_perfil',
     ];
+
+    public function profesor(): HasOne
+    {
+        return $this->hasOne(Profesor::class, 'id_usuario', 'id_usuario');
+    }
+
+    public function estudiante(): HasOne
+    {
+        return $this->hasOne(Estudiante::class, 'id_usuario', 'id_usuario');
+    }
+
+    public function personalAdministrativo(): HasOne
+    {
+        return $this->hasOne(PersonalAdministrativo::class, 'id_usuario', 'id_usuario');
+    }
+
+    public function rol()
+    {
+        return $this->belongsTo(Rol::class, 'id_rol', 'id_rol');
+    }
 
     /**
      * The attributes that should be hidden for serialization.
