@@ -11,18 +11,19 @@ Route::get('/', function () {
 
 Route::get('/dashboard', function () {
     $user = auth()->user();
-    \Illuminate\Support\Facades\Log::info('Dashboard route hit. User: ' . ($user ? $user->email : 'NONE') . ', Role: ' . ($user ? $user->role : 'NONE'));
 
     return match ($user?->role) {
-        'admin' => redirect()->route('dashboard.admin'),
-        'director' => redirect()->route('dashboard.director'),
-        'secretary' => redirect()->route('dashboard.secretary'),
-        'teacher' => redirect()->route('dashboard.teacher'),
-        default => redirect()->route('dashboard.student'),
+        'admin'     => redirect()->route('dashboard.admin'),
+        'director'  => redirect()->route('dashboard.director'),
+        'secretary' => redirect()->route('secretaria.dashboard'),
+        'teacher'   => redirect()->route('dashboard.teacher'),
+        default     => redirect()->route('dashboard.student'),
     };
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+
+    // ── Panel Propietario ──────────────────────────────────────────────────────
     Route::get('/panel/propietario', function () {
         return Inertia::render('Dashboard/Propietario');
     })->middleware('role:admin')->name('dashboard.admin');
@@ -36,21 +37,31 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/usuarios/{id}/password', [UsuarioController::class, 'cambiarPassword'])->name('usuarios.password');
     });
 
+    // ── Panel Director ─────────────────────────────────────────────────────────
     Route::get('/panel/director', function () {
         return Inertia::render('Dashboard/Director');
     })->middleware('role:director')->name('dashboard.director');
 
-    Route::get('/panel/secretaria', function () {
-        return Inertia::render('Dashboard/Secretaria');
-    })->middleware('role:secretary')->name('dashboard.secretary');
+    // ── Panel Secretaria ───────────────────────────────────────────────────────
+    Route::middleware('role:secretary')->prefix('secretaria')->name('secretaria.')->group(function () {
+        Route::get('/panel', function () {
+            return Inertia::render('Dashboard/Secretaria');
+        })->name('dashboard');
 
+        Route::get('/inscripciones', [\App\Http\Controllers\Secretaria\CU2Inscripciones\InscripcionController::class, 'index'])->name('inscripciones.index');
+        Route::get('/pagos', [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'index'])->name('pagos.index');
+    });
+
+    // ── Panel Docente ──────────────────────────────────────────────────────────
     Route::get('/panel/docente', function () {
         return Inertia::render('Dashboard/Docente');
     })->middleware('role:teacher')->name('dashboard.teacher');
 
+    // ── Panel Estudiante ───────────────────────────────────────────────────────
     Route::get('/panel/estudiante', function () {
         return Inertia::render('Dashboard/Estudiante');
     })->middleware('role:student')->name('dashboard.student');
+
 });
 
 Route::middleware('auth')->group(function () {
