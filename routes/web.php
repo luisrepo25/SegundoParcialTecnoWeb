@@ -103,7 +103,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Cronogramas (CU10)
         Route::get('/cronogramas', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'index'])->name('cronogramas.index');
-        Route::post('/cronogramas', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'store'])->name('cronogramas.store');
+        Route::put('/cronogramas/{id}', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'update'])->name('cronogramas.update');
         Route::patch('/cronogramas/{id}/toggle-activo', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'toggleActivo'])->name('cronogramas.toggle-activo');
 
         Route::get('/inscripciones', [\App\Http\Controllers\Secretaria\CU2Inscripciones\InscripcionController::class, 'index'])->name('inscripciones.index');

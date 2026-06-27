@@ -41,7 +41,7 @@ class CronogramaController extends Controller
             }
         }
 
-        $cronogramas = $query->paginate(10)->withQueryString();
+        $cronogramas = $query->get();
         $carreras = Carrera::where('activo', 'true')->get();
 
         return Inertia::render('Secretaria/CU10Cronogramas/Index', [
@@ -51,27 +51,25 @@ class CronogramaController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function update(Request $request, int $id)
     {
         $request->validate([
             'nombre'       => 'required|string|max:50',
-            'tipo_periodo' => 'required|string|max:20',
             'fecha_inicio' => 'required|date',
             'fecha_fin'    => 'required|date|after_or_equal:fecha_inicio',
-            'id_carrera'   => 'nullable|exists:carreras,id_carrera',
-            'activo'       => 'true',
         ]);
 
-        Cronograma::create([
-            'nombre'       => $request->nombre,
-            'tipo_periodo' => $request->tipo_periodo,
-            'fecha_inicio' => $request->fecha_inicio,
-            'fecha_fin'    => $request->fecha_fin,
-            'id_carrera'   => $request->id_carrera,
-            'activo'       => 'true', // Usar string para PgBouncer
-        ]);
+        $cronograma = Cronograma::findOrFail($id);
+        
+        \Illuminate\Support\Facades\DB::table('cronogramas')
+            ->where('id_cronograma', $id)
+            ->update([
+                'nombre'       => $request->nombre,
+                'fecha_inicio' => $request->fecha_inicio,
+                'fecha_fin'    => $request->fecha_fin,
+            ]);
 
-        return redirect()->back()->with('success', 'Cronograma registrado correctamente.');
+        return redirect()->back()->with('success', 'Cronograma actualizado correctamente.');
     }
 
     public function toggleActivo(int $id)
@@ -87,4 +85,5 @@ class CronogramaController extends Controller
         $estado = $cronograma->activo ? 'activado' : 'desactivado';
         return redirect()->back()->with('success', "Cronograma $estado correctamente.");
     }
+
 }
