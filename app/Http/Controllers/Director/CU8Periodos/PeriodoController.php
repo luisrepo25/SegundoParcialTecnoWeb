@@ -147,9 +147,40 @@ class PeriodoController extends Controller
                      'c.id_carrera', 'c.nombre as carrera_nombre')
             ->get();
 
+        // ── Plantillas para "clonar año" ─────────────────────────────────────
+        // Períodos existentes con sus id_nivel, para auto-rellenar el modal lote
+        $periodosExistentes = DB::table('periodos_dictado as pd')
+            ->join('niveles_carrera as n', 'pd.id_nivel', '=', 'n.id_nivel')
+            ->join('carreras as c', 'n.id_carrera', '=', 'c.id_carrera')
+            ->whereNotNull('pd.id_nivel')
+            ->orderBy('pd.fecha_inicio', 'desc')
+            ->select('pd.id_periodo', 'pd.nombre', 'pd.tipo_periodo', 'pd.max_materias',
+                     'pd.fecha_inicio', 'pd.fecha_fin', 'pd.id_nivel',
+                     'n.numero_nivel', 'c.nombre as carrera_nombre')
+            ->get();
+
+        // Agrupar por nombre + tipo + max para obtener "plantillas"
+        $plantillasMap = [];
+        foreach ($periodosExistentes as $r) {
+            $key = $r->nombre . '||' . $r->tipo_periodo . '||' . $r->max_materias;
+            if (!isset($plantillasMap[$key])) {
+                $plantillasMap[$key] = [
+                    'label'        => $r->nombre . ' (' . $r->tipo_periodo . ')',
+                    'nombre'       => $r->nombre,
+                    'tipo_periodo' => $r->tipo_periodo,
+                    'max_materias' => $r->max_materias,
+                    'fecha_inicio' => $r->fecha_inicio,
+                    'fecha_fin'    => $r->fecha_fin,
+                    'id_niveles'   => [],
+                ];
+            }
+            $plantillasMap[$key]['id_niveles'][] = $r->id_nivel;
+        }
+
         return Inertia::render('Director/CU8Periodos/Index', [
             'carreras'      => $carreras,
             'nivelesSelect' => $nivelesSelect,
+            'plantillas'    => array_values($plantillasMap),
         ]);
     }
 
@@ -258,6 +289,43 @@ class PeriodoController extends Controller
 
         return redirect()->route('director.periodos.index')
             ->with('success', $periodo->activo ? 'Período desactivado.' : 'Período activado.');
+    }
+
+    public function storeLote(Request $request)
+    {
+        $request->validate([
+            'nombre'                 => 'required|string|max:50',
+            'fecha_inicio'           => 'required|date',
+            'fecha_fin'              => 'required|date|after:fecha_inicio',
+            'max_materias'           => 'required|integer|min:1|max:30',
+            'niveles'                => 'required|array|min:1',
+            'niveles.*.id_nivel'     => 'required|integer|exists:niveles_carrera,id_nivel',
+            'niveles.*.tipo_periodo' => 'required|in:mensual,semestral,anual,intensivo',
+            'niveles.*.fecha_inicio' => 'nullable|date',
+            'niveles.*.fecha_fin'    => 'nullable|date',
+        ]);
+
+        $rows = [];
+        foreach ($request->niveles as $item) {
+            $fechaInicio = !empty($item['fecha_inicio']) ? $item['fecha_inicio'] : $request->fecha_inicio;
+            $fechaFin    = !empty($item['fecha_fin'])    ? $item['fecha_fin']    : $request->fecha_fin;
+            $rows[] = [
+                'id_nivel'     => (int) $item['id_nivel'],
+                'id_carrera'   => null,
+                'nombre'       => $request->nombre,
+                'tipo_periodo' => $item['tipo_periodo'],
+                'fecha_inicio' => $fechaInicio,
+                'fecha_fin'    => $fechaFin,
+                'max_materias' => $request->max_materias,
+                'activo'       => true,
+            ];
+        }
+
+        DB::table('periodos_dictado')->insert($rows);
+        $n = count($rows);
+
+        return redirect()->route('director.periodos.index')
+            ->with('success', "{$n} período(s) creados correctamente.");
     }
 
     public function destroy(int $id)

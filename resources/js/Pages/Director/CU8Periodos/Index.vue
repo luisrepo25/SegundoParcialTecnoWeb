@@ -1,11 +1,13 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import ComboSelect from '@/Components/ComboSelect.vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 
 const props = defineProps({
     carreras:      Array,
     nivelesSelect: Array,
+    plantillas:    { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -52,6 +54,15 @@ const nivelesParaModal = computed(() => {
     }
     return nivelesAgrupados.value;
 });
+
+const optsNiveles = computed(() =>
+    nivelesParaModal.value.flatMap(grupo =>
+        grupo.niveles.map(n => ({
+            value: n.id_nivel,
+            label: grupo.carrera + ' — ' + (n.nombre ?? 'Año ' + n.numero_nivel),
+        }))
+    )
+);
 
 // ── Modal agregar / editar ───────────────────────────────────────────────────
 const modalOpen     = ref(false);
@@ -138,6 +149,132 @@ function confirmarEliminar() {
     });
 }
 
+// ── Modal Lote ────────────────────────────────────────────────────────────────
+const modalLote   = ref(false);
+const formLote    = useForm({
+    nombre:       '',
+    fecha_inicio: '',
+    fecha_fin:    '',
+    max_materias: 5,
+    id_niveles:   [],
+    niveles:      [],  // construido antes de enviar: [{id_nivel, tipo_periodo}]
+});
+
+// Tipo y fechas por carrera: { [carrera_nombre]: { tipo, fecha_inicio, fecha_fin } }
+const tipoPorCarrera   = ref({});
+const fechasPorCarrera = ref({});  // { [carrera]: { fecha_inicio: '', fecha_fin: '' } }
+
+const plantillaSeleccionada = ref('');
+
+const optsPlantillas = computed(() =>
+    props.plantillas.map((p, i) => ({ value: i, label: p.label }))
+);
+
+function aplicarPlantilla(idx) {
+    if (idx === '' || idx === null || idx === undefined) return;
+    const p = props.plantillas[idx];
+    if (!p) return;
+    formLote.nombre       = p.nombre;
+    formLote.max_materias = p.max_materias;
+    // Aplica tipo de la plantilla a todas las carreras como punto de partida
+    for (const key of Object.keys(tipoPorCarrera.value)) {
+        tipoPorCarrera.value[key] = p.tipo_periodo;
+    }
+    // Auto-marcar los mismos niveles
+    formLote.id_niveles = [...p.id_niveles];
+}
+
+const todosNiveles = computed(() =>
+    (props.nivelesSelect ?? []).map(n => n.id_nivel)
+);
+
+const todosSeleccionados = computed(() =>
+    todosNiveles.value.length > 0 &&
+    todosNiveles.value.every(id => formLote.id_niveles.includes(id))
+);
+
+function toggleTodos() {
+    if (todosSeleccionados.value) {
+        formLote.id_niveles = [];
+    } else {
+        formLote.id_niveles = [...todosNiveles.value];
+    }
+}
+
+function toggleNivel(id) {
+    const idx = formLote.id_niveles.indexOf(id);
+    if (idx === -1) formLote.id_niveles.push(id);
+    else formLote.id_niveles.splice(idx, 1);
+}
+
+function abrirLote() {
+    formLote.reset();
+    formLote.max_materias = 5;
+    plantillaSeleccionada.value = '';
+    // Inicializar tipo 'semestral' y fechas vacías para cada carrera
+    const tipos   = {};
+    const fechas  = {};
+    for (const g of nivelesParaLote.value) {
+        tipos[g.carrera]  = 'semestral';
+        fechas[g.carrera] = { fecha_inicio: '', fecha_fin: '' };
+    }
+    tipoPorCarrera.value   = tipos;
+    fechasPorCarrera.value = fechas;
+    // Cerrar todos los acordeones
+    loteAbiertos.value = {};
+    modalLote.value = true;
+}
+
+function guardarLote() {
+    // Construir array niveles con tipo + fechas por carrera (vacías = usa global)
+    const niveles = [];
+    for (const grupo of nivelesParaLote.value) {
+        const tipo  = tipoPorCarrera.value[grupo.carrera] ?? 'semestral';
+        const fcs   = fechasPorCarrera.value[grupo.carrera] ?? {};
+        for (const n of grupo.niveles) {
+            if (formLote.id_niveles.includes(n.id_nivel)) {
+                niveles.push({
+                    id_nivel:     n.id_nivel,
+                    tipo_periodo: tipo,
+                    fecha_inicio: fcs.fecha_inicio || null,
+                    fecha_fin:    fcs.fecha_fin    || null,
+                });
+            }
+        }
+    }
+    formLote.niveles = niveles;
+    formLote.post(route('director.periodos.lote'), {
+        onSuccess: () => { modalLote.value = false; formLote.reset(); },
+    });
+}
+
+// Estado abierto/cerrado por carrera en el acordeón del lote
+const loteAbiertos = ref({});
+
+function toggleCarrera(grupo) {
+    const ids = grupo.niveles.map(n => n.id_nivel);
+    const todosCheck = ids.every(id => formLote.id_niveles.includes(id));
+    if (todosCheck) {
+        formLote.id_niveles = formLote.id_niveles.filter(id => !ids.includes(id));
+    } else {
+        ids.forEach(id => {
+            if (!formLote.id_niveles.includes(id)) formLote.id_niveles.push(id);
+        });
+    }
+}
+
+// Niveles agrupados por carrera para el checklist del lote
+const nivelesParaLote = computed(() => {
+    const map = {};
+    for (const n of (props.nivelesSelect ?? [])) {
+        if (!map[n.id_carrera]) {
+            map[n.id_carrera] = { carrera: n.carrera_nombre, niveles: [] };
+        }
+        map[n.id_carrera].niveles.push(n);
+    }
+    return Object.values(map);
+});
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function fmtFecha(f) {
     if (!f) return '–';
@@ -176,7 +313,12 @@ function duracionDias(inicio, fin) {
             {{ errors.periodo }}
         </div>
 
-        <div class="flex justify-end mb-4">
+        <div class="flex justify-end gap-2 mb-4">
+            <button @click="abrirLote()"
+                class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition border"
+                style="border-color: var(--primary-color); color: var(--primary-color); background: transparent;">
+                ⚡ Crear en Lote
+            </button>
             <button @click="abrirAgregar()"
                 class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition"
                 style="background-color: var(--primary-color); color: var(--primary-text);">
@@ -359,16 +501,11 @@ function duracionDias(inicio, fin) {
                     <!-- Nivel selector (solo carreras normales al crear) -->
                     <div v-if="!editando && !esCursoLibre">
                         <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Nivel / Año *</label>
-                        <select v-model="form.id_nivel" class="input-field">
-                            <option value="">— Selecciona nivel —</option>
-                            <template v-for="grupo in nivelesParaModal" :key="grupo.id_carrera">
-                                <optgroup :label="grupo.carrera">
-                                    <option v-for="n in grupo.niveles" :key="n.id_nivel" :value="n.id_nivel">
-                                        {{ n.nombre ?? `Año ${n.numero_nivel}` }}
-                                    </option>
-                                </optgroup>
-                            </template>
-                        </select>
+                        <ComboSelect
+                            v-model="form.id_nivel"
+                            :options="optsNiveles"
+                            placeholder="— Selecciona nivel —"
+                            emptyLabel="" />
                         <p v-if="form.errors.id_nivel" class="text-xs mt-1" style="color:#ef4444;">{{ form.errors.id_nivel }}</p>
                     </div>
 
@@ -433,6 +570,211 @@ function duracionDias(inicio, fin) {
                     <button @click="guardar" :disabled="form.processing" class="btn-primary">
                         {{ form.processing ? 'Guardando…' : (editando ? 'Actualizar' : 'Crear Período') }}
                     </button>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- ── Modal Crear en Lote ──────────────────────────────────────────── -->
+    <Teleport to="body">
+        <div v-if="modalLote"
+             class="fixed inset-0 z-50 flex items-center justify-center p-4"
+             style="background: rgba(0,0,0,0.5);"
+             @click.self="modalLote = false">
+            <div class="w-full max-w-xl rounded-2xl shadow-2xl flex flex-col"
+                 style="background-color: var(--card-bg); border: 1px solid var(--border-color); max-height: 90vh;">
+
+                <!-- Header -->
+                <div class="flex items-center justify-between px-6 py-4 border-b shrink-0" style="border-color: var(--border-color);">
+                    <div>
+                        <h3 class="text-base font-semibold" style="color: var(--text-color);">⚡ Crear Períodos en Lote</h3>
+                        <p class="text-xs mt-0.5" style="color: var(--text-secondary);">Fechas comunes · tipo independiente por carrera</p>
+                    </div>
+                    <button @click="modalLote = false" class="text-lg leading-none" style="color: var(--text-secondary);">✕</button>
+                </div>
+
+                <div class="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+
+                    <!-- Copiar desde plantilla existente -->
+                    <div v-if="plantillas.length > 0" class="rounded-lg p-3 border"
+                         style="background-color: color-mix(in srgb,var(--primary-color) 6%,transparent); border-color: color-mix(in srgb,var(--primary-color) 25%,transparent);">
+                        <p class="text-xs font-semibold mb-2" style="color: var(--primary-color);">
+                            📋 Copiar configuración de período existente
+                        </p>
+                        <ComboSelect
+                            v-model="plantillaSeleccionada"
+                            :options="optsPlantillas"
+                            placeholder="— Seleccionar período como plantilla —"
+                            emptyLabel=""
+                            @update:modelValue="aplicarPlantilla" />
+                        <p class="text-[11px] mt-1.5" style="color: var(--text-secondary);">
+                            Auto-rellena campos y pre-marca los mismos niveles. Solo cambia las fechas.
+                        </p>
+                    </div>
+
+                    <!-- Nombre -->
+                    <div>
+                        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Nombre del período *</label>
+                        <input v-model="formLote.nombre" type="text" maxlength="50"
+                            placeholder="Ej: Semestre 1-2027"
+                            class="input-field" />
+                        <p v-if="formLote.errors.nombre" class="text-xs mt-1" style="color:#ef4444;">{{ formLote.errors.nombre }}</p>
+                    </div>
+
+                    <!-- Fechas -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Fecha inicio *</label>
+                            <input v-model="formLote.fecha_inicio" type="date" class="input-field" />
+                            <p v-if="formLote.errors.fecha_inicio" class="text-xs mt-1" style="color:#ef4444;">{{ formLote.errors.fecha_inicio }}</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Fecha fin *</label>
+                            <input v-model="formLote.fecha_fin" type="date" class="input-field" :min="formLote.fecha_inicio || ''" />
+                            <p v-if="formLote.errors.fecha_fin" class="text-xs mt-1" style="color:#ef4444;">{{ formLote.errors.fecha_fin }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Máx materias -->
+                    <div>
+                        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Máx. materias por período *</label>
+                        <input v-model.number="formLote.max_materias" type="number" min="1" max="30" class="input-field" style="max-width: 120px;" />
+                        <p v-if="formLote.errors.max_materias" class="text-xs mt-1" style="color:#ef4444;">{{ formLote.errors.max_materias }}</p>
+                    </div>
+
+                    <!-- Checklist de niveles — acordeón por carrera -->
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-xs font-semibold" style="color: var(--text-secondary);">
+                                Niveles a aplicar *
+                                <span class="font-normal opacity-70">({{ formLote.id_niveles.length }} seleccionados)</span>
+                            </label>
+                            <button type="button" @click="toggleTodos"
+                                class="text-xs font-medium"
+                                style="color: var(--primary-color);">
+                                {{ todosSeleccionados ? 'Desmarcar todos' : 'Seleccionar todos' }}
+                            </button>
+                        </div>
+                        <p v-if="formLote.errors['niveles']" class="text-xs mb-2" style="color:#ef4444;">{{ formLote.errors['niveles'] }}</p>
+
+                        <div class="space-y-2">
+                            <div v-for="grupo in nivelesParaLote" :key="grupo.carrera"
+                                class="rounded-lg border overflow-hidden"
+                                style="border-color: var(--border-color);">
+
+                                <!-- Header carrera colapsable -->
+                                <button type="button"
+                                    @click="loteAbiertos[grupo.carrera] = !loteAbiertos[grupo.carrera]"
+                                    class="w-full flex items-center justify-between px-3 py-2.5 transition-colors"
+                                    :style="loteAbiertos[grupo.carrera]
+                                        ? 'background-color: color-mix(in srgb,var(--primary-color) 10%,transparent);'
+                                        : 'background-color: color-mix(in srgb,var(--text-color) 4%,transparent);'">
+                                    <div class="flex items-center gap-2">
+                                        <!-- Checkbox carrera (selecciona/deselecciona todos sus niveles) -->
+                                        <input type="checkbox"
+                                            :checked="grupo.niveles.every(n => formLote.id_niveles.includes(n.id_nivel))"
+                                            :indeterminate="grupo.niveles.some(n => formLote.id_niveles.includes(n.id_nivel)) && !grupo.niveles.every(n => formLote.id_niveles.includes(n.id_nivel))"
+                                            @click.stop="toggleCarrera(grupo)"
+                                            style="accent-color: var(--primary-color);" />
+                                        <span class="text-xs font-bold uppercase tracking-wide" style="color: var(--text-color);">
+                                            {{ grupo.carrera }}
+                                        </span>
+                                    </div>
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <span class="text-[11px] font-medium"
+                                            :style="grupo.niveles.some(n => formLote.id_niveles.includes(n.id_nivel))
+                                                ? 'color: var(--primary-color);'
+                                                : 'color: var(--text-secondary);'">
+                                            {{ grupo.niveles.filter(n => formLote.id_niveles.includes(n.id_nivel)).length }}/{{ grupo.niveles.length }}
+                                        </span>
+                                        <span class="text-[10px] opacity-50 transition-transform duration-200"
+                                            :style="loteAbiertos[grupo.carrera] ? 'transform:rotate(180deg)' : ''">▾</span>
+                                    </div>
+                                </button>
+
+                                <!-- Niveles (colapsable) -->
+                                <div v-show="loteAbiertos[grupo.carrera]">
+                                    <!-- Tipo + fechas por carrera -->
+                                    <div class="px-4 py-3 border-t space-y-2.5"
+                                         style="border-color: var(--border-color); background-color: color-mix(in srgb,var(--text-color) 2%,transparent);">
+                                        <!-- Tipo -->
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <span class="text-[11px] font-medium shrink-0 w-14" style="color: var(--text-secondary);">Tipo:</span>
+                                            <div class="flex gap-1.5 flex-wrap">
+                                                <button v-for="(label, key) in TIPO_LABELS" :key="key"
+                                                    type="button"
+                                                    @click="tipoPorCarrera[grupo.carrera] = key"
+                                                    class="px-2 py-0.5 rounded text-[11px] font-semibold border transition"
+                                                    :style="(tipoPorCarrera[grupo.carrera] ?? 'semestral') === key
+                                                        ? `background-color:color-mix(in srgb,${TIPO_COLORS[key]} 20%,transparent);color:${TIPO_COLORS[key]};border-color:${TIPO_COLORS[key]};`
+                                                        : 'background:transparent;color:var(--text-secondary);border-color:var(--border-color);'">
+                                                    {{ label }}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <!-- Fechas opcionales (sobreescriben las globales si se llenan) -->
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <span class="text-[11px] font-medium shrink-0 w-14" style="color: var(--text-secondary);">Fechas:</span>
+                                            <div class="flex items-center gap-2 flex-1 flex-wrap">
+                                                <input type="date"
+                                                    v-model="fechasPorCarrera[grupo.carrera].fecha_inicio"
+                                                    class="rounded border px-2 py-1 text-[11px] outline-none"
+                                                    style="background-color: var(--bg-color); border-color: var(--border-color); color: var(--text-color); min-width: 130px;"
+                                                    :placeholder="formLote.fecha_inicio || 'Inicio'" />
+                                                <span class="text-[11px] opacity-40">→</span>
+                                                <input type="date"
+                                                    v-model="fechasPorCarrera[grupo.carrera].fecha_fin"
+                                                    class="rounded border px-2 py-1 text-[11px] outline-none"
+                                                    style="background-color: var(--bg-color); border-color: var(--border-color); color: var(--text-color); min-width: 130px;"
+                                                    :placeholder="formLote.fecha_fin || 'Fin'" />
+                                                <span v-if="fechasPorCarrera[grupo.carrera].fecha_inicio || fechasPorCarrera[grupo.carrera].fecha_fin"
+                                                    class="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                                                    style="background-color:color-mix(in srgb,#f59e0b 15%,transparent); color:#f59e0b;">
+                                                    Personalizado
+                                                </span>
+                                                <span v-else class="text-[10px] opacity-40" style="color: var(--text-secondary);">
+                                                    (usa fechas globales)
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <label v-for="n in grupo.niveles" :key="n.id_nivel"
+                                        class="flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors"
+                                        style="border-top: 1px solid var(--border-color);"
+                                        onmouseover="this.style.backgroundColor='color-mix(in srgb,var(--primary-color) 6%,transparent)'"
+                                        onmouseout="this.style.backgroundColor='transparent'">
+                                        <input type="checkbox"
+                                            :checked="formLote.id_niveles.includes(n.id_nivel)"
+                                            @change="toggleNivel(n.id_nivel)"
+                                            style="accent-color: var(--primary-color);" />
+                                        <span class="text-sm" style="color: var(--text-color);">
+                                            {{ n.nombre ?? 'Año ' + n.numero_nivel }}
+                                        </span>
+                                        <span class="text-[11px] ml-auto" style="color: var(--text-secondary);">
+                                            Año {{ n.numero_nivel }}
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Footer -->
+                <div class="flex items-center justify-between px-6 py-4 border-t shrink-0" style="border-color: var(--border-color);">
+                    <p class="text-xs" style="color: var(--text-secondary);">
+                        Se crearán <strong style="color:var(--primary-color);">{{ formLote.id_niveles.length }}</strong> período(s)
+                        <span v-if="formLote.id_niveles.length > 0" class="opacity-60"> · tipo por carrera</span>
+                    </p>
+                    <div class="flex gap-3">
+                        <button @click="modalLote = false" class="btn-secondary">Cancelar</button>
+                        <button @click="guardarLote" :disabled="formLote.processing || formLote.id_niveles.length === 0"
+                            class="btn-primary"
+                            :style="(formLote.processing || formLote.id_niveles.length === 0) ? 'opacity:0.5;' : ''">
+                            {{ formLote.processing ? 'Creando...' : `Crear ${formLote.id_niveles.length} período(s)` }}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

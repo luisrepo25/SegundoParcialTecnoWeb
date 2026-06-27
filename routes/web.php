@@ -127,9 +127,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // CU8 — Períodos Académicos
         Route::get('/periodos', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'index'])->name('periodos.index');
         Route::post('/periodos', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'store'])->name('periodos.store');
+        Route::post('/periodos/lote', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'storeLote'])->name('periodos.lote');
         Route::put('/periodos/{id}', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'update'])->name('periodos.update');
         Route::patch('/periodos/{id}/toggle', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'toggleActivo'])->name('periodos.toggle');
         Route::delete('/periodos/{id}', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'destroy'])->name('periodos.destroy');
+
+        // CU9 — Gestión de Grupos / Oferta Académica
+        Route::get('/grupos', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'index'])->name('grupos.index');
+        Route::post('/grupos', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'store'])->name('grupos.store');
+        Route::post('/grupos/clonar', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'clonar'])->name('grupos.clonar');
+        Route::put('/grupos/{id}', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'update'])->name('grupos.update');
+        Route::patch('/grupos/{id}/toggle', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'toggleActivo'])->name('grupos.toggle');
+        Route::delete('/grupos/{id}', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'destroy'])->name('grupos.destroy');
     });
 
     // ── Panel Secretaria ───────────────────────────────────────────────────────
