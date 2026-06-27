@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Propietario\CU1Usuarios\UsuarioController;
+use App\Http\Controllers\Propietario\CU2Aulas\AulaController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -35,6 +36,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/usuarios/{id}', [UsuarioController::class, 'update'])->name('usuarios.update');
         Route::patch('/usuarios/{id}/toggle-activo', [UsuarioController::class, 'toggleActivo'])->name('usuarios.toggle-activo');
         Route::patch('/usuarios/{id}/password', [UsuarioController::class, 'cambiarPassword'])->name('usuarios.password');
+    });
+
+    // CU2 — Gestión de Aulas (solo propietario)
+    Route::middleware('role:admin')->prefix('propietario')->name('propietario.')->group(function () {
+        Route::get('/aulas', [AulaController::class, 'index'])->name('aulas.index');
+        Route::post('/aulas', [AulaController::class, 'store'])->name('aulas.store');
+        Route::put('/aulas/{id}', [AulaController::class, 'update'])->name('aulas.update');
+        Route::patch('/aulas/{id}/toggle-activo', [AulaController::class, 'toggleActivo'])->name('aulas.toggle-activo');
     });
 
     // ── Panel Director ─────────────────────────────────────────────────────────
