@@ -1,23 +1,31 @@
 <script setup>
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import DirectorLayout from '@/Layouts/DirectorLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 
-const cus = [
+const props = defineProps({
+    totalCarreras: Number,
+    totalMaterias: Number,
+    carrerasActivas: Number,
+});
+
+const resumen = [
+    { label: 'Carreras Registradas', valor: props.totalCarreras ?? 0,   detalle: 'Total en el sistema' },
+    { label: 'Carreras Activas',     valor: props.carrerasActivas ?? 0,  detalle: 'Disponibles para inscripción' },
+    { label: 'Materias Registradas', valor: props.totalMaterias ?? 0,    detalle: 'Total en catálogo' },
+];
+
+const modulos = [
     {
         numero:      'CU4',
         titulo:      'Gestión de Carreras',
         descripcion: 'Registrar, editar y administrar carreras técnicas y cursos libres.',
-        icono:       '🎓',
         ruta:        'director.carreras.index',
-        color:       'from-green-500 to-green-700',
     },
     {
         numero:      'CU5',
         titulo:      'Gestión de Materias',
         descripcion: 'Registrar, editar y administrar materias, costos y requisitos.',
-        icono:       '📚',
         ruta:        'director.materias.index',
-        color:       'from-teal-500 to-teal-700',
     },
 ];
 </script>
@@ -25,50 +33,62 @@ const cus = [
 <template>
     <Head title="Panel Director" />
 
-    <AuthenticatedLayout>
+    <DirectorLayout>
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight" style="color: var(--text-color);">
-                Panel Director
+            <h2 class="text-xl font-semibold tracking-tight" style="color: var(--text-color);">
+                Panel de Dirección
             </h2>
         </template>
 
-        <div class="py-8">
-            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="space-y-10">
 
-                <p class="mb-6 text-sm" style="color: var(--text-secondary);">
-                    Seleccione una función para gestionar la institución.
+            <!-- Bienvenida -->
+            <div>
+                <p class="text-sm font-medium uppercase tracking-widest opacity-60" style="color: var(--text-secondary);">
+                    {{ new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) }}
                 </p>
+                <h3 class="text-2xl font-light mt-1" style="color: var(--text-color);">
+                    Bienvenido, <span class="font-medium">{{ $page.props.auth.user.name.split(' ')[0] }}</span>
+                </h3>
+            </div>
 
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <!-- Métricas -->
+            <section>
+                <h3 class="text-[11px] font-semibold uppercase tracking-widest mb-4 opacity-50" style="color: var(--text-secondary);">Resumen</h3>
+                <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                    <div v-for="item in resumen" :key="item.label"
+                         class="flex flex-col p-5 rounded-xl border shadow-sm"
+                         style="background-color: var(--card-bg); border-color: var(--border-color);">
+                        <p class="text-[13px] font-medium mb-1" style="color: var(--text-secondary);">{{ item.label }}</p>
+                        <p class="text-4xl font-light tracking-tight mb-2" style="color: var(--text-color);">{{ item.valor }}</p>
+                        <p class="text-xs opacity-60" style="color: var(--text-secondary);">{{ item.detalle }}</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Módulos -->
+            <section>
+                <h3 class="text-[11px] font-semibold uppercase tracking-widest mb-4 opacity-50" style="color: var(--text-secondary);">Módulos</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Link
-                        v-for="cu in cus"
-                        :key="cu.numero"
-                        :href="route(cu.ruta)"
-                        class="group relative overflow-hidden rounded-2xl shadow hover:shadow-lg transition-shadow duration-200"
-                        style="background-color: var(--card-bg); border: 1px solid var(--border-color);"
-                    >
-                        <div :class="['absolute inset-x-0 top-0 h-1 bg-gradient-to-r', cu.color]" />
-                        <div class="p-6">
-                            <div class="mb-3 flex items-center gap-3">
-                                <span class="text-3xl">{{ cu.icono }}</span>
-                                <span class="text-xs font-bold tracking-widest uppercase" style="color: var(--text-secondary);">
-                                    {{ cu.numero }}
-                                </span>
-                            </div>
-                            <h3 class="mb-1 text-base font-semibold transition-colors" style="color: var(--text-color);">
-                                {{ cu.titulo }}
-                            </h3>
-                            <p class="text-sm leading-snug" style="color: var(--text-secondary);">
-                                {{ cu.descripcion }}
-                            </p>
+                        v-for="m in modulos"
+                        :key="m.ruta"
+                        :href="route(m.ruta)"
+                        class="group relative flex flex-col justify-between p-6 rounded-xl border shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+                        style="background-color: var(--card-bg); border-color: var(--border-color);">
+                        <div>
+                            <p class="text-[11px] font-bold uppercase tracking-widest mb-2 opacity-50" style="color: var(--text-secondary);">{{ m.numero }}</p>
+                            <h4 class="text-[15px] font-medium mb-2" style="color: var(--text-color);">{{ m.titulo }}</h4>
+                            <p class="text-[13px] leading-relaxed opacity-70" style="color: var(--text-secondary);">{{ m.descripcion }}</p>
                         </div>
-                        <div class="absolute bottom-4 right-4 transition-colors" style="color: var(--text-secondary);">
-                            →
+                        <div class="mt-8 flex items-center justify-between">
+                            <span class="text-[11px] font-medium uppercase tracking-wider opacity-60 group-hover:opacity-100 transition-opacity" style="color: var(--text-color);">Ingresar al módulo</span>
+                            <span class="opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200" style="color: var(--text-color);">→</span>
                         </div>
                     </Link>
                 </div>
+            </section>
 
-            </div>
         </div>
-    </AuthenticatedLayout>
+    </DirectorLayout>
 </template>

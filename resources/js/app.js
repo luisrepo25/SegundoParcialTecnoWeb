@@ -3,10 +3,13 @@ import '../css/auth.css';
 import '../css/themes.css';
 import './bootstrap';
 
-import { createInertiaApp } from '@inertiajs/vue3';
+import { createInertiaApp, router } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
+
+// Sesión expirada (419) o respuesta no-Inertia → recargar para ir al login
+router.on('invalid', () => { window.location.reload(); });
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 

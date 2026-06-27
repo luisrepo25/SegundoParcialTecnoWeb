@@ -1,5 +1,5 @@
 <script setup>
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import DirectorLayout from '@/Layouts/DirectorLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 
@@ -80,9 +80,9 @@ function toggleActivo(c) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const TIPO_BADGE = {
-    tecnico:          { label: 'Técnico',          color: 'badge-blue'   },
-    tecnico_superior: { label: 'Téc. Superior',    color: 'badge-purple' },
-    curso_libre:      { label: 'Curso Libre',      color: 'badge-yellow' },
+    tecnico:          { label: 'Técnico',    color: 'badge-blue'   },
+    tecnico_superior: { label: 'T. Superior', color: 'badge-purple' },
+    curso_libre:      { label: 'C. Libre',   color: 'badge-yellow' },
 };
 function tipoBadge(tipo) { return TIPO_BADGE[tipo] ?? { label: tipo, color: 'badge-gray' }; }
 
@@ -95,18 +95,11 @@ function formatCosto(val) {
 <template>
     <Head title="Gestión de Carreras" />
 
-    <AuthenticatedLayout>
+    <DirectorLayout>
         <template #header>
-            <div class="flex items-center gap-3">
-                <Link :href="route('dashboard.director')"
-                    class="text-sm px-3 py-1 rounded-lg border transition"
-                    style="color: var(--text-secondary); border-color: var(--border-color); background: var(--card-bg);">
-                    ← Dashboard
-                </Link>
-                <h2 class="text-xl font-semibold leading-tight" style="color: var(--text-color);">
-                    Gestión de Carreras
-                </h2>
-            </div>
+            <h2 class="text-xl font-semibold leading-tight" style="color: var(--text-color);">
+                Gestión de Carreras
+            </h2>
         </template>
 
         <div class="py-8">
@@ -154,19 +147,19 @@ function formatCosto(val) {
                     <table class="min-w-full">
                         <thead>
                             <tr style="background-color: var(--bg-color);">
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--text-secondary);">Código</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Código</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--text-secondary);">Carrera</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--text-secondary);">Tipo</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell" style="color: var(--text-secondary);">Duración</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden lg:table-cell" style="color: var(--text-secondary);">Costo Total</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--text-secondary);">Estado</th>
-                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style="color: var(--text-secondary);">Acciones</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Tipo</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap hidden md:table-cell" style="color: var(--text-secondary);">Duración</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap hidden lg:table-cell" style="color: var(--text-secondary);">Costo Total</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Estado</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr v-for="c in carreras.data" :key="c.id_carrera"
                                 class="border-t" style="border-color: var(--border-color);">
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     <span class="font-mono text-sm font-semibold" style="color: var(--primary-color);">{{ c.codigo }}</span>
                                 </td>
                                 <td class="px-4 py-3">
@@ -177,7 +170,7 @@ function formatCosto(val) {
                                     </Link>
                                     <div v-if="c.descripcion" class="text-xs mt-0.5 line-clamp-1" style="color: var(--text-secondary);">{{ c.descripcion }}</div>
                                 </td>
-                                <td class="px-4 py-3">
+                                <td class="px-4 py-3 whitespace-nowrap">
                                     <span :class="['badge', tipoBadge(c.tipo).color]">{{ tipoBadge(c.tipo).label }}</span>
                                 </td>
                                 <td class="px-4 py-3 text-sm hidden md:table-cell" style="color: var(--text-color);">
@@ -294,7 +287,7 @@ function formatCosto(val) {
                 </div>
             </div>
         </Teleport>
-    </AuthenticatedLayout>
+    </DirectorLayout>
 </template>
 
 <style scoped>

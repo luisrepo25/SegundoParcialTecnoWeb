@@ -100,32 +100,44 @@ class MateriaController extends Controller
     {
         $carrera = Carrera::findOrFail($id);
 
-        $filas = DB::table('malla_curricular as mc')
+        // Todos los niveles de la carrera (incluso vacíos)
+        $niveles = DB::table('niveles_carrera')
+            ->where('id_carrera', $id)
+            ->orderBy('numero_nivel')
+            ->get();
+
+        // Materias asignadas a la malla de esta carrera
+        $mallaPorNivel = DB::table('malla_curricular as mc')
             ->join('materias as m', 'mc.id_materia', '=', 'm.id_materia')
-            ->leftJoin('niveles_carrera as nc', 'mc.id_nivel', '=', 'nc.id_nivel')
             ->where('mc.id_carrera', $id)
-            ->orderBy('nc.numero_nivel')
             ->orderByRaw('mc.orden_en_nivel NULLS LAST')
             ->select(
                 'm.id_materia', 'm.codigo', 'm.nombre',
-                'm.duracion_meses', 'm.costo_mensual', 'm.creditos', 'm.activo',
-                'mc.id_malla', 'mc.orden_en_nivel', 'mc.obligatoria',
-                'nc.numero_nivel', 'nc.nombre as nombre_nivel'
+                'm.duracion_meses', 'm.costo_mensual', 'm.creditos',
+                'm.id_materia_requisito',
+                'mc.id_malla', 'mc.id_nivel', 'mc.orden_en_nivel', 'mc.obligatoria'
             )
-            ->get();
+            ->get()
+            ->groupBy('id_nivel');
 
-        // Agrupar por nivel
-        $porNivel = $filas->groupBy('numero_nivel')->map(function ($items, $nivel) {
+        $porNivel = $niveles->map(function ($nivel) use ($mallaPorNivel) {
             return [
-                'numero_nivel' => $nivel,
-                'nombre_nivel' => $items->first()->nombre_nivel ?? "Nivel $nivel",
-                'materias'     => $items->values(),
+                'id_nivel'     => $nivel->id_nivel,
+                'numero_nivel' => $nivel->numero_nivel,
+                'nombre_nivel' => $nivel->nombre ?? "Nivel {$nivel->numero_nivel}",
+                'descripcion'  => $nivel->descripcion,
+                'materias'     => ($mallaPorNivel[$nivel->id_nivel] ?? collect())->values(),
             ];
         })->values();
 
+        $materiasDisponibles = Materia::where('activo', true)
+            ->orderBy('nombre')
+            ->get(['id_materia', 'codigo', 'nombre', 'id_materia_requisito']);
+
         return Inertia::render('Director/CU5Materias/PorCarrera', [
-            'carrera'  => $carrera,
-            'porNivel' => $porNivel,
+            'carrera'             => $carrera,
+            'porNivel'            => $porNivel,
+            'materiasDisponibles' => $materiasDisponibles,
         ]);
     }
 }

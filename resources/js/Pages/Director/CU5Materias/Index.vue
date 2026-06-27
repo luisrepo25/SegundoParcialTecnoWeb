@@ -1,7 +1,8 @@
 <script setup>
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import DirectorLayout from '@/Layouts/DirectorLayout.vue';
+import ComboSelect from '@/Components/ComboSelect.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
+import { ref, computed, watch } from 'vue';
 
 const props = defineProps({
     materias:          Object,
@@ -70,10 +71,12 @@ function toggleActivo(m) {
     router.patch(route('director.materias.toggle-activo', m.id_materia));
 }
 
-// Opciones de requisito (excluye la materia que se está editando)
-function opcionesRequisito() {
-    return props.todasLasMaterias.filter(m => m.id_materia !== editandoId.value);
-}
+// Opciones de requisito para ComboSelect (excluye la materia que se está editando)
+const opcionesRequisito = computed(() =>
+    (props.todasLasMaterias ?? [])
+        .filter(m => m.id_materia !== editandoId.value)
+        .map(m => ({ value: m.id_materia, label: `${m.codigo} — ${m.nombre}` }))
+);
 
 function formatCosto(val) {
     if (!val) return '—';
@@ -84,18 +87,11 @@ function formatCosto(val) {
 <template>
     <Head title="Gestión de Materias" />
 
-    <AuthenticatedLayout>
+    <DirectorLayout>
         <template #header>
-            <div class="flex items-center gap-3">
-                <Link :href="route('dashboard.director')"
-                    class="text-sm px-3 py-1 rounded-lg border transition"
-                    style="color: var(--text-secondary); border-color: var(--border-color); background: var(--card-bg);">
-                    ← Dashboard
-                </Link>
-                <h2 class="text-xl font-semibold leading-tight" style="color: var(--text-color);">
-                    Gestión de Materias
-                </h2>
-            </div>
+            <h2 class="text-xl font-semibold leading-tight" style="color: var(--text-color);">
+                Gestión de Materias
+            </h2>
         </template>
 
         <div class="py-8">
@@ -256,12 +252,12 @@ function formatCosto(val) {
 
                         <div>
                             <label class="field-label">Materia requisito</label>
-                            <select v-model="form.id_materia_requisito" class="field-input">
-                                <option value="">Sin requisito</option>
-                                <option v-for="m in opcionesRequisito()" :key="m.id_materia" :value="m.id_materia">
-                                    {{ m.codigo }} — {{ m.nombre }}
-                                </option>
-                            </select>
+                            <ComboSelect
+                                v-model="form.id_materia_requisito"
+                                :options="opcionesRequisito"
+                                placeholder="Sin requisito"
+                                empty-label="Sin requisito"
+                            />
                             <p v-if="form.errors.id_materia_requisito" class="field-error">{{ form.errors.id_materia_requisito }}</p>
                         </div>
 
@@ -277,7 +273,7 @@ function formatCosto(val) {
                 </div>
             </div>
         </Teleport>
-    </AuthenticatedLayout>
+    </DirectorLayout>
 </template>
 
 <style scoped>

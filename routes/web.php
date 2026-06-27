@@ -48,7 +48,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // ── Panel Director ─────────────────────────────────────────────────────────
     Route::get('/panel/director', function () {
-        return Inertia::render('Dashboard/Director');
+        return Inertia::render('Dashboard/Director', [
+            'totalCarreras'   => \App\Models\Carrera::count(),
+            'carrerasActivas' => \App\Models\Carrera::where('activo', true)->count(),
+            'totalMaterias'   => \App\Models\Materia::count(),
+        ]);
     })->middleware('role:director')->name('dashboard.director');
 
     // CU4 — Gestión de Carreras + CU5 Materias (director)
@@ -65,6 +69,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/materias', [\App\Http\Controllers\Director\CU5Materias\MateriaController::class, 'store'])->name('materias.store');
         Route::put('/materias/{id}', [\App\Http\Controllers\Director\CU5Materias\MateriaController::class, 'update'])->name('materias.update');
         Route::patch('/materias/{id}/toggle-activo', [\App\Http\Controllers\Director\CU5Materias\MateriaController::class, 'toggleActivo'])->name('materias.toggle-activo');
+
+        // CU6 Malla Curricular
+        Route::post('/carreras/{id}/niveles', [\App\Http\Controllers\Director\CU6Malla\MallaController::class, 'storeNivel'])->name('malla.nivel.store');
+        Route::delete('/niveles/{id}', [\App\Http\Controllers\Director\CU6Malla\MallaController::class, 'destroyNivel'])->name('malla.nivel.destroy');
+        Route::post('/malla', [\App\Http\Controllers\Director\CU6Malla\MallaController::class, 'storeMalla'])->name('malla.store');
+        Route::delete('/malla/{id}', [\App\Http\Controllers\Director\CU6Malla\MallaController::class, 'destroyMalla'])->name('malla.destroy');
+        Route::post('/carreras/{id}/nueva-materia', [\App\Http\Controllers\Director\CU6Malla\MallaController::class, 'storeMateriaNueva'])->name('malla.materia.store');
     });
 
     // ── Panel Secretaria ───────────────────────────────────────────────────────
