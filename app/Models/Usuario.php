@@ -124,7 +124,12 @@ class Usuario extends Authenticatable implements JWTSubject
 
     public function getAuthPassword(): string
     {
-        return $this->password_hash;
+        $hash = $this->password_hash ?? '';
+        // Java BCrypt uses $2a$ prefix; PHP password_get_info() only recognizes $2y$
+        if (str_starts_with($hash, '$2a$')) {
+            $hash = '$2y$' . substr($hash, 4);
+        }
+        return $hash;
     }
 
     public function hasVerifiedEmail(): bool
