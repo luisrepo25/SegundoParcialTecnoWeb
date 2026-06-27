@@ -13,14 +13,14 @@ const showingNavigationDropdown = ref(false);
 const page = usePage();
 
 const roleLabels = {
-    admin:     { label: 'Propietario', icon: '🏛️' },
-    director:  { label: 'Director',    icon: '🎓' },
-    secretary: { label: 'Secretaría',  icon: '📋' },
-    teacher:   { label: 'Docente',     icon: '👨‍🏫' },
-    student:   { label: 'Estudiante',  icon: '📚' },
+    propietario: { label: 'Propietario', icon: '🏛️' },
+    director:    { label: 'Director',    icon: '🎓' },
+    secretaria:  { label: 'Secretaría',  icon: '📋' },
+    profesor:    { label: 'Docente',     icon: '👨‍🏫' },
+    estudiante:  { label: 'Estudiante',  icon: '📚' },
 };
 
-const userRole = computed(() => page.props.auth?.user?.role ?? 'student');
+const userRole = computed(() => page.props.auth?.user?.role ?? 'estudiante');
 const roleInfo = computed(() => roleLabels[userRole.value] ?? { label: 'Panel', icon: '🏠' });
 
 </script>

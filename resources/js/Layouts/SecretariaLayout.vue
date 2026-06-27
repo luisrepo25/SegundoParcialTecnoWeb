@@ -10,6 +10,7 @@ const user = computed(() => page.props.auth.user);
 const modulos = [
     { name: 'Dashboard', route: 'secretaria.dashboard', activeUrls: ['/secretaria/panel'] },
     { name: 'Gestión de Usuarios', route: 'propietario.usuarios.index', activeUrls: ['/propietario/usuarios'] },
+    { name: 'Cronogramas', route: 'secretaria.cronogramas.index', activeUrls: ['/secretaria/cronogramas'] },
     { name: 'Inscripciones', route: 'secretaria.inscripciones.index', activeUrls: ['/secretaria/inscripciones'] },
     { name: 'Caja y Pagos', route: 'secretaria.pagos.index', activeUrls: ['/secretaria/pagos'] }
 ];

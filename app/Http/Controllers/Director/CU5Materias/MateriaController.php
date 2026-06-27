@@ -25,7 +25,7 @@ class MateriaController extends Controller
         }
 
         if ($request->filled('activo') && $request->activo !== 'todos') {
-            $query->where('activo', $request->activo === '1');
+            $query->whereRaw($request->activo === '1' ? 'activo IS TRUE' : 'activo IS FALSE');
         }
 
         $materias        = $query->paginate(10)->withQueryString();

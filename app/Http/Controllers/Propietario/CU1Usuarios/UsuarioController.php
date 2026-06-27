@@ -19,10 +19,10 @@ class UsuarioController extends Controller
     private function rolesPermitidos(): array
     {
         return match (auth()->user()->role) {
-            'admin'      => [1, 2, 3, 4, 5],
-            'director'   => [2, 3, 4, 5],
-            'secretary'  => [3, 4, 5],
-            default      => [],
+            'propietario' => [1, 2, 3, 4, 5],
+            'director'    => [2, 3, 4, 5],
+            'secretaria'  => [3, 4, 5],
+            default       => [],
         };
     }
 
@@ -48,7 +48,7 @@ class UsuarioController extends Controller
 
         $usuarios = $query->paginate(10)->withQueryString();
 
-        $roles = Rol::where('activo', true)->get();
+        $roles = Rol::where('activo', 'true')->get();
 
         return Inertia::render('Propietario/CU1Usuarios/Index', [
             'usuarios'        => $usuarios,
