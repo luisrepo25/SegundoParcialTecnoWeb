@@ -15,15 +15,20 @@ class PagoFacilService
     public function getToken(): string
     {
         return Cache::remember(self::CACHE_TOKEN, self::TOKEN_TTL, function () {
-            $resp = Http::withHeaders([
-                'tcTokenService' => config('services.pagofacil.token_service'),
-                'tcTokenSecret'  => config('services.pagofacil.token_secret'),
-            ])->post(self::BASE . '/login');
+            $resp = Http::withoutVerifying()   // SSL no disponible en Windows dev
+                ->withHeaders([
+                    'tcTokenService' => config('services.pagofacil.token_service'),
+                    'tcTokenSecret'  => config('services.pagofacil.token_secret'),
+                ])->post(self::BASE . '/login');
 
             $data = $resp->json();
 
-            // PagoFácil puede devolver el token en distintas claves
-            return $data['token'] ?? $data['tcToken'] ?? $data['access_token'] ?? throw new \RuntimeException('PagoFácil: token no recibido. Respuesta: ' . $resp->body());
+            // La API devuelve: { "values": { "accessToken": "..." } }
+            return $data['values']['accessToken']
+                ?? $data['token']
+                ?? $data['tcToken']
+                ?? $data['access_token']
+                ?? throw new \RuntimeException('PagoFácil: token no recibido. Respuesta: ' . $resp->body());
         });
     }
 
@@ -51,7 +56,8 @@ class PagoFacilService
         // Quitar 'concepto' de $params si existe (no es un campo de la API)
         unset($params['concepto']);
 
-        $resp = Http::withToken($this->getToken())
+        $resp = Http::withoutVerifying()
+            ->withToken($this->getToken())
             ->post(self::BASE . '/generate-qr', array_merge($base, $params));
 
         if (!$resp->successful()) {
@@ -64,18 +70,20 @@ class PagoFacilService
     // ── Consultar estado de transacción ───────────────────────────────────────
     public function consultarTransaccion(int $transactionId): array
     {
-        // La API usa 'pagofacilTransactionId' (no 'transactionId') según la colección Postman
-        $resp = Http::withToken($this->getToken())
+        $resp = Http::withoutVerifying()
+            ->withToken($this->getToken())
             ->post(self::BASE . '/query-transaction', ['pagofacilTransactionId' => $transactionId]);
 
-        return $resp->json() ?? [];
+        $data = $resp->json() ?? [];
+        // La API envuelve los datos en 'values' — igual que login y generate-qr
+        return $data['values'] ?? $data;
     }
 
     // ── Determinar si un resultado es "pagado" ────────────────────────────────
     public static function esPagado(array $result): bool
     {
         $status = $result['paymentStatus'] ?? $result['status'] ?? null;
-        $date   = $result['paymentDate']   ?? null;
+        $date   = $result['paymentDate']   ?? $result['paymentDateStr'] ?? null;
         return $date !== null || in_array($status, [2, 5], true);
     }
 }

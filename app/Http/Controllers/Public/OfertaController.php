@@ -113,40 +113,41 @@ class OfertaController extends Controller
 
         $carrera = Carrera::whereRaw('activo IS TRUE')->where('id_carrera', $idCarrera)->firstOrFail();
 
-        // 1. Crear usuario inactivo (activo=false hasta confirmar pago)
+        // 1. Crear usuario inactivo + estudiante (en transacción DB)
         $tempPassword = Str::random(10);
-        $usuario = Usuario::create([
-            'nombre'   => $request->nombre,
-            'apellido' => $request->apellido,
-            'email'    => $request->email,
-            'password' => Hash::make($tempPassword),
-            'dni'      => $request->dni,
-            'telefono' => $request->telefono,
-            'id_rol'   => 5,
-            'activo'   => false,
-        ]);
+        $usuario    = null;
+        $estudiante = null;
 
-        // 2. Crear estudiante
-        $legajo = 'LEG-' . now()->year . '-' . str_pad($usuario->id_usuario, 5, '0', STR_PAD_LEFT);
-        $estudiante = Estudiante::create([
-            'id_usuario'                => $usuario->id_usuario,
-            'legajo'                    => $legajo,
-            'fecha_inscripcion_inicial' => now()->toDateString(),
-            'id_carrera_actual'         => $idCarrera,
-        ]);
+        DB::beginTransaction();
+        try {
+            $usuario = Usuario::create([
+                'nombre'        => $request->nombre,
+                'apellido'      => $request->apellido,
+                'email'         => $request->email,
+                'password_hash' => Hash::make($tempPassword), // fillable es 'password_hash', no 'password'
+                'dni'           => $request->dni,
+                'telefono'      => $request->telefono,
+                'id_rol'        => 5,
+                'activo'        => false,
+            ]);
 
-        // 3. Registrar transacción pendiente
+            $legajo = 'LEG-' . now()->year . '-' . str_pad($usuario->id_usuario, 5, '0', STR_PAD_LEFT);
+            $estudiante = Estudiante::create([
+                'id_usuario'                => $usuario->id_usuario,
+                'legajo'                    => $legajo,
+                'fecha_inscripcion_inicial' => now()->toDateString(),
+                'id_carrera_actual'         => $idCarrera,
+            ]);
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return back()->withErrors(['general' => 'Error al registrar datos: ' . $e->getMessage()]);
+        }
+
+        // 2. Generar QR con PagoFácil PRIMERO (transaction_id_api es NOT NULL en la tabla)
         $paymentNumber = 'MAT-' . $estudiante->id_estudiante . '-' . now()->timestamp;
-        $transId = DB::table('pagofacil_transacciones')->insertGetId([
-            'id_estudiante'   => $estudiante->id_estudiante,
-            'concepto'        => 'matricula',
-            'monto'           => 500.00,
-            'estado'          => 'pendiente',
-            'payment_number'  => $paymentNumber,
-            'fecha_generacion' => now(),
-        ]);
 
-        // 4. Generar QR con PagoFácil
         try {
             $pf = app(PagoFacilService::class);
             $qrResult = $pf->generarQR([
@@ -156,26 +157,51 @@ class OfertaController extends Controller
                 'email'         => $request->email,
                 'paymentNumber' => $paymentNumber,
                 'clientCode'    => (string) $estudiante->id_estudiante,
-                'concepto'      => 'Matrícula — ' . $carrera->nombre, // extraído antes de enviar a la API
+                'concepto'      => 'Matrícula — ' . $carrera->nombre,
             ]);
-
-            DB::table('pagofacil_transacciones')
-                ->where('id_transaccion_pf', $transId)
-                ->update(['transaction_id_api' => $qrResult['transactionId'] ?? null]);
-
-            // Guardar QR y password temporal en sesión (se limpian tras mostrar credenciales)
-            session([
-                'pf_qr_' . $transId => $qrResult['qrImage'] ?? null,
-                'pf_pw_' . $transId => $tempPassword,
-            ]);
-
         } catch (\Throwable $e) {
-            // Rollback completo si PagoFácil falla
-            DB::table('pagofacil_transacciones')->where('id_transaccion_pf', $transId)->delete();
+            // PagoFácil falló — limpiar usuario y estudiante creados
             $estudiante->delete();
             $usuario->delete();
             return back()->withErrors(['general' => 'No se pudo conectar con el sistema de pago: ' . $e->getMessage()]);
         }
+
+        // Estructura real: { "values": { "transactionId": ..., "qrBase64": "..." } }
+        $apiTransId = $qrResult['values']['transactionId']
+            ?? $qrResult['transactionId']
+            ?? null;
+
+        $qrRaw = $qrResult['values']['qrBase64']
+            ?? $qrResult['values']['qrImage']
+            ?? $qrResult['qrImage']
+            ?? null;
+
+        // Agregar prefijo data URI si no lo tiene
+        $qrImage = $qrRaw
+            ? (str_starts_with($qrRaw, 'data:') ? $qrRaw : 'data:image/png;base64,' . $qrRaw)
+            : null;
+
+        if (!$apiTransId) {
+            $estudiante->delete();
+            $usuario->delete();
+            return back()->withErrors(['general' => 'PagoFácil no devolvió ID de transacción. Respuesta: ' . json_encode($qrResult)]);
+        }
+
+        // 3. Insertar transacción con transaction_id_api ya disponible
+        $transId = DB::table('pagofacil_transacciones')->insertGetId([
+            'transaction_id_api' => $apiTransId,
+            'payment_number'     => $paymentNumber,
+            'id_estudiante'      => $estudiante->id_estudiante,
+            'monto'              => 500.00,
+            'concepto'           => 'matricula',
+            'estado'             => 'pendiente',
+        ], 'id_transaccion_pf');
+
+        // 4. Guardar QR y contraseña temporal en sesión
+        session([
+            'pf_qr_' . $transId => $qrImage,
+            'pf_pw_' . $transId => $tempPassword,
+        ]);
 
         return redirect()->route('oferta.pago', $transId);
     }
