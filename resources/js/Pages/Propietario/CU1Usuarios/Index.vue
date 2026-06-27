@@ -1,6 +1,6 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { Head, router, useForm, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
 
 const page = usePage();
@@ -137,6 +137,15 @@ function toggleActivo(u) {
 
         <div class="py-8">
             <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+
+                <!-- Volver -->
+                <div class="mb-5">
+                    <Link :href="route('dashboard.propietario')"
+                        class="inline-flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-70"
+                        style="color: var(--text-secondary);">
+                        ← Volver al Dashboard
+                    </Link>
+                </div>
 
                 <!-- Flash -->
                 <div v-if="$page.props.flash?.success" class="mb-4 rounded-lg p-4 text-sm font-medium"

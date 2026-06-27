@@ -34,31 +34,33 @@ const secciones = [
         key: 'academico',
         label: 'Académico',
         items: [
-            { name: 'Gestión de Carreras', route: 'director.carreras.index', activeUrls: ['/director/carreras'] },
-            { name: 'Gestión de Materias', route: 'director.materias.index', activeUrls: ['/director/materias'] },
+            { name: 'Gestión de Carreras', route: 'director.carreras.index',      activeUrls: ['/director/carreras'] },
+            { name: 'Gestión de Materias', route: 'director.materias.index',      activeUrls: ['/director/materias'] },
+            { name: 'Cronogramas',         route: 'secretaria.cronogramas.index', activeUrls: ['/secretaria/cronogramas'] },
+        ],
+    },
+    {
+        key: 'financiero',
+        label: 'Financiero',
+        items: [
+            { name: 'Inscripciones', route: 'secretaria.inscripciones.index', activeUrls: ['/secretaria/inscripciones'] },
+            { name: 'Caja y Pagos',  route: 'secretaria.pagos.index',         activeUrls: ['/secretaria/pagos'] },
         ],
     },
     {
         key: 'administrativo',
         label: 'Administrativo',
         items: [
-            { name: 'Gestión de Usuarios', route: 'propietario.usuarios.index',   activeUrls: ['/propietario/usuarios'] },
-            { name: 'Gestión de Aulas',    route: 'propietario.aulas.index',      activeUrls: ['/propietario/aulas'] },
-            { name: 'Gestión de Horarios', route: 'propietario.horarios.index',   activeUrls: ['/propietario/horarios'] },
-            { name: 'Cronogramas',         route: 'secretaria.cronogramas.index', activeUrls: ['/secretaria/cronogramas'] },
-        ],
-    },
-    {
-        key: 'secretaria',
-        label: 'Secretaría',
-        items: [
-            { name: 'Inscripciones', route: 'secretaria.inscripciones.index', activeUrls: ['/secretaria/inscripciones'] },
-            { name: 'Caja y Pagos',  route: 'secretaria.pagos.index',         activeUrls: ['/secretaria/pagos'] },
+            { name: 'Gestión de Usuarios', route: 'propietario.usuarios.index', activeUrls: ['/propietario/usuarios'] },
+            { name: 'Gestión de Aulas',    route: 'propietario.aulas.index',    activeUrls: ['/propietario/aulas'] },
+            { name: 'Gestión de Horarios', route: 'propietario.horarios.index', activeUrls: ['/propietario/horarios'] },
         ],
     },
 ];
 
-const openSections = ref({ academico: true, administrativo: true, secretaria: false });
+const reportesItem = { name: 'Reportes y Estadísticas', route: 'propietario.reportes.index', activeUrls: ['/propietario/reportes'] };
+
+const openSections = ref({ academico: true, financiero: false, administrativo: false });
 const toggleSection = (key) => { openSections.value[key] = !openSections.value[key]; };
 
 const isActive = (urls) => urls.some(url => page.url.startsWith(url));
@@ -117,6 +119,18 @@ const showUserMenu   = ref(false);
                         : 'color: var(--text-secondary);'"
                 >
                     <span class="text-base leading-none">⊞</span> Dashboard
+                </Link>
+
+                <!-- Reportes — propietario y director -->
+                <Link v-if="user?.role === 'propietario' || user?.role === 'director'"
+                    :href="route(reportesItem.route)"
+                    @click="showMobileMenu = false"
+                    class="flex items-center gap-2 px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150"
+                    :style="isActive(reportesItem.activeUrls)
+                        ? 'background-color: color-mix(in srgb, var(--primary-color) 15%, transparent); color: var(--primary-color);'
+                        : 'color: var(--text-secondary);'"
+                >
+                    <span class="text-base leading-none">📊</span> Reportes
                 </Link>
 
                 <!-- Secciones colapsables -->

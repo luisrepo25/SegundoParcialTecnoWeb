@@ -35,6 +35,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'total_usuarios'   => Usuario::count(),
                 'usuarios_activos' => Usuario::whereRaw('activo IS TRUE')->count(),
                 'total_aulas'      => Aula::count(),
+                'total_carreras'   => \App\Models\Carrera::count(),
+                'total_materias'   => \App\Models\Materia::count(),
+                'total_horarios'   => \App\Models\Horario::count(),
             ],
         ]);
     })->middleware('role:propietario')->name('dashboard.propietario');
@@ -47,6 +50,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/usuarios/{id}/toggle-activo', [UsuarioController::class, 'toggleActivo'])->name('usuarios.toggle-activo');
         Route::patch('/usuarios/{id}/password', [UsuarioController::class, 'cambiarPassword'])->name('usuarios.password');
     });
+
+    // CU14 — Reportes y Estadísticas (propietario + director; auditoría solo propietario)
+    Route::get('/propietario/reportes', [\App\Http\Controllers\Propietario\CU14Reportes\ReporteController::class, 'index'])
+        ->middleware('role:propietario,director')
+        ->name('propietario.reportes.index');
 
     // CU2 y CU11 — todos los roles admin
     Route::middleware('role:propietario,director,secretaria')->prefix('propietario')->name('propietario.')->group(function () {
@@ -67,7 +75,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/panel/director', function () {
         return Inertia::render('Dashboard/Director', [
             'totalCarreras'   => \App\Models\Carrera::count(),
-            'carrerasActivas' => \App\Models\Carrera::where('activo', true)->count(),
+            'carrerasActivas' => \App\Models\Carrera::whereRaw('activo IS TRUE')->count(),
             'totalMaterias'   => \App\Models\Materia::count(),
         ]);
     })->middleware('role:director')->name('dashboard.director');
