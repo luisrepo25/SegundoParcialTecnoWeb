@@ -18,6 +18,8 @@ class Usuario extends Authenticatable implements JWTSubject
     protected $primaryKey = 'id_usuario';
     public $timestamps = false;
 
+    protected $appends = ['role', 'name'];
+
     /**
      * The attributes that are mass assignable.
      *
