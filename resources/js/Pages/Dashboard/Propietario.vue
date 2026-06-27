@@ -1,23 +1,43 @@
 <script setup>
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import PropietarioLayout from '@/Layouts/PropietarioLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
-const cus = [
+const props = defineProps({
+    stats:  { type: Object, default: () => ({}) },
+    nombre: { type: String, default: '' },
+});
+
+const hoy = computed(() => {
+    return new Date().toLocaleDateString('es-ES', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    }).toUpperCase();
+});
+
+const metricas = computed(() => [
+    { label: 'Usuarios Registrados', valor: props.stats.total_usuarios  ?? 0, desc: 'Total en el sistema' },
+    { label: 'Usuarios Activos',     valor: props.stats.usuarios_activos ?? 0, desc: 'Con acceso habilitado' },
+    { label: 'Aulas Registradas',    valor: props.stats.total_aulas      ?? 0, desc: 'Total en catálogo' },
+]);
+
+const modulos = [
     {
         numero: 'CU1',
         titulo: 'Gestión de Usuarios',
         descripcion: 'Crear, editar, activar/desactivar y gestionar contraseñas de usuarios del sistema.',
-        icono: '👥',
         ruta: 'propietario.usuarios.index',
-        color: 'from-indigo-500 to-indigo-700',
     },
     {
         numero: 'CU2',
         titulo: 'Gestión de Aulas',
-        descripcion: 'Registrar, editar y administrar aulas, laboratorios, talleres y salas.',
-        icono: '🏫',
+        descripcion: 'Registrar, editar y administrar aulas, laboratorios y salas.',
         ruta: 'propietario.aulas.index',
-        color: 'from-blue-500 to-blue-700',
+    },
+    {
+        numero: 'CU11',
+        titulo: 'Gestión de Horarios',
+        descripcion: 'Registrar y administrar bloques horarios por día y hora.',
+        ruta: 'propietario.horarios.index',
     },
 ];
 </script>
@@ -25,50 +45,54 @@ const cus = [
 <template>
     <Head title="Panel Propietario" />
 
-    <AuthenticatedLayout>
+    <PropietarioLayout>
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight" style="color: var(--text-color);">
-                Panel Propietario
-            </h2>
+            <h2 class="text-base font-semibold" style="color: var(--text-color);">Panel de Propietario</h2>
         </template>
 
-        <div class="py-8">
-            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <!-- Fecha y bienvenida -->
+        <div class="mb-8">
+            <p class="text-xs font-semibold tracking-widest mb-1" style="color: var(--text-secondary);">{{ hoy }}</p>
+            <h1 class="text-2xl font-light" style="color: var(--text-color);">
+                Bienvenido, <strong class="font-bold">{{ nombre || $page.props.auth.user.nombre }}</strong>
+            </h1>
+        </div>
 
-                <p class="mb-6 text-sm" style="color: var(--text-secondary);">
-                    Seleccione una función para gestionar el sistema.
-                </p>
-
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <Link
-                        v-for="cu in cus"
-                        :key="cu.numero"
-                        :href="route(cu.ruta)"
-                        class="group relative overflow-hidden rounded-2xl shadow hover:shadow-lg transition-shadow duration-200"
-                        style="background-color: var(--card-bg); border: 1px solid var(--border-color);"
-                    >
-                        <div :class="['absolute inset-x-0 top-0 h-1 bg-gradient-to-r', cu.color]" />
-                        <div class="p-6">
-                            <div class="mb-3 flex items-center gap-3">
-                                <span class="text-3xl">{{ cu.icono }}</span>
-                                <span class="text-xs font-bold tracking-widest uppercase" style="color: var(--text-secondary);">
-                                    {{ cu.numero }}
-                                </span>
-                            </div>
-                            <h3 class="mb-1 text-base font-semibold transition-colors" style="color: var(--text-color);">
-                                {{ cu.titulo }}
-                            </h3>
-                            <p class="text-sm leading-snug" style="color: var(--text-secondary);">
-                                {{ cu.descripcion }}
-                            </p>
-                        </div>
-                        <div class="absolute bottom-4 right-4 transition-colors" style="color: var(--text-secondary);">
-                            →
-                        </div>
-                    </Link>
+        <!-- Métricas -->
+        <div class="mb-8">
+            <p class="text-[11px] font-semibold uppercase tracking-widest mb-4" style="color: var(--text-secondary);">Resumen</p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div v-for="m in metricas" :key="m.label"
+                     class="rounded-xl p-6"
+                     style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                    <p class="text-sm mb-2" style="color: var(--text-secondary);">{{ m.label }}</p>
+                    <p class="text-4xl font-light mb-1" style="color: var(--text-color);">{{ m.valor }}</p>
+                    <p class="text-xs" style="color: var(--text-secondary);">{{ m.desc }}</p>
                 </div>
-
             </div>
         </div>
-    </AuthenticatedLayout>
+
+        <!-- Módulos -->
+        <div>
+            <p class="text-[11px] font-semibold uppercase tracking-widest mb-4" style="color: var(--text-secondary);">Módulos</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Link
+                    v-for="m in modulos"
+                    :key="m.numero"
+                    :href="route(m.ruta)"
+                    class="group rounded-xl p-6 flex flex-col justify-between transition-shadow hover:shadow-md"
+                    style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-widest mb-2" style="color: var(--text-secondary);">{{ m.numero }}</p>
+                        <h3 class="text-base font-semibold mb-2" style="color: var(--text-color);">{{ m.titulo }}</h3>
+                        <p class="text-sm leading-snug" style="color: var(--text-secondary);">{{ m.descripcion }}</p>
+                    </div>
+                    <div class="mt-6 flex items-center justify-between border-t pt-4" style="border-color: var(--border-color);">
+                        <span class="text-[11px] font-semibold uppercase tracking-widest" style="color: var(--text-secondary);">Ingresar al módulo</span>
+                        <span style="color: var(--text-secondary);">→</span>
+                    </div>
+                </Link>
+            </div>
+        </div>
+    </PropietarioLayout>
 </template>

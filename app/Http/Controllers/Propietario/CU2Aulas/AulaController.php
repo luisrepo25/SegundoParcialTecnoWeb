@@ -27,7 +27,7 @@ class AulaController extends Controller
         }
 
         if ($request->filled('activo') && $request->activo !== 'todos') {
-            $query->where('activo', $request->activo === '1');
+            $query->whereRaw($request->activo === '1' ? 'activo IS TRUE' : 'activo IS FALSE');
         }
 
         $aulas = $query->paginate(10)->withQueryString();
@@ -44,7 +44,7 @@ class AulaController extends Controller
             'nombre'    => 'required|string|max:50|unique:aulas,nombre',
             'capacidad' => 'required|integer|min:1',
             'ubicacion' => 'nullable|string|max:100',
-            'tipo'      => 'required|string|in:aula,laboratorio,taller,sala',
+            'tipo'      => 'required|string|in:aula,laboratorio,sala,auditorio',
         ]);
 
         Aula::create([
@@ -66,7 +66,7 @@ class AulaController extends Controller
             'nombre'    => ['required', 'string', 'max:50', Rule::unique('aulas', 'nombre')->ignore($id, 'id_aula')],
             'capacidad' => 'required|integer|min:1',
             'ubicacion' => 'nullable|string|max:100',
-            'tipo'      => 'required|string|in:aula,laboratorio,taller,sala',
+            'tipo'      => 'required|string|in:aula,laboratorio,sala,auditorio',
         ]);
 
         $aula->update([

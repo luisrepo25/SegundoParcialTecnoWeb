@@ -27,7 +27,7 @@ class CarreraController extends Controller
         }
 
         if ($request->filled('activo') && $request->activo !== 'todos') {
-            $query->where('activo', $request->activo === '1');
+            $query->whereRaw($request->activo === '1' ? 'activo IS TRUE' : 'activo IS FALSE');
         }
 
         $carreras = $query->paginate(10)->withQueryString();
