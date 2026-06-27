@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'pagofacil' => [
+        'token_service' => env('PAGOFACIL_TOKEN_SERVICE'),
+        'token_secret'  => env('PAGOFACIL_TOKEN_SECRET'),
+        'callback_url'  => env('PAGOFACIL_CALLBACK_URL', 'https://grupo07sc.ngrok.app/pagofacil/callback'),
+    ],
+
 ];

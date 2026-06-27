@@ -13,6 +13,20 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
+// ── Oferta académica pública (sin autenticación) ───────────────────────────
+Route::prefix('oferta')->name('oferta.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Public\OfertaController::class, 'index'])->name('index');
+    // /pago/* ANTES de /{id} para evitar colisión de rutas
+    Route::get('/pago/{transId}/estado', [\App\Http\Controllers\Public\OfertaController::class, 'estado'])->name('estado');
+    Route::get('/pago/{transId}', [\App\Http\Controllers\Public\OfertaController::class, 'pago'])->name('pago');
+    Route::get('/{id}', [\App\Http\Controllers\Public\OfertaController::class, 'show'])->where('id', '[0-9]+')->name('show');
+    Route::get('/{id}/inscribirse', [\App\Http\Controllers\Public\OfertaController::class, 'formulario'])->where('id', '[0-9]+')->name('formulario');
+    Route::post('/{id}/inscribirse', [\App\Http\Controllers\Public\OfertaController::class, 'registrar'])->where('id', '[0-9]+')->name('registrar');
+});
+
+// Callback PagoFácil (sin CSRF — excluido en bootstrap/app.php)
+Route::post('/pagofacil/callback', [\App\Http\Controllers\Public\CallbackController::class, 'handle'])->name('pagofacil.callback');
+
 Route::get('/dashboard', function () {
     $user = auth()->user();
 
@@ -123,7 +137,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/cronogramas/{id}/toggle-activo', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'toggleActivo'])->name('cronogramas.toggle-activo');
 
         Route::get('/inscripciones', [\App\Http\Controllers\Secretaria\CU2Inscripciones\InscripcionController::class, 'index'])->name('inscripciones.index');
-        Route::get('/pagos', [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'index'])->name('pagos.index');
+
+        // CU7 — Gestión de Pagos (fase 1: lado admin)
+        Route::get('/pagos',                                      [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'index'])             ->name('pagos.index');
+        Route::get('/pagos/{id}',                                 [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'show'])              ->name('pagos.show');
+        Route::post('/pagos/{id}/matricula',                      [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'registrarMatricula'])->name('pagos.matricula');
+        Route::post('/pagos/{id}/carrera',                        [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'registrarCarrera'])  ->name('pagos.carrera');
+        Route::post('/pagos/cuota/{idPago}/{numCuota}',           [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'pagarCuota'])        ->name('pagos.cuota');
     });
 
     // ── Panel Docente ──────────────────────────────────────────────────────────

@@ -63,9 +63,9 @@ const secciones = [
                 ruta: 'secretaria.inscripciones.index',
             },
             {
-                numero: 'CU8',
+                numero: 'CU7',
                 titulo: 'Caja y Pagos',
-                descripcion: 'Registrar pagos y gestionar el flujo de caja del instituto.',
+                descripcion: 'Registrar matrículas, planes de carrera y cuotas de estudiantes.',
                 ruta: 'secretaria.pagos.index',
             },
         ],

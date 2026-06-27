@@ -69,6 +69,14 @@ const pilares = [
                     </div>
                 </div>
             </div>
+
+            <!-- CTA oferta académica -->
+            <div class="login-oferta-cta">
+                <p class="login-oferta-label">¿Querés estudiar con nosotros?</p>
+                <Link :href="route('oferta.index')" class="login-oferta-btn">
+                    Ver oferta académica →
+                </Link>
+            </div>
         </template>
 
         <!-- Formulario de ingreso -->
@@ -212,5 +220,36 @@ const pilares = [
     font-size: 0.82rem;
     color: #64748b;
     line-height: 1.5;
+}
+
+/* Oferta académica CTA */
+.login-oferta-cta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding-top: 0.5rem;
+}
+.login-oferta-label {
+    font-size: 0.82rem;
+    color: #475569;
+    margin: 0;
+    flex-shrink: 0;
+}
+.login-oferta-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #0f172a;
+    background: linear-gradient(135deg, #38bdf8, #818cf8);
+    padding: 0.45rem 1.1rem;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    transition: opacity 0.15s;
+}
+.login-oferta-btn:hover {
+    opacity: 0.85;
 }
 </style>
