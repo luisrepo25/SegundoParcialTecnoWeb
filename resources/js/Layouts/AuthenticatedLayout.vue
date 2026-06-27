@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue';
-import ApplicationLogo from '@/Components/ApplicationLogo.vue';
+import InstituteLogo from '@/Components/InstituteLogo.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
@@ -35,13 +35,17 @@ const roleInfo = computed(() => roleLabels[userRole.value] ?? { label: 'Panel', 
                         <!-- Izquierda: Logo + nombre panel -->
                         <div class="flex items-center gap-4">
                             <Link :href="route('dashboard')" class="flex shrink-0 items-center">
-                                <ApplicationLogo class="block h-9 w-auto fill-current" style="color: var(--primary-color);" />
+                                <InstituteLogo :size="38" />
                             </Link>
-                            <div class="hidden sm:flex items-center gap-2">
-                                <span class="text-lg">{{ roleInfo.icon }}</span>
-                                <span class="font-semibold text-sm" style="color: var(--text-color);">
-                                    Instituto San Pablo
-                                </span>
+                            <div class="hidden sm:flex items-center gap-2.5">
+                                <div class="leading-tight">
+                                    <p class="font-bold text-sm leading-none" style="color: var(--text-color);">
+                                        Instituto San Pablo
+                                    </p>
+                                    <p class="text-xs leading-none mt-0.5" style="color: #f59e0b;">
+                                        del Oriente
+                                    </p>
+                                </div>
                                 <span class="text-xs px-2 py-0.5 rounded-full font-medium"
                                     style="background-color: var(--primary-color); color: var(--primary-text);">
                                     {{ roleInfo.label }}
@@ -76,7 +80,7 @@ const roleInfo = computed(() => roleLabels[userRole.value] ?? { label: 'Panel', 
                                 </template>
                                 <template #content>
                                     <div class="px-4 py-2 border-b" style="border-color: var(--border-color);">
-                                        <p class="text-xs font-semibold" style="color: var(--text-secondary);">{{ roleInfo.icon }} {{ roleInfo.label }}</p>
+                                        <p class="text-xs font-semibold" style="color: var(--text-secondary);">{{ roleInfo.label }}</p>
                                         <p class="text-xs truncate" style="color: var(--text-secondary);">{{ $page.props.auth.user.email }}</p>
                                     </div>
                                     <DropdownLink :href="route('profile.edit')">Perfil</DropdownLink>

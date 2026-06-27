@@ -1,64 +1,64 @@
 /* resources/css/themes.css */
 
-/* Define the default CSS variables under root and Adults theme */
+/* Adultos — Día claro, verde institucional */
 :root, html[data-theme="adults"] {
-    --bg-color: #f3f4f6;
+    --bg-color: #f0f7f2;
     --card-bg: #ffffff;
-    --text-color: #1f2937;
-    --text-secondary: #4b5563;
+    --text-color: #1a3328;
+    --text-secondary: #4a6d5a;
     --nav-bg: #ffffff;
-    --border-color: #e5e7eb;
-    --primary-color: #1e40af;
-    --primary-hover: #1e3a8a;
+    --border-color: #c8e6d2;
+    --primary-color: #1a5c30;
+    --primary-hover: #144a26;
     --primary-text: #ffffff;
     --font-family: 'Outfit', 'Inter', system-ui, sans-serif;
     --border-radius: 0.5rem;
     --border-width: 1px;
 }
 
-/* Youth Theme (Modo Noche - Azul institucional suave) */
+/* Jóvenes — Noche verde oscura institucional */
 html[data-theme="youth"] {
-    --bg-color: #1a2236;
-    --card-bg: #243047;
-    --text-color: #e8edf5;
-    --text-secondary: #8fa3c0;
-    --nav-bg: #1e2a40;
-    --border-color: #2e3f5c;
-    --primary-color: #4f8ef7;
-    --primary-hover: #3b7de8;
-    --primary-text: #ffffff;
+    --bg-color: #0d2014;
+    --card-bg: #132d1e;
+    --text-color: #e0f2e9;
+    --text-secondary: #7aab8a;
+    --nav-bg: #0f2518;
+    --border-color: #1e4028;
+    --primary-color: #34d058;
+    --primary-hover: #28b048;
+    --primary-text: #0d2014;
     --font-family: 'Outfit', 'Inter', system-ui, sans-serif;
     --border-radius: 0.5rem;
     --border-width: 1px;
 }
 
-/* Kids Theme (Playful pastel pink/yellow/purple) */
+/* Niños — Verde menta suave y dorado */
 html[data-theme="kids"] {
-    --bg-color: #fef9c3;
-    --card-bg: #fdf2f8;
-    --text-color: #831843;
-    --text-secondary: #be185d;
-    --nav-bg: #fae8ff;
-    --border-color: #fbcfe8;
-    --primary-color: #ec4899;
-    --primary-hover: #db2777;
+    --bg-color: #ecfdf5;
+    --card-bg: #f0fff8;
+    --text-color: #064e3b;
+    --text-secondary: #059669;
+    --nav-bg: #d1fae5;
+    --border-color: #a7f3d0;
+    --primary-color: #10b981;
+    --primary-hover: #059669;
     --primary-text: #ffffff;
-    --font-family: 'Comic Sans MS', 'Comic Neue', cursive, sans-serif;
-    --border-radius: 1.5rem;
-    --border-width: 3px;
+    --font-family: 'Comic Neue', 'Comic Sans MS', cursive, sans-serif;
+    --border-radius: 1.2rem;
+    --border-width: 2px;
 }
 
-/* High Contrast Mode (Accessibility - menos agresivo) */
+/* Alto contraste — Verde oscuro + blanco */
 html[data-contrast="high"] {
-    --bg-color: #0d1b2a !important;
-    --card-bg: #112240 !important;
+    --bg-color: #041208 !important;
+    --card-bg: #071a0d !important;
     --text-color: #ffffff !important;
-    --text-secondary: #a8d0f5 !important;
-    --nav-bg: #0a1628 !important;
-    --border-color: #4f8ef7 !important;
-    --primary-color: #4f8ef7 !important;
-    --primary-hover: #7ab3ff !important;
-    --primary-text: #ffffff !important;
+    --text-secondary: #86efac !important;
+    --nav-bg: #020d05 !important;
+    --border-color: #34d058 !important;
+    --primary-color: #34d058 !important;
+    --primary-hover: #4ade80 !important;
+    --primary-text: #041208 !important;
     --border-width: 2px !important;
 }
 
