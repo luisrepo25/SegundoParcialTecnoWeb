@@ -10,131 +10,116 @@ const props = defineProps({
     filtros: Object,
 });
 
-// ── Filtros ──────────────────────────────────────────────────────────────────
-const buscar = ref(props.filtros?.buscar ?? '');
+// ── Filtros ───────────────────────────────────────────────────────────────────
+const buscar   = ref(props.filtros?.buscar ?? '');
 const rolFiltro = ref(props.filtros?.rol ?? '');
 
 let buscarTimeout = null;
-watch(buscar, (val) => {
+watch(buscar, () => {
     clearTimeout(buscarTimeout);
-    buscarTimeout = setTimeout(() => aplicarFiltros(), 400);
+    buscarTimeout = setTimeout(aplicarFiltros, 400);
 });
-watch(rolFiltro, () => aplicarFiltros());
+watch(rolFiltro, aplicarFiltros);
 
 function aplicarFiltros() {
-    router.get(route('admin.usuarios.index'), {
+    router.get(route('propietario.usuarios.index'), {
         buscar: buscar.value || undefined,
-        rol: rolFiltro.value || undefined,
+        rol:    rolFiltro.value || undefined,
     }, { preserveState: true, replace: true });
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-const ROLES_LABEL = {
-    1: { label: 'Propietario', color: 'bg-purple-100 text-purple-800' },
-    2: { label: 'Director',    color: 'bg-blue-100 text-blue-800' },
-    3: { label: 'Secretaria',  color: 'bg-green-100 text-green-800' },
-    4: { label: 'Profesor',    color: 'bg-yellow-100 text-yellow-800' },
-    5: { label: 'Estudiante',  color: 'bg-gray-100 text-gray-800' },
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const ROLES_MAP = {
+    1: { label: 'Propietario', badge: 'badge-purple' },
+    2: { label: 'Director',    badge: 'badge-blue'   },
+    3: { label: 'Secretaria',  badge: 'badge-green'  },
+    4: { label: 'Profesor',    badge: 'badge-yellow' },
+    5: { label: 'Estudiante',  badge: 'badge-gray'   },
 };
 
 const rolesCreables = computed(() =>
     props.roles.filter(r => props.rolesPermitidos.includes(r.id_rol))
 );
 
-function rolInfo(idRol) {
-    return ROLES_LABEL[idRol] ?? { label: 'Desconocido', color: 'bg-gray-100 text-gray-500' };
+function rolInfo(id) { return ROLES_MAP[id] ?? { label: 'Desconocido', badge: 'badge-gray' }; }
+
+// ── Modal VER ─────────────────────────────────────────────────────────────────
+const showVerModal      = ref(false);
+const usuarioVer        = ref(null);
+const showPassEnVer     = ref(false);
+
+const passVerForm = useForm({ password: '', password_confirmation: '' });
+
+function abrirVer(u) {
+    usuarioVer.value    = u;
+    showPassEnVer.value = false;
+    passVerForm.reset();
+    passVerForm.clearErrors();
+    showVerModal.value  = true;
 }
 
-// ── Modal Crear / Editar ──────────────────────────────────────────────────────
-const showModal = ref(false);
-const modoEdicion = ref(false);
-const editandoId = ref(null);
+function guardarPassVer() {
+    passVerForm.patch(route('propietario.usuarios.password', usuarioVer.value.id_usuario), {
+        onSuccess: () => {
+            showPassEnVer.value = false;
+            passVerForm.reset();
+        },
+    });
+}
+
+// ── Modal CREAR / EDITAR ──────────────────────────────────────────────────────
+const showFormModal = ref(false);
+const modoEdicion   = ref(false);
+const editandoId    = ref(null);
 
 const form = useForm({
     nombre: '', apellido: '', email: '', dni: '',
     telefono: '', direccion: '', id_rol: '',
     password: '', password_confirmation: '',
-    // Profesor
     especialidad: '', titulo_maximo: '', fecha_contratacion: '',
-    // Personal admin
     cargo: '', fecha_ingreso: '',
 });
 
 function abrirCrear() {
-    form.reset();
+    form.reset(); form.clearErrors();
     modoEdicion.value = false;
-    editandoId.value = null;
-    showModal.value = true;
+    editandoId.value  = null;
+    showFormModal.value = true;
 }
 
-function abrirEditar(usuario) {
-    form.reset();
-    form.nombre    = usuario.nombre;
-    form.apellido  = usuario.apellido;
-    form.email     = usuario.email;
-    form.dni       = usuario.dni;
-    form.telefono  = usuario.telefono ?? '';
-    form.direccion = usuario.direccion ?? '';
-    form.id_rol    = usuario.id_rol;
-    modoEdicion.value = true;
-    editandoId.value  = usuario.id_usuario;
-    showModal.value   = true;
+function abrirEditar(u) {
+    form.reset(); form.clearErrors();
+    form.nombre    = u.nombre;
+    form.apellido  = u.apellido;
+    form.email     = u.email;
+    form.dni       = u.dni;
+    form.telefono  = u.telefono ?? '';
+    form.direccion = u.direccion ?? '';
+    form.id_rol    = u.id_rol;
+    modoEdicion.value   = true;
+    editandoId.value    = u.id_usuario;
+    showFormModal.value = true;
 }
 
-function cerrarModal() {
-    showModal.value = false;
-    form.reset();
-    form.clearErrors();
-}
+function cerrarForm() { showFormModal.value = false; form.reset(); form.clearErrors(); }
 
 function guardar() {
     if (modoEdicion.value) {
-        form.put(route('admin.usuarios.update', editandoId.value), {
-            onSuccess: () => cerrarModal(),
-        });
+        form.put(route('propietario.usuarios.update', editandoId.value), { onSuccess: cerrarForm });
     } else {
-        form.post(route('admin.usuarios.store'), {
-            onSuccess: () => cerrarModal(),
-        });
+        form.post(route('propietario.usuarios.store'), { onSuccess: cerrarForm });
     }
 }
 
-const rolSeleccionado = computed(() => Number(form.id_rol));
-const esProfesor     = computed(() => rolSeleccionado.value === 4);
-const esPersonalAdm  = computed(() => [1, 2, 3].includes(rolSeleccionado.value));
-
-// ── Modal Cambiar Password ────────────────────────────────────────────────────
-const showPasswordModal = ref(false);
-const passwordUsuarioId = ref(null);
-const passwordUsuarioNombre = ref('');
-
-const passForm = useForm({
-    password: '',
-    password_confirmation: '',
-});
-
-function abrirCambiarPassword(usuario) {
-    passForm.reset();
-    passForm.clearErrors();
-    passwordUsuarioId.value     = usuario.id_usuario;
-    passwordUsuarioNombre.value = `${usuario.nombre} ${usuario.apellido}`;
-    showPasswordModal.value     = true;
-}
-
-function guardarPassword() {
-    passForm.patch(route('admin.usuarios.password', passwordUsuarioId.value), {
-        onSuccess: () => {
-            showPasswordModal.value = false;
-            passForm.reset();
-        },
-    });
-}
+const rolSel     = computed(() => Number(form.id_rol));
+const esProfesor = computed(() => rolSel.value === 4);
+const esAdmRol   = computed(() => [1, 2, 3].includes(rolSel.value));
 
 // ── Toggle Activo ─────────────────────────────────────────────────────────────
-function toggleActivo(usuario) {
-    const accion = usuario.activo ? 'desactivar' : 'activar';
-    if (!confirm(`¿Desea ${accion} a ${usuario.nombre} ${usuario.apellido}?`)) return;
-    router.patch(route('admin.usuarios.toggle-activo', usuario.id_usuario));
+function toggleActivo(u) {
+    const accion = u.activo ? 'desactivar' : 'activar';
+    if (!confirm(`¿Desea ${accion} a ${u.nombre} ${u.apellido}?`)) return;
+    router.patch(route('propietario.usuarios.toggle-activo', u.id_usuario));
 }
 </script>
 
@@ -143,7 +128,7 @@ function toggleActivo(usuario) {
 
     <AuthenticatedLayout>
         <template #header>
-            <h2 class="text-xl font-semibold leading-tight text-gray-800">
+            <h2 class="text-xl font-semibold leading-tight" style="color: var(--text-color);">
                 Gestión de Usuarios
             </h2>
         </template>
@@ -151,98 +136,80 @@ function toggleActivo(usuario) {
         <div class="py-8">
             <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 
-                <!-- Flash messages -->
-                <div v-if="$page.props.flash?.success"
-                     class="mb-4 rounded-lg bg-green-50 p-4 text-green-800 border border-green-200">
+                <!-- Flash -->
+                <div v-if="$page.props.flash?.success" class="mb-4 rounded-lg p-4 text-sm font-medium"
+                     style="background-color: #d1fae5; color: #065f46; border: 1px solid #6ee7b7;">
                     {{ $page.props.flash.success }}
                 </div>
-                <div v-if="$page.props.flash?.error"
-                     class="mb-4 rounded-lg bg-red-50 p-4 text-red-800 border border-red-200">
+                <div v-if="$page.props.flash?.error" class="mb-4 rounded-lg p-4 text-sm font-medium"
+                     style="background-color: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;">
                     {{ $page.props.flash.error }}
                 </div>
 
                 <!-- Barra superior -->
                 <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div class="flex gap-2 flex-1 flex-wrap">
-                        <input
-                            v-model="buscar"
-                            type="text"
-                            placeholder="Buscar por nombre, email o DNI..."
-                            class="flex-1 min-w-[200px] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        />
-                        <select
-                            v-model="rolFiltro"
-                            class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        >
+                        <input v-model="buscar" type="text" placeholder="Buscar por nombre, email o DNI..."
+                            class="flex-1 min-w-[200px] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                            style="background-color: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color); focus-ring-color: var(--primary-color);" />
+                        <select v-model="rolFiltro"
+                            class="rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                            style="background-color: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color);">
                             <option value="">Todos los roles</option>
-                            <option v-for="r in roles" :key="r.id_rol" :value="r.id_rol">
-                                {{ r.nombre_rol }}
-                            </option>
+                            <option v-for="r in roles" :key="r.id_rol" :value="r.id_rol">{{ r.nombre_rol }}</option>
                         </select>
                     </div>
-                    <button
-                        v-if="rolesCreables.length > 0"
-                        @click="abrirCrear"
-                        class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition"
-                    >
+                    <button v-if="rolesCreables.length > 0" @click="abrirCrear"
+                        class="rounded-lg px-4 py-2 text-sm font-medium transition"
+                        style="background-color: var(--primary-color); color: var(--primary-text);">
                         + Nuevo Usuario
                     </button>
                 </div>
 
                 <!-- Tabla -->
-                <div class="overflow-hidden rounded-xl bg-white shadow">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Usuario</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">DNI</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rol</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                <div class="overflow-hidden rounded-xl shadow" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                    <table class="min-w-full divide-y" style="border-color: var(--border-color);">
+                        <thead>
+                            <tr style="background-color: var(--bg-color);">
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--text-secondary);">Usuario</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--text-secondary);">Email</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell" style="color: var(--text-secondary);">DNI</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--text-secondary);">Rol</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--text-secondary);">Estado</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style="color: var(--text-secondary);">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100">
-                            <tr v-for="u in usuarios.data" :key="u.id_usuario" class="hover:bg-gray-50">
+                        <tbody>
+                            <tr v-for="u in usuarios.data" :key="u.id_usuario"
+                                class="border-t transition-colors hover:opacity-90"
+                                style="border-color: var(--border-color);">
                                 <td class="px-4 py-3">
-                                    <div class="font-medium text-gray-900">{{ u.nombre }} {{ u.apellido }}</div>
-                                    <div class="text-xs text-gray-400">ID: {{ u.id_usuario }}</div>
+                                    <div class="font-medium text-sm" style="color: var(--text-color);">{{ u.nombre }} {{ u.apellido }}</div>
+                                    <div class="text-xs" style="color: var(--text-secondary);">ID: {{ u.id_usuario }}</div>
                                 </td>
-                                <td class="px-4 py-3 text-sm text-gray-600">{{ u.email }}</td>
-                                <td class="px-4 py-3 text-sm text-gray-600">{{ u.dni }}</td>
+                                <td class="px-4 py-3 text-sm" style="color: var(--text-secondary);">{{ u.email }}</td>
+                                <td class="px-4 py-3 text-sm hidden md:table-cell" style="color: var(--text-secondary);">{{ u.dni }}</td>
                                 <td class="px-4 py-3">
-                                    <span :class="['inline-flex rounded-full px-2 py-0.5 text-xs font-semibold', rolInfo(u.id_rol).color]">
-                                        {{ rolInfo(u.id_rol).label }}
-                                    </span>
+                                    <span :class="['badge', rolInfo(u.id_rol).badge]">{{ rolInfo(u.id_rol).label }}</span>
                                 </td>
                                 <td class="px-4 py-3">
-                                    <span :class="u.activo
-                                        ? 'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700'
-                                        : 'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700'">
+                                    <span :class="['badge', u.activo ? 'badge-activo' : 'badge-inactivo']">
                                         {{ u.activo ? 'Activo' : 'Inactivo' }}
                                     </span>
                                 </td>
                                 <td class="px-4 py-3 text-right">
                                     <div class="flex justify-end gap-1">
-                                        <button @click="abrirEditar(u)"
-                                            class="rounded px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 transition">
-                                            Editar
-                                        </button>
-                                        <button @click="abrirCambiarPassword(u)"
-                                            class="rounded px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-50 transition">
-                                            Contraseña
-                                        </button>
-                                        <button @click="toggleActivo(u)"
-                                            :class="u.activo
-                                                ? 'rounded px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition'
-                                                : 'rounded px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-50 transition'">
+                                        <button @click="abrirVer(u)" class="btn-accion" style="color: var(--primary-color);">Ver</button>
+                                        <button @click="abrirEditar(u)" class="btn-accion" style="color: #d97706;">Editar</button>
+                                        <button @click="toggleActivo(u)" class="btn-accion"
+                                            :style="u.activo ? 'color: #dc2626;' : 'color: #059669;'">
                                             {{ u.activo ? 'Desactivar' : 'Activar' }}
                                         </button>
                                     </div>
                                 </td>
                             </tr>
                             <tr v-if="usuarios.data.length === 0">
-                                <td colspan="6" class="px-4 py-8 text-center text-gray-400 text-sm">
+                                <td colspan="6" class="px-4 py-8 text-center text-sm" style="color: var(--text-secondary);">
                                     No se encontraron usuarios.
                                 </td>
                             </tr>
@@ -250,21 +217,21 @@ function toggleActivo(usuario) {
                     </table>
 
                     <!-- Paginación -->
-                    <div v-if="usuarios.last_page > 1" class="flex items-center justify-between border-t border-gray-200 px-4 py-3">
-                        <p class="text-sm text-gray-500">
+                    <div v-if="usuarios.last_page > 1" class="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-3 border-t"
+                         style="border-color: var(--border-color);">
+                        <p class="text-sm" style="color: var(--text-secondary);">
                             Mostrando {{ usuarios.from }}–{{ usuarios.to }} de {{ usuarios.total }} usuarios
                         </p>
-                        <div class="flex gap-1">
+                        <div class="flex gap-1 flex-wrap">
                             <template v-for="link in usuarios.links" :key="link.label">
-                                <button
-                                    v-if="link.url"
-                                    @click="router.get(link.url)"
-                                    :class="['px-3 py-1 rounded text-sm border', link.active
-                                        ? 'bg-indigo-600 text-white border-indigo-600'
-                                        : 'text-gray-600 border-gray-300 hover:bg-gray-50']"
-                                    v-html="link.label"
-                                />
-                                <span v-else class="px-3 py-1 rounded text-sm border border-gray-200 text-gray-300"
+                                <button v-if="link.url" @click="router.get(link.url)"
+                                    class="px-3 py-1 rounded text-sm border transition"
+                                    :style="link.active
+                                        ? 'background-color: var(--primary-color); color: var(--primary-text); border-color: var(--primary-color);'
+                                        : 'background-color: var(--card-bg); color: var(--text-color); border-color: var(--border-color);'"
+                                    v-html="link.label" />
+                                <span v-else class="px-3 py-1 rounded text-sm border"
+                                    style="color: var(--text-secondary); border-color: var(--border-color); opacity: 0.5;"
                                     v-html="link.label" />
                             </template>
                         </div>
@@ -273,154 +240,192 @@ function toggleActivo(usuario) {
             </div>
         </div>
 
-        <!-- ── Modal Crear / Editar ──────────────────────────────────────── -->
+        <!-- ── Modal VER ───────────────────────────────────────────────────── -->
         <Teleport to="body">
-            <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                <div class="w-full max-w-lg rounded-2xl bg-white shadow-xl overflow-y-auto max-h-[90vh]">
-                    <div class="flex items-center justify-between border-b px-6 py-4">
-                        <h3 class="text-lg font-semibold text-gray-900">
-                            {{ modoEdicion ? 'Editar Usuario' : 'Nuevo Usuario' }}
-                        </h3>
-                        <button @click="cerrarModal" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            <div v-if="showVerModal" class="modal-overlay" @click.self="showVerModal = false">
+                <div class="modal-box" style="max-width: 30rem;">
+                    <div class="modal-header">
+                        <h3 class="modal-title">Detalle de Usuario</h3>
+                        <button @click="showVerModal = false" class="modal-close">&times;</button>
                     </div>
 
-                    <form @submit.prevent="guardar" class="px-6 py-4 space-y-4">
-
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="label-form">Nombre *</label>
-                                <input v-model="form.nombre" type="text" class="input-form" />
-                                <p v-if="form.errors.nombre" class="text-error">{{ form.errors.nombre }}</p>
+                    <div class="p-6 space-y-3" v-if="usuarioVer">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold"
+                                 style="background-color: var(--primary-color); color: var(--primary-text);">
+                                {{ usuarioVer.nombre[0] }}{{ usuarioVer.apellido[0] }}
                             </div>
                             <div>
-                                <label class="label-form">Apellido *</label>
-                                <input v-model="form.apellido" type="text" class="input-form" />
-                                <p v-if="form.errors.apellido" class="text-error">{{ form.errors.apellido }}</p>
+                                <p class="font-semibold text-base" style="color: var(--text-color);">{{ usuarioVer.nombre }} {{ usuarioVer.apellido }}</p>
+                                <span :class="['badge', rolInfo(usuarioVer.id_rol).badge]">{{ rolInfo(usuarioVer.id_rol).label }}</span>
                             </div>
                         </div>
 
-                        <div>
-                            <label class="label-form">Email *</label>
-                            <input v-model="form.email" type="email" class="input-form" />
-                            <p v-if="form.errors.email" class="text-error">{{ form.errors.email }}</p>
+                        <div class="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                                <p class="font-medium mb-0.5" style="color: var(--text-secondary);">Email</p>
+                                <p style="color: var(--text-color);">{{ usuarioVer.email }}</p>
+                            </div>
+                            <div>
+                                <p class="font-medium mb-0.5" style="color: var(--text-secondary);">DNI</p>
+                                <p style="color: var(--text-color);">{{ usuarioVer.dni }}</p>
+                            </div>
+                            <div>
+                                <p class="font-medium mb-0.5" style="color: var(--text-secondary);">Teléfono</p>
+                                <p style="color: var(--text-color);">{{ usuarioVer.telefono ?? '—' }}</p>
+                            </div>
+                            <div>
+                                <p class="font-medium mb-0.5" style="color: var(--text-secondary);">Estado</p>
+                                <span :class="['badge', usuarioVer.activo ? 'badge-activo' : 'badge-inactivo']">
+                                    {{ usuarioVer.activo ? 'Activo' : 'Inactivo' }}
+                                </span>
+                            </div>
+                            <div class="col-span-2">
+                                <p class="font-medium mb-0.5" style="color: var(--text-secondary);">Dirección</p>
+                                <p style="color: var(--text-color);">{{ usuarioVer.direccion ?? '—' }}</p>
+                            </div>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="label-form">DNI *</label>
-                                <input v-model="form.dni" type="text" class="input-form" />
-                                <p v-if="form.errors.dni" class="text-error">{{ form.errors.dni }}</p>
-                            </div>
-                            <div>
-                                <label class="label-form">Teléfono</label>
-                                <input v-model="form.telefono" type="text" class="input-form" />
-                            </div>
-                        </div>
+                        <!-- Cambiar Contraseña (dentro del modal Ver) -->
+                        <div class="border-t pt-3 mt-3" style="border-color: var(--border-color);">
+                            <button @click="showPassEnVer = !showPassEnVer" class="text-sm font-medium transition"
+                                style="color: var(--primary-color);">
+                                {{ showPassEnVer ? '▲ Cancelar cambio de contraseña' : '🔑 Cambiar contraseña' }}
+                            </button>
 
-                        <div>
-                            <label class="label-form">Dirección</label>
-                            <input v-model="form.direccion" type="text" class="input-form" />
-                        </div>
-
-                        <!-- Rol (solo al crear) -->
-                        <div v-if="!modoEdicion">
-                            <label class="label-form">Rol *</label>
-                            <select v-model="form.id_rol" class="input-form">
-                                <option value="">Seleccione un rol</option>
-                                <option v-for="r in rolesCreables" :key="r.id_rol" :value="r.id_rol">
-                                    {{ r.nombre_rol }}
-                                </option>
-                            </select>
-                            <p v-if="form.errors.id_rol" class="text-error">{{ form.errors.id_rol }}</p>
-                        </div>
-
-                        <!-- Campos extra: Profesor -->
-                        <template v-if="esProfesor && !modoEdicion">
-                            <div>
-                                <label class="label-form">Especialidad *</label>
-                                <input v-model="form.especialidad" type="text" class="input-form" />
-                                <p v-if="form.errors.especialidad" class="text-error">{{ form.errors.especialidad }}</p>
-                            </div>
-                            <div>
-                                <label class="label-form">Título Máximo</label>
-                                <input v-model="form.titulo_maximo" type="text" class="input-form" />
-                            </div>
-                            <div>
-                                <label class="label-form">Fecha de Contratación *</label>
-                                <input v-model="form.fecha_contratacion" type="date" class="input-form" />
-                                <p v-if="form.errors.fecha_contratacion" class="text-error">{{ form.errors.fecha_contratacion }}</p>
-                            </div>
-                        </template>
-
-                        <!-- Campos extra: Personal Administrativo -->
-                        <template v-if="esPersonalAdm && !modoEdicion">
-                            <div>
-                                <label class="label-form">Cargo</label>
-                                <input v-model="form.cargo" type="text" class="input-form" placeholder="Se asigna automáticamente si se deja vacío" />
-                            </div>
-                            <div>
-                                <label class="label-form">Fecha de Ingreso</label>
-                                <input v-model="form.fecha_ingreso" type="date" class="input-form" />
-                            </div>
-                        </template>
-
-                        <!-- Password (solo al crear) -->
-                        <template v-if="!modoEdicion">
-                            <div class="grid grid-cols-2 gap-3">
+                            <form v-if="showPassEnVer" @submit.prevent="guardarPassVer" class="mt-3 space-y-3">
                                 <div>
-                                    <label class="label-form">Contraseña *</label>
-                                    <input v-model="form.password" type="password" class="input-form" />
-                                    <p v-if="form.errors.password" class="text-error">{{ form.errors.password }}</p>
+                                    <label class="block text-sm font-medium mb-1" style="color: var(--text-color);">Nueva contraseña *</label>
+                                    <input v-model="passVerForm.password" type="password" class="field-input" />
+                                    <p v-if="passVerForm.errors.password" class="mt-1 text-xs" style="color: #ef4444;">{{ passVerForm.errors.password }}</p>
                                 </div>
                                 <div>
-                                    <label class="label-form">Confirmar Contraseña *</label>
-                                    <input v-model="form.password_confirmation" type="password" class="input-form" />
+                                    <label class="block text-sm font-medium mb-1" style="color: var(--text-color);">Confirmar contraseña *</label>
+                                    <input v-model="passVerForm.password_confirmation" type="password" class="field-input" />
                                 </div>
-                            </div>
-                        </template>
-
-                        <div class="flex justify-end gap-2 pt-2 border-t">
-                            <button type="button" @click="cerrarModal"
-                                class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                Cancelar
-                            </button>
-                            <button type="submit" :disabled="form.processing"
-                                class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
-                                {{ form.processing ? 'Guardando...' : (modoEdicion ? 'Actualizar' : 'Crear Usuario') }}
-                            </button>
+                                <button type="submit" :disabled="passVerForm.processing"
+                                    class="rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50"
+                                    style="background-color: var(--primary-color); color: var(--primary-text);">
+                                    {{ passVerForm.processing ? 'Guardando...' : 'Actualizar contraseña' }}
+                                </button>
+                            </form>
                         </div>
-                    </form>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button @click="showVerModal = false" class="btn-secondary">Cerrar</button>
+                    </div>
                 </div>
             </div>
         </Teleport>
 
-        <!-- ── Modal Cambiar Contraseña ───────────────────────────────────── -->
+        <!-- ── Modal CREAR / EDITAR ────────────────────────────────────────── -->
         <Teleport to="body">
-            <div v-if="showPasswordModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                <div class="w-full max-w-sm rounded-2xl bg-white shadow-xl">
-                    <div class="flex items-center justify-between border-b px-6 py-4">
-                        <h3 class="text-lg font-semibold text-gray-900">Cambiar Contraseña</h3>
-                        <button @click="showPasswordModal = false" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+            <div v-if="showFormModal" class="modal-overlay" @click.self="cerrarForm">
+                <div class="modal-box" style="max-width: 32rem;">
+                    <div class="modal-header">
+                        <h3 class="modal-title">{{ modoEdicion ? 'Editar Usuario' : 'Nuevo Usuario' }}</h3>
+                        <button @click="cerrarForm" class="modal-close">&times;</button>
                     </div>
-                    <form @submit.prevent="guardarPassword" class="px-6 py-4 space-y-4">
-                        <p class="text-sm text-gray-500">Usuario: <strong>{{ passwordUsuarioNombre }}</strong></p>
-                        <div>
-                            <label class="label-form">Nueva Contraseña *</label>
-                            <input v-model="passForm.password" type="password" class="input-form" />
-                            <p v-if="passForm.errors.password" class="text-error">{{ passForm.errors.password }}</p>
+
+                    <form @submit.prevent="guardar" class="p-6 space-y-4 overflow-y-auto" style="max-height: 70vh;">
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="field-label">Nombre *</label>
+                                <input v-model="form.nombre" type="text" class="field-input" />
+                                <p v-if="form.errors.nombre" class="field-error">{{ form.errors.nombre }}</p>
+                            </div>
+                            <div>
+                                <label class="field-label">Apellido *</label>
+                                <input v-model="form.apellido" type="text" class="field-input" />
+                                <p v-if="form.errors.apellido" class="field-error">{{ form.errors.apellido }}</p>
+                            </div>
                         </div>
+
                         <div>
-                            <label class="label-form">Confirmar Contraseña *</label>
-                            <input v-model="passForm.password_confirmation" type="password" class="input-form" />
+                            <label class="field-label">Email *</label>
+                            <input v-model="form.email" type="email" class="field-input" />
+                            <p v-if="form.errors.email" class="field-error">{{ form.errors.email }}</p>
                         </div>
-                        <div class="flex justify-end gap-2 pt-2 border-t">
-                            <button type="button" @click="showPasswordModal = false"
-                                class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                Cancelar
-                            </button>
-                            <button type="submit" :disabled="passForm.processing"
-                                class="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">
-                                {{ passForm.processing ? 'Guardando...' : 'Actualizar Contraseña' }}
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="field-label">DNI *</label>
+                                <input v-model="form.dni" type="text" class="field-input" />
+                                <p v-if="form.errors.dni" class="field-error">{{ form.errors.dni }}</p>
+                            </div>
+                            <div>
+                                <label class="field-label">Teléfono</label>
+                                <input v-model="form.telefono" type="text" class="field-input" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="field-label">Dirección</label>
+                            <input v-model="form.direccion" type="text" class="field-input" />
+                        </div>
+
+                        <div v-if="!modoEdicion">
+                            <label class="field-label">Rol *</label>
+                            <select v-model="form.id_rol" class="field-input">
+                                <option value="">Seleccione un rol</option>
+                                <option v-for="r in rolesCreables" :key="r.id_rol" :value="r.id_rol">{{ r.nombre_rol }}</option>
+                            </select>
+                            <p v-if="form.errors.id_rol" class="field-error">{{ form.errors.id_rol }}</p>
+                        </div>
+
+                        <!-- Extra: Profesor -->
+                        <template v-if="esProfesor && !modoEdicion">
+                            <div>
+                                <label class="field-label">Especialidad *</label>
+                                <input v-model="form.especialidad" type="text" class="field-input" />
+                                <p v-if="form.errors.especialidad" class="field-error">{{ form.errors.especialidad }}</p>
+                            </div>
+                            <div>
+                                <label class="field-label">Título Máximo</label>
+                                <input v-model="form.titulo_maximo" type="text" class="field-input" />
+                            </div>
+                            <div>
+                                <label class="field-label">Fecha de Contratación *</label>
+                                <input v-model="form.fecha_contratacion" type="date" class="field-input" />
+                                <p v-if="form.errors.fecha_contratacion" class="field-error">{{ form.errors.fecha_contratacion }}</p>
+                            </div>
+                        </template>
+
+                        <!-- Extra: Personal Administrativo -->
+                        <template v-if="esAdmRol && !modoEdicion">
+                            <div>
+                                <label class="field-label">Cargo</label>
+                                <input v-model="form.cargo" type="text" class="field-input" placeholder="Se asigna automáticamente si se deja vacío" />
+                            </div>
+                            <div>
+                                <label class="field-label">Fecha de Ingreso</label>
+                                <input v-model="form.fecha_ingreso" type="date" class="field-input" />
+                            </div>
+                        </template>
+
+                        <!-- Password solo al crear -->
+                        <template v-if="!modoEdicion">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="field-label">Contraseña *</label>
+                                    <input v-model="form.password" type="password" class="field-input" />
+                                    <p v-if="form.errors.password" class="field-error">{{ form.errors.password }}</p>
+                                </div>
+                                <div>
+                                    <label class="field-label">Confirmar *</label>
+                                    <input v-model="form.password_confirmation" type="password" class="field-input" />
+                                </div>
+                            </div>
+                        </template>
+
+                        <div class="modal-footer border-t pt-4" style="border-color: var(--border-color);">
+                            <button type="button" @click="cerrarForm" class="btn-secondary">Cancelar</button>
+                            <button type="submit" :disabled="form.processing"
+                                class="rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50"
+                                style="background-color: var(--primary-color); color: var(--primary-text);">
+                                {{ form.processing ? 'Guardando...' : (modoEdicion ? 'Actualizar' : 'Crear Usuario') }}
                             </button>
                         </div>
                     </form>
@@ -431,7 +436,65 @@ function toggleActivo(usuario) {
 </template>
 
 <style scoped>
-.label-form { @apply block text-sm font-medium text-gray-700 mb-1; }
-.input-form  { @apply w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500; }
-.text-error  { @apply mt-1 text-xs text-red-600; }
+/* Overlay y caja modal */
+.modal-overlay {
+    position: fixed; inset: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.55); padding: 1rem;
+}
+.modal-box {
+    width: 100%; border-radius: 1rem; overflow: hidden;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4);
+}
+.modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+.modal-title  { font-size: 1rem; font-weight: 600; color: var(--text-color); }
+.modal-close  { font-size: 1.5rem; line-height: 1; color: var(--text-secondary); background: none; border: none; cursor: pointer; }
+.modal-close:hover { color: var(--text-color); }
+.modal-footer { display: flex; justify-content: flex-end; gap: 0.5rem; padding: 0.75rem 1.5rem; }
+
+/* Campos */
+.field-label {
+    display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem;
+    color: var(--text-color);
+}
+.field-input {
+    width: 100%; border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 0.875rem;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    outline: none;
+}
+.field-input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 30%, transparent); }
+.field-error { margin-top: 0.25rem; font-size: 0.75rem; color: #ef4444; }
+
+/* Botón secundario */
+.btn-secondary {
+    border-radius: 0.5rem; padding: 0.5rem 1rem; font-size: 0.875rem;
+    background: none; cursor: pointer; transition: opacity 0.15s;
+    color: var(--text-color); border: 1px solid var(--border-color);
+}
+.btn-secondary:hover { opacity: 0.8; }
+
+/* Botón de acción en tabla */
+.btn-accion {
+    padding: 0.25rem 0.5rem; border-radius: 0.375rem; font-size: 0.75rem; font-weight: 500;
+    background: none; border: none; cursor: pointer; transition: opacity 0.15s;
+}
+.btn-accion:hover { opacity: 0.7; }
+
+/* Badges */
+.badge { display: inline-flex; border-radius: 9999px; padding: 0.125rem 0.625rem; font-size: 0.75rem; font-weight: 600; }
+.badge-purple { background: rgba(139,92,246,0.2); color: #a78bfa; }
+.badge-blue   { background: rgba(59,130,246,0.2); color: #60a5fa; }
+.badge-green  { background: rgba(16,185,129,0.2); color: #34d399; }
+.badge-yellow { background: rgba(245,158,11,0.2); color: #fbbf24; }
+.badge-gray   { background: rgba(107,114,128,0.2); color: #9ca3af; }
+.badge-activo   { background: rgba(16,185,129,0.2); color: #34d399; }
+.badge-inactivo { background: rgba(239,68,68,0.2);  color: #f87171; }
 </style>

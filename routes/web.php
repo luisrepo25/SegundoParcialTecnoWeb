@@ -23,12 +23,12 @@ Route::get('/dashboard', function () {
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/panel/admin', function () {
-        return Inertia::render('Dashboard/Admin');
+    Route::get('/panel/propietario', function () {
+        return Inertia::render('Dashboard/Propietario');
     })->middleware('role:admin')->name('dashboard.admin');
 
-    // CU1 — Gestión de Usuarios (admin, director, secretaria)
-    Route::middleware('role:admin,director,secretary')->prefix('admin')->name('admin.')->group(function () {
+    // CU1 — Gestión de Usuarios (propietario, director, secretaria)
+    Route::middleware('role:admin,director,secretary')->prefix('propietario')->name('propietario.')->group(function () {
         Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
         Route::post('/usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
         Route::put('/usuarios/{id}', [UsuarioController::class, 'update'])->name('usuarios.update');
@@ -41,15 +41,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->middleware('role:director')->name('dashboard.director');
 
     Route::get('/panel/secretaria', function () {
-        return Inertia::render('Dashboard/Secretary');
+        return Inertia::render('Dashboard/Secretaria');
     })->middleware('role:secretary')->name('dashboard.secretary');
 
     Route::get('/panel/docente', function () {
-        return Inertia::render('Dashboard/Teacher');
+        return Inertia::render('Dashboard/Docente');
     })->middleware('role:teacher')->name('dashboard.teacher');
 
     Route::get('/panel/estudiante', function () {
-        return Inertia::render('Dashboard/Student');
+        return Inertia::render('Dashboard/Estudiante');
     })->middleware('role:student')->name('dashboard.student');
 });
 
