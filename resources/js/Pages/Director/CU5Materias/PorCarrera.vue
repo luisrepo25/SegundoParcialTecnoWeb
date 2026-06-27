@@ -16,9 +16,24 @@ const TIPOS = {
     curso_libre:      'Curso Libre',
 };
 
+const totalMaterias = computed(() =>
+    props.porNivel.reduce((sum, n) => sum + n.materias.length, 0)
+);
+
+const costoPorMateria = computed(() => {
+    const total = props.carrera.costo_carrera_completa;
+    if (!total || totalMaterias.value === 0) return null;
+    return Math.round((parseFloat(total) / totalMaterias.value) * 100) / 100;
+});
+
 function formatCosto(val) {
     if (!val) return '—';
     return 'Bs ' + parseFloat(val).toLocaleString('es-BO', { minimumFractionDigits: 2 });
+}
+
+function formatCostoEntero(val) {
+    if (!val) return '—';
+    return 'Bs ' + Math.round(parseFloat(val)).toLocaleString('es-BO');
 }
 
 // ── Modal: Agregar Nivel ──────────────────────────────────────────────────────
@@ -41,6 +56,7 @@ function guardarNivel() {
 const modalMateria    = ref(false);
 const nivelActivo     = ref(null);   // nivel objeto completo
 const tabMateria      = ref('existente'); // 'existente' | 'nueva'
+const mostrarBlockeadas = ref(false);
 
 const formAsignar = useForm({ id_materia: '', obligatoria: true });
 const formNueva   = useForm({
@@ -60,11 +76,50 @@ const materiasEnNivel = computed(() => {
     return new Set(nivelActivo.value.materias.map(m => m.id_materia));
 });
 
-// Materias disponibles filtradas (excluye las ya en el nivel) → formato ComboSelect
+// Set de TODAS las materias ya en la malla de esta carrera (cualquier nivel)
+const materiasEnMallaIds = computed(() => {
+    const set = new Set();
+    props.porNivel.forEach(n => n.materias.forEach(m => set.add(m.id_materia)));
+    return set;
+});
+
+// Mapa id_materia → nombre del prerequisito (para mostrar en la lista bloqueada)
+const mapaNombreMateria = computed(() => {
+    const map = {};
+    props.materiasDisponibles.forEach(m => { map[m.id_materia] = `${m.codigo} — ${m.nombre}`; });
+    return map;
+});
+
+// Materias disponibles filtradas:
+//   - Excluye las ya en la malla de esta carrera
+//   - Excluye las que tienen prerequisito NO cumplido (prereq aún no en malla)
+// Materias del catálogo cuyo prereq YA está en la malla pero ellas aún no — "cadenas pendientes"
+const materiasConCadenaPendiente = computed(() =>
+    props.materiasDisponibles.filter(m =>
+        !materiasEnMallaIds.value.has(m.id_materia) &&
+        m.id_materia_requisito &&
+        materiasEnMallaIds.value.has(m.id_materia_requisito)
+    )
+);
+
 const materiasParaAsignar = computed(() =>
     props.materiasDisponibles
-        .filter(m => !materiasEnNivel.value.has(m.id_materia))
+        .filter(m => {
+            if (materiasEnMallaIds.value.has(m.id_materia)) return false;
+            if (m.id_materia_requisito && !materiasEnMallaIds.value.has(m.id_materia_requisito)) return false;
+            // Solo mostrar base cuando no queden cadenas pendientes
+            if (!m.id_materia_requisito && materiasConCadenaPendiente.value.length > 0) return false;
+            return true;
+        })
         .map(m => ({ value: m.id_materia, label: `${m.codigo} — ${m.nombre}` }))
+);
+
+// Materias bloqueadas (prerequisito no cumplido aún) → para mostrar info al usuario
+const materiasBlockeadas = computed(() =>
+    props.materiasDisponibles.filter(m => {
+        if (materiasEnMallaIds.value.has(m.id_materia)) return false;
+        return m.id_materia_requisito && !materiasEnMallaIds.value.has(m.id_materia_requisito);
+    })
 );
 
 // Todas las materias → formato ComboSelect (para selector de prerequisito)
@@ -87,8 +142,11 @@ function abrirModalMateria(nivel) {
     formAsignar.reset();
     formNueva.reset();
 
-    // Smart prerequisito: si el nivel ya tiene materias, pre-selecciona la última
-    if (ultimaMateriaDelNivel.value) {
+    // Si hay cadenas pendientes en la carrera, forzar prereq; si no, sugerir base o último del nivel
+    if (materiasConCadenaPendiente.value.length > 0) {
+        formNueva.es_base              = false;
+        formNueva.id_materia_requisito = ultimaMateriaDelNivel.value?.id_materia ?? '';
+    } else if (ultimaMateriaDelNivel.value) {
         formNueva.es_base              = false;
         formNueva.id_materia_requisito = ultimaMateriaDelNivel.value.id_materia;
     } else {
@@ -99,6 +157,7 @@ function abrirModalMateria(nivel) {
     formNueva.obligatoria    = true;
     formAsignar.obligatoria  = true;
 
+    mostrarBlockeadas.value = false;
     modalMateria.value = true;
 }
 
@@ -138,17 +197,35 @@ function onEsBaseChange() {
     }
 }
 
-// ── Quitar materia de la malla ────────────────────────────────────────────────
-const confirmMalla = ref(null); // id_malla a eliminar
+// ── Dependencias de prerequisito dentro de la malla ──────────────────────────
+// Map: id_materia → nombre de la materia que la requiere (dentro de esta carrera)
+const esRequisitoDe = computed(() => {
+    const map = {};
+    props.porNivel.forEach(n =>
+        n.materias.forEach(m => {
+            if (m.id_materia_requisito) {
+                map[m.id_materia_requisito] = m.nombre;
+            }
+        })
+    );
+    return map;
+});
 
-function quitarMateria(idMalla) {
-    confirmMalla.value = idMalla;
+// Materia pendiente de confirmación { id_malla, nombre, bloqueadoPor }
+const confirmMalla = ref(null);
+const errorMalla   = ref('');
+
+function quitarMateria(m) {
+    const bloqueadoPor = esRequisitoDe.value[m.id_materia];
+    confirmMalla.value = { id_malla: m.id_malla, nombre: m.nombre, bloqueadoPor: bloqueadoPor ?? null };
+    errorMalla.value = '';
 }
 
 function confirmarQuitarMateria() {
-    router.delete(route('director.malla.destroy', confirmMalla.value), {
+    router.delete(route('director.malla.destroy', confirmMalla.value.id_malla), {
         preserveScroll: true,
-        onSuccess: () => { confirmMalla.value = null; },
+        onSuccess: () => { confirmMalla.value = null; errorMalla.value = ''; },
+        onError:   (e) => { errorMalla.value = e.malla ?? 'Error al quitar la materia.'; },
     });
 }
 
@@ -202,6 +279,24 @@ function confirmarEliminarNivel() {
                         style="background-color: var(--primary-color); color: var(--primary-text);">
                         + Agregar Nivel
                     </button>
+                </div>
+
+                <!-- Resumen de costos de la carrera -->
+                <div v-if="totalMaterias > 0" class="rounded-lg px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm border" style="background-color: color-mix(in srgb, var(--primary-color) 6%, transparent); border-color: color-mix(in srgb, var(--primary-color) 20%, transparent);">
+                    <span style="color: var(--text-secondary);">
+                        <span class="font-semibold" style="color: var(--text-color);">{{ totalMaterias }}</span> materia(s) en la malla
+                    </span>
+                    <span style="color: var(--text-secondary);">
+                        Costo total carrera:
+                        <span class="font-semibold" style="color: var(--text-color);">{{ formatCosto(carrera.costo_carrera_completa) }}</span>
+                    </span>
+                    <span v-if="costoPorMateria" style="color: var(--text-secondary);">
+                        Costo por materia (calculado):
+                        <span class="font-bold text-base" style="color: var(--primary-color);">{{ formatCostoEntero(costoPorMateria) }}</span>
+                    </span>
+                    <span v-else class="text-xs" style="color: var(--text-secondary);">
+                        (Define el costo total de la carrera para ver el costo por materia)
+                    </span>
                 </div>
 
                 <!-- Sin niveles -->
@@ -264,20 +359,21 @@ function confirmarEliminarNivel() {
                     <table v-else class="min-w-full">
                         <thead>
                             <tr style="border-bottom: 1px solid var(--border-color);">
-                                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Ord.</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap w-10" style="color: var(--text-secondary);">#</th>
                                 <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Código</th>
                                 <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Materia</th>
-                                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell whitespace-nowrap" style="color: var(--text-secondary);">Duración</th>
-                                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell whitespace-nowrap" style="color: var(--text-secondary);">Costo/mes</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Prerequisito</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell whitespace-nowrap" style="color: var(--text-secondary);">Costo en carrera</th>
                                 <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Tipo</th>
                                 <th class="px-4 py-2 whitespace-nowrap"></th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="m in nivel.materias" :key="m.id_malla"
+                            <tr v-for="(m, idx) in nivel.materias" :key="m.id_malla"
                                 class="border-t" style="border-color: var(--border-color);">
-                                <td class="px-4 py-3 text-sm" style="color: var(--text-secondary);">
-                                    {{ m.orden_en_nivel ?? '—' }}
+                                <!-- Número de orden dentro del nivel -->
+                                <td class="px-4 py-3 text-sm font-semibold w-10" style="color: var(--text-secondary);">
+                                    {{ idx + 1 }}
                                 </td>
                                 <td class="px-4 py-3 whitespace-nowrap">
                                     <span class="font-mono text-sm font-semibold" style="color: var(--primary-color);">{{ m.codigo }}</span>
@@ -285,12 +381,24 @@ function confirmarEliminarNivel() {
                                 <td class="px-4 py-3">
                                     <div class="font-medium text-sm" style="color: var(--text-color);">{{ m.nombre }}</div>
                                     <div v-if="m.creditos" class="text-xs mt-0.5" style="color: var(--text-secondary);">{{ m.creditos }} créditos</div>
+                                    <!-- Indicador: esta materia es requisito de otra en la malla -->
+                                    <div v-if="esRequisitoDe[m.id_materia]" class="text-xs mt-0.5 font-medium" style="color: #f59e0b;">
+                                        → requerida por: {{ esRequisitoDe[m.id_materia] }}
+                                    </div>
                                 </td>
-                                <td class="px-4 py-3 text-sm hidden md:table-cell whitespace-nowrap" style="color: var(--text-color);">
-                                    {{ m.duracion_meses }} mes(es)
+                                <!-- Prerequisito de esta materia -->
+                                <td class="px-4 py-3 text-sm whitespace-nowrap">
+                                    <span v-if="m.nombre_requisito" class="inline-flex items-center gap-1">
+                                        <span class="text-xs" style="color: var(--text-secondary);">Req:</span>
+                                        <span class="font-medium text-xs" style="color: var(--text-color);">{{ m.nombre_requisito }}</span>
+                                    </span>
+                                    <span v-else class="text-xs" style="color: var(--text-secondary);">—</span>
                                 </td>
-                                <td class="px-4 py-3 text-sm hidden md:table-cell whitespace-nowrap" style="color: var(--text-color);">
-                                    {{ formatCosto(m.costo_mensual) }}
+                                <td class="px-4 py-3 text-sm hidden md:table-cell whitespace-nowrap">
+                                    <span v-if="costoPorMateria" class="font-semibold" style="color: var(--primary-color);">
+                                        {{ formatCostoEntero(costoPorMateria) }}
+                                    </span>
+                                    <span v-else class="text-xs" style="color: var(--text-secondary);">Sin costo total</span>
                                 </td>
                                 <td class="px-4 py-3 whitespace-nowrap">
                                     <span :class="['badge', m.obligatoria ? 'badge-obligatoria' : 'badge-electiva']">
@@ -298,9 +406,10 @@ function confirmarEliminarNivel() {
                                     </span>
                                 </td>
                                 <td class="px-4 py-3 whitespace-nowrap text-right">
-                                    <button @click="quitarMateria(m.id_malla)"
+                                    <button @click="quitarMateria(m)"
                                         class="text-xs font-medium hover:underline"
-                                        style="color: #ef4444;">
+                                        :style="esRequisitoDe[m.id_materia] ? 'color: #9ca3af; cursor: not-allowed;' : 'color: #ef4444;'"
+                                        :title="esRequisitoDe[m.id_materia] ? `No se puede quitar: '${esRequisitoDe[m.id_materia]}' la requiere` : 'Quitar de la malla'">
                                         Quitar
                                     </button>
                                 </td>
@@ -399,10 +508,30 @@ function confirmarEliminarNivel() {
                                 :options="materiasParaAsignar"
                                 placeholder="— Selecciona una materia —"
                             />
-                            <p v-if="!materiasParaAsignar.length" class="text-xs mt-1" style="color: var(--text-secondary);">
-                                Todas las materias ya están asignadas a este nivel.
-                            </p>
                             <p v-if="formAsignar.errors.materia" class="text-xs mt-1" style="color:#ef4444;">{{ formAsignar.errors.materia }}</p>
+
+                            <!-- Info: materias bloqueadas por prerequisito no cumplido -->
+                            <div v-if="materiasBlockeadas.length" class="mt-2 rounded-lg text-xs" style="background-color: color-mix(in srgb, #f59e0b 12%, var(--bg-color)); border: 1px solid color-mix(in srgb, #f59e0b 40%, transparent);">
+                                <button type="button" @click="mostrarBlockeadas = !mostrarBlockeadas"
+                                    class="w-full flex items-center justify-between px-3 py-2 text-left">
+                                    <span class="font-semibold" style="color: #f59e0b;">⚠ {{ materiasBlockeadas.length }} bloqueada(s) — prereq pendiente</span>
+                                    <span style="color: var(--text-muted);">{{ mostrarBlockeadas ? '▲ ocultar' : '▼ ver' }}</span>
+                                </button>
+                                <ul v-if="mostrarBlockeadas" class="px-3 pb-2 space-y-1 border-t" style="border-color: color-mix(in srgb, #f59e0b 25%, transparent);">
+                                    <li v-for="bm in materiasBlockeadas" :key="bm.id_materia" class="pt-1 flex flex-wrap gap-x-1">
+                                        <span class="font-mono font-semibold" style="color: #fbbf24;">{{ bm.codigo }}</span>
+                                        <span style="color: var(--text-color);">{{ bm.nombre }}</span>
+                                        <span style="color: var(--text-muted);">→ falta: {{ mapaNombreMateria[bm.id_materia_requisito] ?? '?' }}</span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <p v-if="!materiasParaAsignar.length && !materiasBlockeadas.length" class="text-xs mt-1" style="color: var(--text-secondary);">
+                                Todas las materias ya están asignadas a esta carrera.
+                            </p>
+                            <p v-else-if="!materiasParaAsignar.length" class="text-xs mt-1" style="color: var(--text-secondary);">
+                                Las materias restantes requieren prerequisites que aún no están en la malla.
+                            </p>
                         </div>
                         <div class="flex items-center gap-2">
                             <input type="checkbox" id="oblig-asignar" v-model="formAsignar.obligatoria" class="w-4 h-4" />
@@ -424,28 +553,46 @@ function confirmarEliminarNivel() {
                         <!-- Tipo: base o con prerequisito -->
                         <div class="rounded-lg p-3" style="background-color: var(--bg-color); border: 1px solid var(--border-color);">
                             <p class="text-xs font-semibold mb-2" style="color: var(--text-secondary);">PREREQUISITO</p>
-                            <div class="flex gap-4">
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" :value="true" v-model="formNueva.es_base" @change="onEsBaseChange" class="w-4 h-4" />
-                                    <span class="text-sm" style="color: var(--text-color);">Materia base <span class="opacity-50 text-xs">(sin prerequisito)</span></span>
-                                </label>
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" :value="false" v-model="formNueva.es_base" @change="onEsBaseChange" class="w-4 h-4" />
-                                    <span class="text-sm" style="color: var(--text-color);">Requiere prerequisito</span>
-                                </label>
-                            </div>
-                            <!-- Selector prerequisito -->
-                            <div v-if="!formNueva.es_base" class="mt-3">
+
+                            <!-- Hay cadenas pendientes → forzar prereq, no permitir base -->
+                            <template v-if="materiasConCadenaPendiente.length > 0">
+                                <p class="text-xs mb-2" style="color: var(--text-secondary);">
+                                    Quedan <strong>{{ materiasConCadenaPendiente.length }}</strong> materia(s) que continúan cadenas existentes. Agrégalas antes de iniciar una nueva rama.
+                                </p>
                                 <ComboSelect
                                     v-model="formNueva.id_materia_requisito"
                                     :options="opcionesPrerequisito"
-                                    placeholder="— Sin prerequisito —"
-                                    empty-label="— Sin prerequisito —"
+                                    placeholder="— Selecciona prerequisito —"
                                 />
                                 <p v-if="ultimaMateriaDelNivel" class="text-xs mt-1" style="color: var(--primary-color);">
                                     💡 Sugerido: {{ ultimaMateriaDelNivel.codigo }} (última del nivel)
                                 </p>
-                            </div>
+                            </template>
+
+                            <!-- Sin cadenas pendientes → puede elegir base o con prereq -->
+                            <template v-else>
+                                <div class="flex gap-4">
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" :value="true" v-model="formNueva.es_base" @change="onEsBaseChange" class="w-4 h-4" />
+                                        <span class="text-sm" style="color: var(--text-color);">Materia base <span class="opacity-50 text-xs">(sin prerequisito)</span></span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" :value="false" v-model="formNueva.es_base" @change="onEsBaseChange" class="w-4 h-4" />
+                                        <span class="text-sm" style="color: var(--text-color);">Requiere prerequisito</span>
+                                    </label>
+                                </div>
+                                <div v-if="!formNueva.es_base" class="mt-3">
+                                    <ComboSelect
+                                        v-model="formNueva.id_materia_requisito"
+                                        :options="opcionesPrerequisito"
+                                        placeholder="— Sin prerequisito —"
+                                        empty-label="— Sin prerequisito —"
+                                    />
+                                    <p v-if="ultimaMateriaDelNivel" class="text-xs mt-1" style="color: var(--primary-color);">
+                                        💡 Sugerido: {{ ultimaMateriaDelNivel.codigo }} (última del nivel)
+                                    </p>
+                                </div>
+                            </template>
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
@@ -473,8 +620,9 @@ function confirmarEliminarNivel() {
                                 <p v-if="formNueva.errors.duracion_meses" class="text-xs mt-1" style="color:#ef4444;">{{ formNueva.errors.duracion_meses }}</p>
                             </div>
                             <div>
-                                <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Costo mensual (Bs) *</label>
+                                <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Precio sugerido (Bs) *</label>
                                 <input v-model="formNueva.costo_mensual" type="number" min="0" step="0.01" placeholder="Ej: 500.00" class="input-field" />
+                                <p class="text-xs mt-1" style="color: var(--text-secondary);">Usado solo si la materia se cursa suelta. En carrera, el sistema calcula automáticamente.</p>
                                 <p v-if="formNueva.errors.costo_mensual" class="text-xs mt-1" style="color:#ef4444;">{{ formNueva.errors.costo_mensual }}</p>
                             </div>
                         </div>
@@ -504,13 +652,33 @@ function confirmarEliminarNivel() {
              style="background: rgba(0,0,0,0.5);">
             <div class="w-full max-w-sm rounded-2xl shadow-2xl p-6 text-center"
                  style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
-                <p class="text-2xl mb-3">⚠️</p>
-                <p class="font-semibold mb-1" style="color: var(--text-color);">¿Quitar materia de la malla?</p>
-                <p class="text-sm mb-5" style="color: var(--text-secondary);">La materia seguirá en el catálogo, solo se desvincula de este nivel.</p>
-                <div class="flex justify-center gap-3">
-                    <button @click="confirmMalla = null" class="btn-secondary">Cancelar</button>
-                    <button @click="confirmarQuitarMateria" class="btn-danger">Sí, quitar</button>
-                </div>
+
+                <!-- Bloqueado: tiene dependiente -->
+                <template v-if="confirmMalla.bloqueadoPor">
+                    <p class="text-2xl mb-3">🔒</p>
+                    <p class="font-semibold mb-2" style="color: var(--text-color);">No se puede quitar</p>
+                    <p class="text-sm mb-1" style="color: var(--text-secondary);">
+                        <span class="font-medium" style="color: var(--text-color);">{{ confirmMalla.nombre }}</span>
+                        es prerequisito de:
+                    </p>
+                    <p class="text-sm font-semibold mb-4" style="color: #ef4444;">{{ confirmMalla.bloqueadoPor }}</p>
+                    <p class="text-xs mb-5" style="color: var(--text-secondary);">Quita primero "{{ confirmMalla.bloqueadoPor }}" para poder quitar esta.</p>
+                    <button @click="confirmMalla = null" class="btn-secondary w-full">Entendido</button>
+                </template>
+
+                <!-- Normal: se puede quitar -->
+                <template v-else>
+                    <p class="text-2xl mb-3">⚠️</p>
+                    <p class="font-semibold mb-1" style="color: var(--text-color);">¿Quitar de la malla?</p>
+                    <p class="text-sm font-medium mb-1" style="color: var(--primary-color);">{{ confirmMalla.nombre }}</p>
+                    <p class="text-sm mb-4" style="color: var(--text-secondary);">La materia seguirá en el catálogo, solo se desvincula de este nivel.</p>
+                    <!-- Error de backend (si el backend también valida) -->
+                    <p v-if="errorMalla" class="text-xs mb-3 px-3 py-2 rounded" style="color: #ef4444; background: rgba(239,68,68,0.08);">{{ errorMalla }}</p>
+                    <div class="flex justify-center gap-3">
+                        <button @click="confirmMalla = null; errorMalla = ''" class="btn-secondary">Cancelar</button>
+                        <button @click="confirmarQuitarMateria" class="btn-danger">Sí, quitar</button>
+                    </div>
+                </template>
             </div>
         </div>
     </Teleport>

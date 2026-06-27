@@ -76,14 +76,6 @@ function toggleActivo(id) {
         </template>
 
         <div class="max-w-7xl mx-auto">
-            <!-- Header de la página -->
-            <div class="flex justify-between items-center mb-8">
-                <div>
-                    <h2 class="text-3xl font-light text-[var(--text-color)] tracking-tight">Cronogramas Académicos</h2>
-                    <p class="text-[var(--text-muted)] mt-1 font-light">Gestiona las ventanas de tiempo del instituto.</p>
-                </div>
-            </div>
-
             <!-- Filtros -->
             <div class="bg-[var(--card-bg)] p-4 rounded-sm border border-[var(--border-color)] mb-6 flex flex-col sm:flex-row gap-4 items-center">
                 <input

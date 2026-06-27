@@ -39,15 +39,20 @@ class MallaController extends Controller
     // DELETE /director/niveles/{id}
     public function destroyNivel(int $idNivel)
     {
+        $nivel = DB::table('niveles_carrera')->where('id_nivel', $idNivel)->first();
+        if (!$nivel) return redirect()->back()->withErrors(['nivel' => 'Nivel no encontrado.']);
+
         $tieneMaterias = DB::table('malla_curricular')->where('id_nivel', $idNivel)->exists();
 
         if ($tieneMaterias) {
-            return redirect()->back()->withErrors(['nivel' => 'Quita las materias del nivel antes de eliminarlo.']);
+            return redirect()->route('director.carreras.materias', $nivel->id_carrera)
+                ->withErrors(['nivel' => 'Quita las materias del nivel antes de eliminarlo.']);
         }
 
         DB::table('niveles_carrera')->where('id_nivel', $idNivel)->delete();
 
-        return redirect()->back()->with('success', 'Nivel eliminado.');
+        return redirect()->route('director.carreras.materias', $nivel->id_carrera)
+            ->with('success', 'Nivel eliminado.');
     }
 
     // POST /director/malla  — asigna materia existente a un nivel
@@ -62,12 +67,57 @@ class MallaController extends Controller
         ]);
 
         $existe = DB::table('malla_curricular')
-            ->where('id_nivel', $request->id_nivel)
+            ->where('id_carrera', $request->id_carrera)
             ->where('id_materia', $request->id_materia)
             ->exists();
 
         if ($existe) {
-            return redirect()->back()->withErrors(['materia' => 'Esta materia ya está en este nivel.']);
+            return redirect()->back()->withErrors(['materia' => 'Esta materia ya está en la malla de esta carrera.']);
+        }
+
+        // Validar que el prerequisito ya esté en la malla antes de agregar esta materia
+        $materia = DB::table('materias')->where('id_materia', $request->id_materia)->first();
+
+        // Si es materia base (sin prereq), verificar que no queden cadenas pendientes en la carrera
+        if (!$materia->id_materia_requisito) {
+            $cadenaPendiente = DB::table('materias as m')
+                ->whereNotNull('m.id_materia_requisito')
+                ->where('m.activo', true)
+                ->whereExists(function ($q) use ($request) {
+                    // Su prereq está en la malla de esta carrera
+                    $q->select(DB::raw(1))
+                      ->from('malla_curricular as mc_pre')
+                      ->where('mc_pre.id_carrera', $request->id_carrera)
+                      ->whereColumn('mc_pre.id_materia', 'm.id_materia_requisito');
+                })
+                ->whereNotExists(function ($q) use ($request) {
+                    // Pero ella misma aún no está en la malla
+                    $q->select(DB::raw(1))
+                      ->from('malla_curricular as mc_self')
+                      ->where('mc_self.id_carrera', $request->id_carrera)
+                      ->whereColumn('mc_self.id_materia', 'm.id_materia');
+                })
+                ->exists();
+
+            if ($cadenaPendiente) {
+                return redirect()->route('director.carreras.materias', $request->id_carrera)->withErrors([
+                    'materia' => 'Aún hay materias que continúan cadenas existentes sin agregar. Completa las cadenas antes de iniciar una nueva rama.',
+                ]);
+            }
+        }
+
+        if ($materia->id_materia_requisito) {
+            $prereqEnMalla = DB::table('malla_curricular')
+                ->where('id_carrera', $request->id_carrera)
+                ->where('id_materia', $materia->id_materia_requisito)
+                ->exists();
+
+            if (!$prereqEnMalla) {
+                $prereq = DB::table('materias')->where('id_materia', $materia->id_materia_requisito)->first();
+                return redirect()->back()->withErrors([
+                    'materia' => "No se puede agregar \"{$materia->nombre}\": su prerequisito \"{$prereq->nombre}\" aún no está en la malla. Agrégalo primero.",
+                ]);
+            }
         }
 
         $orden = $request->orden_en_nivel ??
@@ -87,9 +137,27 @@ class MallaController extends Controller
     // DELETE /director/malla/{id}
     public function destroyMalla(int $idMalla)
     {
+        $entry = DB::table('malla_curricular')->where('id_malla', $idMalla)->first();
+        if (!$entry) return redirect()->back()->withErrors(['malla' => 'Entrada no encontrada.']);
+
+        // Bloquear si otra materia en la misma malla la requiere como prerequisito
+        $dependiente = DB::table('malla_curricular as mc')
+            ->join('materias as m', 'mc.id_materia', '=', 'm.id_materia')
+            ->where('mc.id_carrera', $entry->id_carrera)
+            ->where('m.id_materia_requisito', $entry->id_materia)
+            ->select('m.nombre')
+            ->first();
+
+        if ($dependiente) {
+            return redirect()->route('director.carreras.materias', $entry->id_carrera)->withErrors([
+                'malla' => "No puedes quitar esta materia: \"{$dependiente->nombre}\" la requiere como prerequisito. Quita esa materia primero.",
+            ]);
+        }
+
         DB::table('malla_curricular')->where('id_malla', $idMalla)->delete();
 
-        return redirect()->back()->with('success', 'Materia removida de la malla.');
+        return redirect()->route('director.carreras.materias', $entry->id_carrera)
+            ->with('success', 'Materia removida de la malla.');
     }
 
     // POST /director/carreras/{id}/nueva-materia — crea materia Y la asigna al nivel

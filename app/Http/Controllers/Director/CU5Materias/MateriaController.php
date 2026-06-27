@@ -106,15 +106,18 @@ class MateriaController extends Controller
             ->orderBy('numero_nivel')
             ->get();
 
-        // Materias asignadas a la malla de esta carrera
+        // Materias asignadas a la malla de esta carrera (con nombre del prerequisito)
         $mallaPorNivel = DB::table('malla_curricular as mc')
             ->join('materias as m', 'mc.id_materia', '=', 'm.id_materia')
+            ->leftJoin('materias as req', 'm.id_materia_requisito', '=', 'req.id_materia')
             ->where('mc.id_carrera', $id)
-            ->orderByRaw('mc.orden_en_nivel NULLS LAST')
+            ->orderByRaw('mc.orden_en_nivel NULLS LAST, mc.id_malla')
             ->select(
                 'm.id_materia', 'm.codigo', 'm.nombre',
                 'm.duracion_meses', 'm.costo_mensual', 'm.creditos',
                 'm.id_materia_requisito',
+                DB::raw('req.nombre as nombre_requisito'),
+                DB::raw('req.codigo as codigo_requisito'),
                 'mc.id_malla', 'mc.id_nivel', 'mc.orden_en_nivel', 'mc.obligatoria'
             )
             ->get()
