@@ -51,6 +51,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('Dashboard/Director');
     })->middleware('role:director')->name('dashboard.director');
 
+    // CU4 — Gestión de Carreras + CU5 Materias (director)
+    Route::middleware('role:director')->prefix('director')->name('director.')->group(function () {
+        // CU4 Carreras
+        Route::get('/carreras', [\App\Http\Controllers\Director\CU4Carreras\CarreraController::class, 'index'])->name('carreras.index');
+        Route::post('/carreras', [\App\Http\Controllers\Director\CU4Carreras\CarreraController::class, 'store'])->name('carreras.store');
+        Route::put('/carreras/{id}', [\App\Http\Controllers\Director\CU4Carreras\CarreraController::class, 'update'])->name('carreras.update');
+        Route::patch('/carreras/{id}/toggle-activo', [\App\Http\Controllers\Director\CU4Carreras\CarreraController::class, 'toggleActivo'])->name('carreras.toggle-activo');
+        Route::get('/carreras/{id}/materias', [\App\Http\Controllers\Director\CU5Materias\MateriaController::class, 'porCarrera'])->name('carreras.materias');
+
+        // CU5 Materias
+        Route::get('/materias', [\App\Http\Controllers\Director\CU5Materias\MateriaController::class, 'index'])->name('materias.index');
+        Route::post('/materias', [\App\Http\Controllers\Director\CU5Materias\MateriaController::class, 'store'])->name('materias.store');
+        Route::put('/materias/{id}', [\App\Http\Controllers\Director\CU5Materias\MateriaController::class, 'update'])->name('materias.update');
+        Route::patch('/materias/{id}/toggle-activo', [\App\Http\Controllers\Director\CU5Materias\MateriaController::class, 'toggleActivo'])->name('materias.toggle-activo');
+    });
+
     // ── Panel Secretaria ───────────────────────────────────────────────────────
     Route::middleware('role:secretary')->prefix('secretaria')->name('secretaria.')->group(function () {
         Route::get('/panel', function () {
