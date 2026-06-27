@@ -1314,7 +1314,7 @@ ALTER SEQUENCE public.inscripciones_id_inscripcion_seq OWNED BY public.inscripci
 CREATE TABLE public.malla_curricular (
     id_malla integer NOT NULL,
     id_carrera integer NOT NULL,
-    id_nivel integer NOT NULL,
+    id_nivel integer, -- NULL para cursos libres (sin nivel)
     id_materia integer NOT NULL,
     orden_en_nivel integer DEFAULT 0,
     obligatoria boolean DEFAULT true
@@ -1657,6 +1657,8 @@ CREATE TABLE public.periodos_dictado (
     fecha_fin date NOT NULL,
     id_nivel integer,
     activo boolean DEFAULT true,
+    max_materias integer DEFAULT 5,
+    id_carrera integer, -- FK → carreras (para cursos libres sin nivel)
     CONSTRAINT periodos_dictado_tipo_periodo_check CHECK (((tipo_periodo)::text = ANY ((ARRAY['mensual'::character varying, 'semestral'::character varying, 'anual'::character varying, 'intensivo'::character varying])::text[])))
 );
 
@@ -4351,6 +4353,9 @@ ALTER TABLE ONLY public.pagofacil_transacciones
 
 ALTER TABLE ONLY public.periodos_dictado
     ADD CONSTRAINT periodos_dictado_id_nivel_fkey FOREIGN KEY (id_nivel) REFERENCES public.niveles_carrera(id_nivel);
+
+ALTER TABLE ONLY public.periodos_dictado
+    ADD CONSTRAINT periodos_dictado_id_carrera_fkey FOREIGN KEY (id_carrera) REFERENCES public.carreras(id_carrera);
 
 
 --

@@ -123,6 +123,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/malla', [\App\Http\Controllers\Director\CU6Malla\MallaController::class, 'storeMalla'])->name('malla.store');
         Route::delete('/malla/{id}', [\App\Http\Controllers\Director\CU6Malla\MallaController::class, 'destroyMalla'])->name('malla.destroy');
         Route::post('/carreras/{id}/nueva-materia', [\App\Http\Controllers\Director\CU6Malla\MallaController::class, 'storeMateriaNueva'])->name('malla.materia.store');
+
+        // CU8 — Períodos Académicos
+        Route::get('/periodos', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'index'])->name('periodos.index');
+        Route::post('/periodos', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'store'])->name('periodos.store');
+        Route::put('/periodos/{id}', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'update'])->name('periodos.update');
+        Route::patch('/periodos/{id}/toggle', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'toggleActivo'])->name('periodos.toggle');
+        Route::delete('/periodos/{id}', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'destroy'])->name('periodos.destroy');
     });
 
     // ── Panel Secretaria ───────────────────────────────────────────────────────

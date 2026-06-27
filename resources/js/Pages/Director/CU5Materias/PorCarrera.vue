@@ -7,6 +7,7 @@ import { ref, computed } from 'vue';
 const props = defineProps({
     carrera:             Object,
     porNivel:            Array,
+    materiasLibres:      { type: Array, default: () => [] },
     materiasDisponibles: Array,
 });
 
@@ -17,7 +18,9 @@ const TIPOS = {
 };
 
 const totalMaterias = computed(() =>
-    props.porNivel.reduce((sum, n) => sum + n.materias.length, 0)
+    props.carrera.tipo === 'curso_libre'
+        ? (props.materiasLibres ?? []).length
+        : props.porNivel.reduce((sum, n) => sum + n.materias.length, 0)
 );
 
 const costoPorMateria = computed(() => {
@@ -35,6 +38,14 @@ function formatCostoEntero(val) {
     if (!val) return '—';
     return 'Bs ' + Math.round(parseFloat(val)).toLocaleString('es-BO');
 }
+
+// ── Pseudo-nivel para cursos libres (lista plana sin nivel real) ──────────────
+const nivelLibre = computed(() => ({
+    id_nivel:     null,
+    numero_nivel: null,
+    nombre_nivel: 'Módulos del Curso',
+    materias:     props.materiasLibres ?? [],
+}));
 
 // ── Modal: Agregar Nivel ──────────────────────────────────────────────────────
 const modalNivel = ref(false);
@@ -80,6 +91,7 @@ const materiasEnNivel = computed(() => {
 const materiasEnMallaIds = computed(() => {
     const set = new Set();
     props.porNivel.forEach(n => n.materias.forEach(m => set.add(m.id_materia)));
+    (props.materiasLibres ?? []).forEach(m => set.add(m.id_materia));
     return set;
 });
 
@@ -162,10 +174,12 @@ function abrirModalMateria(nivel) {
 }
 
 function guardarAsignar() {
+    const esLibre = props.carrera.tipo === 'curso_libre';
     formAsignar.transform(data => ({
         ...data,
-        id_carrera: props.carrera.id_carrera,
-        id_nivel:   nivelActivo.value.id_nivel,
+        id_carrera:     props.carrera.id_carrera,
+        id_nivel:       esLibre ? null : nivelActivo.value.id_nivel,
+        es_curso_libre: esLibre,
     })).post(route('director.malla.store'), {
         preserveScroll: true,
         onSuccess: () => { modalMateria.value = false; },
@@ -173,9 +187,11 @@ function guardarAsignar() {
 }
 
 function guardarNueva() {
+    const esLibre = props.carrera.tipo === 'curso_libre';
     const payload = {
         ...formNueva.data(),
-        id_nivel: nivelActivo.value.id_nivel,
+        id_nivel:       esLibre ? null : nivelActivo.value.id_nivel,
+        es_curso_libre: esLibre,
     };
     if (formNueva.es_base) payload.id_materia_requisito = null;
 
@@ -203,11 +219,12 @@ const esRequisitoDe = computed(() => {
     const map = {};
     props.porNivel.forEach(n =>
         n.materias.forEach(m => {
-            if (m.id_materia_requisito) {
-                map[m.id_materia_requisito] = m.nombre;
-            }
+            if (m.id_materia_requisito) map[m.id_materia_requisito] = m.nombre;
         })
     );
+    (props.materiasLibres ?? []).forEach(m => {
+        if (m.id_materia_requisito) map[m.id_materia_requisito] = m.nombre;
+    });
     return map;
 });
 
@@ -272,9 +289,21 @@ function confirmarEliminarNivel() {
                 <!-- Toolbar superior -->
                 <div class="flex items-center justify-between">
                     <p class="text-sm font-medium" style="color: var(--text-secondary);">
-                        {{ porNivel.length }} nivel(es) configurado(s)
+                        <template v-if="carrera.tipo === 'curso_libre'">
+                            {{ (materiasLibres ?? []).length }} materia(s) en el curso
+                        </template>
+                        <template v-else>
+                            {{ porNivel.length }} nivel(es) configurado(s)
+                        </template>
                     </p>
-                    <button @click="abrirModalNivel"
+                    <button v-if="carrera.tipo === 'curso_libre'"
+                        @click="abrirModalMateria(nivelLibre)"
+                        class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition"
+                        style="background-color: var(--primary-color); color: var(--primary-text);">
+                        + Agregar Materia
+                    </button>
+                    <button v-else
+                        @click="abrirModalNivel"
                         class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition"
                         style="background-color: var(--primary-color); color: var(--primary-text);">
                         + Agregar Nivel
@@ -299,8 +328,24 @@ function confirmarEliminarNivel() {
                     </span>
                 </div>
 
-                <!-- Sin niveles -->
-                <div v-if="porNivel.length === 0"
+                <!-- Sin materias (curso libre vacío) -->
+                <div v-if="carrera.tipo === 'curso_libre' && (materiasLibres ?? []).length === 0"
+                     class="rounded-xl p-10 text-center"
+                     style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                    <p class="text-3xl mb-3">📋</p>
+                    <p class="font-semibold text-sm" style="color: var(--text-color);">Sin materias configuradas</p>
+                    <p class="text-sm mt-1" style="color: var(--text-secondary);">
+                        Agrega las materias del curso libre directamente.
+                    </p>
+                    <button @click="abrirModalMateria(nivelLibre)"
+                        class="inline-block mt-5 rounded-lg px-5 py-2.5 text-sm font-semibold"
+                        style="background-color: var(--primary-color); color: var(--primary-text);">
+                        + Agregar Primera Materia
+                    </button>
+                </div>
+
+                <!-- Sin niveles (carrera normal) -->
+                <div v-else-if="carrera.tipo !== 'curso_libre' && porNivel.length === 0"
                      class="rounded-xl p-10 text-center"
                      style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
                     <p class="text-3xl mb-3">📋</p>
@@ -313,6 +358,80 @@ function confirmarEliminarNivel() {
                         style="background-color: var(--primary-color); color: var(--primary-text);">
                         + Agregar Primer Nivel
                     </button>
+                </div>
+
+                <!-- Curso libre: lista plana de materias -->
+                <div v-if="carrera.tipo === 'curso_libre' && (materiasLibres ?? []).length > 0"
+                     class="rounded-xl overflow-hidden"
+                     style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                    <div class="flex items-center justify-between px-5 py-3"
+                         style="background-color: var(--bg-color); border-bottom: 1px solid var(--border-color);">
+                        <div class="flex items-center gap-3">
+                            <div class="flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold flex-shrink-0"
+                                 style="background-color: var(--primary-color); color: var(--primary-text);">★</div>
+                            <div>
+                                <p class="font-semibold text-sm" style="color: var(--text-color);">Módulos del Curso</p>
+                                <p class="text-xs" style="color: var(--text-secondary);">{{ (materiasLibres ?? []).length }} materia(s)</p>
+                            </div>
+                        </div>
+                        <button @click="abrirModalMateria(nivelLibre)"
+                            class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition"
+                            style="background-color: var(--primary-color); color: var(--primary-text);">
+                            + Asignar Materia
+                        </button>
+                    </div>
+                    <table class="min-w-full">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--border-color);">
+                                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap w-10" style="color: var(--text-secondary);">#</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Código</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Materia</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Prerequisito</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell whitespace-nowrap" style="color: var(--text-secondary);">Costo sugerido</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Tipo</th>
+                                <th class="px-4 py-2 whitespace-nowrap"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(m, idx) in (materiasLibres ?? [])" :key="m.id_malla"
+                                class="border-t" style="border-color: var(--border-color);">
+                                <td class="px-4 py-3 text-sm font-semibold w-10" style="color: var(--text-secondary);">{{ idx + 1 }}</td>
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    <span class="font-mono text-sm font-semibold" style="color: var(--primary-color);">{{ m.codigo }}</span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="font-medium text-sm" style="color: var(--text-color);">{{ m.nombre }}</div>
+                                    <div v-if="m.creditos" class="text-xs mt-0.5" style="color: var(--text-secondary);">{{ m.creditos }} créditos</div>
+                                    <div v-if="esRequisitoDe[m.id_materia]" class="text-xs mt-0.5 font-medium" style="color: #f59e0b;">
+                                        → requerida por: {{ esRequisitoDe[m.id_materia] }}
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 text-sm whitespace-nowrap">
+                                    <span v-if="m.nombre_requisito" class="inline-flex items-center gap-1">
+                                        <span class="text-xs" style="color: var(--text-secondary);">Req:</span>
+                                        <span class="font-medium text-xs" style="color: var(--text-color);">{{ m.nombre_requisito }}</span>
+                                    </span>
+                                    <span v-else class="text-xs" style="color: var(--text-secondary);">—</span>
+                                </td>
+                                <td class="px-4 py-3 text-sm hidden md:table-cell whitespace-nowrap">
+                                    <span class="font-semibold" style="color: var(--primary-color);">{{ formatCosto(m.costo_mensual) }}</span>
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    <span :class="['badge', m.obligatoria ? 'badge-obligatoria' : 'badge-electiva']">
+                                        {{ m.obligatoria ? 'Obligatoria' : 'Electiva' }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap text-right">
+                                    <button @click="quitarMateria(m)"
+                                        class="text-xs font-medium hover:underline"
+                                        :style="esRequisitoDe[m.id_materia] ? 'color: #9ca3af; cursor: not-allowed;' : 'color: #ef4444;'"
+                                        :title="esRequisitoDe[m.id_materia] ? `No se puede quitar: '${esRequisitoDe[m.id_materia]}' la requiere` : 'Quitar de la malla'">
+                                        Quitar
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
 
                 <!-- Niveles -->
@@ -419,7 +538,7 @@ function confirmarEliminarNivel() {
                 </div>
 
                 <!-- Botón ir a gestionar materias -->
-                <div v-if="porNivel.length > 0" class="flex justify-end">
+                <div v-if="porNivel.length > 0 || (carrera.tipo === 'curso_libre' && (materiasLibres ?? []).length > 0)" class="flex justify-end">
                     <Link :href="route('director.materias.index')"
                         class="rounded-lg px-4 py-2 text-sm font-medium border transition"
                         style="color: var(--primary-color); border-color: var(--primary-color); background: transparent;">
@@ -549,6 +668,11 @@ function confirmarEliminarNivel() {
 
                     <!-- TAB: Nueva -->
                     <div v-if="tabMateria === 'nueva'" class="space-y-4">
+
+                        <p v-if="formNueva.errors.materia" class="rounded-lg px-3 py-2 text-xs font-medium"
+                           style="background-color:color-mix(in srgb,#ef4444 12%,transparent); color:#ef4444; border:1px solid color-mix(in srgb,#ef4444 30%,transparent);">
+                            {{ formNueva.errors.materia }}
+                        </p>
 
                         <!-- Tipo: base o con prerequisito -->
                         <div class="rounded-lg p-3" style="background-color: var(--bg-color); border: 1px solid var(--border-color);">
