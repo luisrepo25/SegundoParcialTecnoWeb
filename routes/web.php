@@ -67,11 +67,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/materias/{id}/toggle-activo', [\App\Http\Controllers\Director\CU5Materias\MateriaController::class, 'toggleActivo'])->name('materias.toggle-activo');
     });
 
-    // ── Panel Secretaria ───────────────────────────────────────────────────────
+    // ── Panel Secretaria ────────────────────────────────────────────────────────────
     Route::middleware('role:secretary')->prefix('secretaria')->name('secretaria.')->group(function () {
         Route::get('/panel', function () {
             return Inertia::render('Dashboard/Secretaria');
         })->name('dashboard');
+
+        // Cronogramas (CU10)
+        Route::get('/cronogramas', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'index'])->name('cronogramas.index');
+        Route::post('/cronogramas', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'store'])->name('cronogramas.store');
+        Route::patch('/cronogramas/{id}/toggle-activo', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'toggleActivo'])->name('cronogramas.toggle-activo');
 
         Route::get('/inscripciones', [\App\Http\Controllers\Secretaria\CU2Inscripciones\InscripcionController::class, 'index'])->name('inscripciones.index');
         Route::get('/pagos', [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'index'])->name('pagos.index');
