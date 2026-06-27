@@ -36,7 +36,8 @@ const secciones = [
         items: [
             { name: 'Gestión de Carreras', route: 'director.carreras.index',      activeUrls: ['/director/carreras'] },
             { name: 'Gestión de Materias', route: 'director.materias.index',      activeUrls: ['/director/materias'] },
-            { name: 'Cronogramas',         route: 'secretaria.cronogramas.index', activeUrls: ['/secretaria/cronogramas'] },
+            { name: 'Cronogramas',         route: 'secretaria.cronogramas.index',    activeUrls: ['/secretaria/cronogramas'] },
+            { name: 'Seguimiento Académico', route: 'propietario.seguimiento.index', activeUrls: ['/propietario/seguimiento'] },
         ],
     },
     {

@@ -45,6 +45,12 @@ const secciones = [
                 descripcion: 'Consultar y gestionar los cronogramas académicos por periodo.',
                 ruta: 'secretaria.cronogramas.index',
             },
+            {
+                numero: 'CU13',
+                titulo: 'Seguimiento Académico',
+                descripcion: 'Ver historial, indicadores y progreso académico de cualquier estudiante.',
+                ruta: 'propietario.seguimiento.index',
+            },
         ],
     },
     {

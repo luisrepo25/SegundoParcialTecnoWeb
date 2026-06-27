@@ -51,6 +51,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/usuarios/{id}/password', [UsuarioController::class, 'cambiarPassword'])->name('usuarios.password');
     });
 
+    // CU13 — Seguimiento Académico (propietario + director)
+    Route::middleware('role:propietario,director')->prefix('propietario')->name('propietario.')->group(function () {
+        Route::get('/seguimiento',                                    [\App\Http\Controllers\Propietario\CU13Seguimiento\SeguimientoController::class, 'index'])          ->name('seguimiento.index');
+        Route::get('/seguimiento/{id}',                               [\App\Http\Controllers\Propietario\CU13Seguimiento\SeguimientoController::class, 'show'])           ->name('seguimiento.show');
+        Route::post('/seguimiento/{id}/abandono',                     [\App\Http\Controllers\Propietario\CU13Seguimiento\SeguimientoController::class, 'registrarAbandono'])->name('seguimiento.abandono');
+        Route::get('/seguimiento/{id}/recurso/{idMateria}',           [\App\Http\Controllers\Propietario\CU13Seguimiento\SeguimientoController::class, 'validarRecurso']) ->name('seguimiento.recurso');
+    });
+
     // CU14 — Reportes y Estadísticas (propietario + director; auditoría solo propietario)
     Route::get('/propietario/reportes', [\App\Http\Controllers\Propietario\CU14Reportes\ReporteController::class, 'index'])
         ->middleware('role:propietario,director')
