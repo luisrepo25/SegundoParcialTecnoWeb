@@ -156,6 +156,7 @@ class OfertaController extends Controller
                 'email'         => $request->email,
                 'paymentNumber' => $paymentNumber,
                 'clientCode'    => (string) $estudiante->id_estudiante,
+                'concepto'      => 'Matrícula — ' . $carrera->nombre, // extraído antes de enviar a la API
             ]);
 
             DB::table('pagofacil_transacciones')

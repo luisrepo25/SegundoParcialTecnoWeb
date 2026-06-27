@@ -30,14 +30,29 @@ class PagoFacilService
     // ── Generar QR ────────────────────────────────────────────────────────────
     public function generarQR(array $params): array
     {
+        $amount = 0.01; // valor ficticio para pruebas; monto real queda en pagofacil_transacciones
+
+        $base = [
+            'paymentMethod' => 34,
+            'documentType'  => 1,
+            'currency'      => 2,
+            'amount'        => $amount,
+            'callbackUrl'   => config('services.pagofacil.callback_url'),
+            'orderDetail'   => [[
+                'serial'   => 1,
+                'product'  => $params['concepto'] ?? 'Matrícula Instituto San Pablo',
+                'quantity' => 1,
+                'price'    => $amount,
+                'discount' => 0,
+                'total'    => $amount,
+            ]],
+        ];
+
+        // Quitar 'concepto' de $params si existe (no es un campo de la API)
+        unset($params['concepto']);
+
         $resp = Http::withToken($this->getToken())
-            ->post(self::BASE . '/generate-qr', array_merge([
-                'paymentMethod' => 34,
-                'documentType'  => 1,
-                'currency'      => 2,
-                'amount'        => 0.01, // valor ficticio para pruebas; el monto real queda en DB
-                'callbackUrl'   => config('services.pagofacil.callback_url'),
-            ], $params));
+            ->post(self::BASE . '/generate-qr', array_merge($base, $params));
 
         if (!$resp->successful()) {
             throw new \RuntimeException('PagoFácil generarQR error: ' . $resp->body());
@@ -49,8 +64,9 @@ class PagoFacilService
     // ── Consultar estado de transacción ───────────────────────────────────────
     public function consultarTransaccion(int $transactionId): array
     {
+        // La API usa 'pagofacilTransactionId' (no 'transactionId') según la colección Postman
         $resp = Http::withToken($this->getToken())
-            ->post(self::BASE . '/query-transaction', ['transactionId' => $transactionId]);
+            ->post(self::BASE . '/query-transaction', ['pagofacilTransactionId' => $transactionId]);
 
         return $resp->json() ?? [];
     }
