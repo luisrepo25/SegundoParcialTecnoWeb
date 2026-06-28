@@ -5,9 +5,10 @@ import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 
 const props = defineProps({
-    carreras:      Array,
-    nivelesSelect: Array,
-    plantillas:    { type: Array, default: () => [] },
+    carreras:          Array,
+    nivelesSelect:     Array,
+    plantillas:        { type: Array, default: () => [] },
+    cronogramasClases: { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -69,6 +70,7 @@ const modalOpen     = ref(false);
 const editando      = ref(null);
 const esCursoLibre  = ref(false);
 const nombreCarreraModal = ref('');
+const cronogramaModal = ref(null);
 
 const form = useForm({
     id_nivel:       '',
@@ -112,7 +114,8 @@ function abrirEditar(p) {
 }
 
 function cerrar() {
-    modalOpen.value = false;
+    modalOpen.value     = false;
+    cronogramaModal.value = null;
     form.reset();
     editando.value     = null;
     esCursoLibre.value = false;
@@ -150,6 +153,7 @@ function confirmarEliminar() {
 }
 
 // ── Modal Lote ────────────────────────────────────────────────────────────────
+const cronogramaLote = ref(null);
 const modalLote   = ref(false);
 const formLote    = useForm({
     nombre:       '',
@@ -211,6 +215,7 @@ function abrirLote() {
     formLote.reset();
     formLote.max_materias = 5;
     plantillaSeleccionada.value = '';
+    cronogramaLote.value = null;
     // Inicializar tipo 'semestral' y fechas vacías para cada carrera
     const tipos   = {};
     const fechas  = {};
@@ -289,6 +294,32 @@ function duracionDias(inicio, fin) {
     return `${d} días`;
 }
 
+// ── Selector cronograma → auto-rellena fechas ────────────────────────────────
+const MODALIDAD_LABELS = {
+    mensual:   'Mensual',
+    semestral: 'Semestral',
+    anual:     'Anual',
+    intensivo: 'Intensivo',
+};
+
+function cronogramasFiltrados(modalidadFiltro = null) {
+    return props.cronogramasClases
+        .filter(c => !modalidadFiltro || c.modalidad === null || c.modalidad === modalidadFiltro);
+}
+
+function labelCronograma(c) {
+    const mod = c.modalidad ? MODALIDAD_LABELS[c.modalidad] ?? c.modalidad : 'Global';
+    return `${c.nombre}  (${fmtFecha(c.fecha_inicio)} → ${fmtFecha(c.fecha_fin)})  · ${mod}`;
+}
+
+function aplicarCronograma(idCronograma, targetForm) {
+    if (!idCronograma) return;
+    const c = props.cronogramasClases.find(x => String(x.id_cronograma) === String(idCronograma));
+    if (!c) return;
+    targetForm.fecha_inicio = c.fecha_inicio;
+    targetForm.fecha_fin    = c.fecha_fin;
+}
+
 // ── Clonar año siguiente ─────────────────────────────────────────────────────
 const confirmClonar = ref(false);
 const anoSiguiente  = new Date().getFullYear() + 1;
@@ -306,6 +337,8 @@ function clonarSiguienteAnio() {
 // ── Accordion carreras ────────────────────────────────────────────────────────
 const carreraAbierta = ref(null);
 const buscarCarrera  = ref('');
+const soloAnoActual  = ref(true);
+const anoActual      = new Date().getFullYear();
 
 const toggleCarreraPanel = (id) => {
     carreraAbierta.value = carreraAbierta.value === id ? null : id;
@@ -313,8 +346,23 @@ const toggleCarreraPanel = (id) => {
 
 const carrerasFiltradas = computed(() => {
     const q = buscarCarrera.value.trim().toLowerCase();
-    if (!q) return props.carreras;
-    return props.carreras.filter(c => c.nombre.toLowerCase().includes(q));
+    let lista = props.carreras;
+    if (q) lista = lista.filter(c => c.nombre.toLowerCase().includes(q));
+
+    if (!soloAnoActual.value) return lista;
+
+    return lista.map(c => ({
+        ...c,
+        niveles: (c.niveles ?? []).map(n => ({
+            ...n,
+            periodos: n.periodos.filter(p =>
+                p.fecha_inicio && new Date(p.fecha_inicio).getFullYear() === anoActual
+            ),
+        })),
+        periodos_directos: (c.periodos_directos ?? []).filter(p =>
+            p.fecha_inicio && new Date(p.fecha_inicio).getFullYear() === anoActual
+        ),
+    }));
 });
 
 function totalPeriodosCarrera(carrera) {
@@ -365,11 +413,23 @@ function totalPeriodosCarrera(carrera) {
             </button>
         </div>
 
-        <!-- Buscador de carrera -->
-        <div class="mb-3">
+        <!-- Buscador + filtro año -->
+        <div class="flex items-center gap-3 mb-3 flex-wrap">
             <input v-model="buscarCarrera" type="text" placeholder="Buscar carrera..."
-                class="w-full max-w-xs rounded-lg border px-3 py-2 text-sm outline-none"
-                style="background-color: var(--card-bg); border-color: var(--border-color); color: var(--text-color);" />
+                class="rounded-lg border px-3 py-2 text-sm outline-none"
+                style="width: 220px; background-color: var(--card-bg); border-color: var(--border-color); color: var(--text-color);" />
+
+            <label class="flex items-center gap-2 cursor-pointer select-none">
+                <div class="relative" @click="soloAnoActual = !soloAnoActual">
+                    <div class="w-9 h-5 rounded-full transition-colors duration-200"
+                         :style="soloAnoActual ? 'background-color: var(--primary-color);' : 'background-color: var(--border-color);'"></div>
+                    <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200"
+                         :style="soloAnoActual ? 'transform: translateX(16px);' : ''"></div>
+                </div>
+                <span class="text-xs font-medium" style="color: var(--text-secondary);">
+                    Solo vigentes
+                </span>
+            </label>
         </div>
 
         <div class="space-y-2">
@@ -597,6 +657,22 @@ function totalPeriodosCarrera(carrera) {
                         <p v-if="form.errors.tipo_periodo" class="text-xs mt-1" style="color:#ef4444;">{{ form.errors.tipo_periodo }}</p>
                     </div>
 
+                    <!-- Tomar fechas del cronograma -->
+                    <div v-if="cronogramasClases.length > 0">
+                        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">📅 Tomar fechas del cronograma</label>
+                        <select
+                            v-model="cronogramaModal"
+                            class="input-field"
+                            @change="aplicarCronograma(cronogramaModal, form)">
+                            <option value="">— Seleccionar cronograma (opcional) —</option>
+                            <option v-for="c in cronogramasFiltrados(form.tipo_periodo)"
+                                    :key="c.id_cronograma"
+                                    :value="c.id_cronograma">
+                                {{ labelCronograma(c) }}
+                            </option>
+                        </select>
+                    </div>
+
                     <!-- Fechas -->
                     <div class="grid grid-cols-2 gap-3">
                         <div>
@@ -681,6 +757,23 @@ function totalPeriodosCarrera(carrera) {
                             placeholder="Ej: Semestre 1-2027"
                             class="input-field" />
                         <p v-if="formLote.errors.nombre" class="text-xs mt-1" style="color:#ef4444;">{{ formLote.errors.nombre }}</p>
+                    </div>
+
+                    <!-- Tomar fechas del cronograma -->
+                    <div v-if="cronogramasClases.length > 0">
+                        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">📅 Tomar fechas del cronograma</label>
+                        <select
+                            v-model="cronogramaLote"
+                            class="input-field"
+                            @change="aplicarCronograma(cronogramaLote, formLote)">
+                            <option value="">— Seleccionar cronograma (opcional) —</option>
+                            <option v-for="c in cronogramasFiltrados()"
+                                    :key="c.id_cronograma"
+                                    :value="c.id_cronograma">
+                                {{ labelCronograma(c) }}
+                            </option>
+                        </select>
+                        <p class="text-[11px] mt-1" style="color: var(--text-muted);">Auto-rellena las fechas globales · podés ajustar por carrera debajo</p>
                     </div>
 
                     <!-- Fechas -->

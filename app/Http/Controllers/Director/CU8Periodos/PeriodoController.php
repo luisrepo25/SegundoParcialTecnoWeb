@@ -177,10 +177,19 @@ class PeriodoController extends Controller
             $plantillasMap[$key]['id_niveles'][] = $r->id_nivel;
         }
 
+        // ── Cronogramas de clases para auto-rellenar fechas ─────────────────────
+        $cronogramasClases = DB::table('cronogramas')
+            ->where('tipo_periodo', 'clases')
+            ->where('activo', true)
+            ->orderBy('fecha_inicio', 'desc')
+            ->select('id_cronograma', 'nombre', 'modalidad', 'fecha_inicio', 'fecha_fin')
+            ->get();
+
         return Inertia::render('Director/CU8Periodos/Index', [
-            'carreras'      => $carreras,
-            'nivelesSelect' => $nivelesSelect,
-            'plantillas'    => array_values($plantillasMap),
+            'carreras'          => $carreras,
+            'nivelesSelect'     => $nivelesSelect,
+            'plantillas'        => array_values($plantillasMap),
+            'cronogramasClases' => $cronogramasClases,
         ]);
     }
 
