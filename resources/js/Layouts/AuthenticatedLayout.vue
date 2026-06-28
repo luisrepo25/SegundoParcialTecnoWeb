@@ -83,7 +83,7 @@ const roleInfo = computed(() => roleLabels[userRole.value] ?? { label: 'Panel', 
                                         <p class="text-xs font-semibold" style="color: var(--text-secondary);">{{ roleInfo.label }}</p>
                                         <p class="text-xs truncate" style="color: var(--text-secondary);">{{ $page.props.auth.user.email }}</p>
                                     </div>
-                                    <DropdownLink :href="route('profile.edit')">Perfil</DropdownLink>
+                                    <DropdownLink :href="$page.props.auth.user?.role === 'estudiante' ? route('estudiante.perfil') : route('profile.edit')">Perfil</DropdownLink>
                                     <DropdownLink :href="route('logout')" method="post" as="button">Cerrar sesión</DropdownLink>
                                 </template>
                             </Dropdown>
@@ -118,7 +118,7 @@ const roleInfo = computed(() => roleLabels[userRole.value] ?? { label: 'Panel', 
                     </div>
 
                     <div class="space-y-1 pb-3 pt-2">
-                        <ResponsiveNavLink :href="route('profile.edit')">Perfil</ResponsiveNavLink>
+                        <ResponsiveNavLink :href="$page.props.auth.user?.role === 'estudiante' ? route('estudiante.perfil') : route('profile.edit')">Perfil</ResponsiveNavLink>
                         <ResponsiveNavLink :href="route('logout')" method="post" as="button">Cerrar sesión</ResponsiveNavLink>
                     </div>
                 </div>

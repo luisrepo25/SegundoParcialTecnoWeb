@@ -210,6 +210,12 @@ CREATE TABLE pagofacil_transacciones (
     fecha_pago                timestamp without time zone NULL       
 );
 
+CREATE TABLE password_reset_tokens (
+    email                     character varying(255)       NOT NULL   ,
+    token                     character varying(255)       NOT NULL   ,
+    created_at                timestamp without time zone  NULL
+);
+
 CREATE TABLE periodos_dictado (
     id_periodo                integer              NOT NULL   DEFAULT nextval('periodos_dictado_id_periodo_seq'::regclass),
     nombre                    character varying(50) NOT NULL   ,

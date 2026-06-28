@@ -1646,6 +1646,22 @@ ALTER SEQUENCE public.pagofacil_transacciones_id_transaccion_pf_seq OWNED BY pub
 
 
 --
+-- Name: password_reset_tokens; Type: TABLE; Schema: public; Owner: postgres
+-- Creada por migración Laravel para recuperación de contraseña (2026-06-28)
+--
+
+CREATE TABLE public.password_reset_tokens (
+    email character varying(255) NOT NULL,
+    token character varying(255) NOT NULL,
+    created_at timestamp without time zone,
+    CONSTRAINT password_reset_tokens_pkey PRIMARY KEY (email)
+);
+
+
+ALTER TABLE public.password_reset_tokens OWNER TO postgres;
+
+
+--
 -- Name: periodos_dictado; Type: TABLE; Schema: public; Owner: postgres
 --
 

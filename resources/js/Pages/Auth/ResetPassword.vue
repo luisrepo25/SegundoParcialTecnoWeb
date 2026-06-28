@@ -1,101 +1,76 @@
 <script setup>
-import GuestLayout from '@/Layouts/GuestLayout.vue';
+import AuthShell from '@/Components/Auth/AuthShell.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, useForm } from '@inertiajs/vue3';
 
-const props = defineProps({
-    email: {
-        type: String,
-        required: true,
-    },
-    token: {
-        type: String,
-        required: true,
-    },
+defineProps({
+    email: { type: String, required: true },
 });
 
 const form = useForm({
-    token: props.token,
-    email: props.email,
-    password: '',
+    password:              '',
     password_confirmation: '',
 });
 
 const submit = () => {
     form.post(route('password.store'), {
-        onFinish: () => form.reset('password', 'password_confirmation'),
+        onFinish: () => form.reset(),
     });
 };
 </script>
 
 <template>
-    <GuestLayout>
-        <Head title="Reset Password" />
+    <Head title="Nueva contraseña" />
 
-        <form @submit.prevent="submit">
-            <div>
-                <InputLabel for="email" value="Email" />
-
-                <TextInput
-                    id="email"
-                    type="email"
-                    class="mt-1 block w-full"
-                    v-model="form.email"
-                    required
-                    autofocus
-                    autocomplete="username"
-                />
-
-                <InputError class="mt-2" :message="form.errors.email" />
+    <AuthShell
+        title="Nueva contraseña"
+        subtitle="Elegí una contraseña segura para tu cuenta."
+    >
+        <div class="auth-card">
+            <div class="auth-card-head">
+                <h2>Establecer contraseña</h2>
+                <p>Ingresá y confirmá tu nueva contraseña para <strong>{{ email }}</strong>.</p>
             </div>
 
-            <div class="mt-4">
-                <InputLabel for="password" value="Password" />
+            <form class="auth-form" @submit.prevent="submit">
+                <div class="auth-field">
+                    <InputLabel for="password" value="Nueva contraseña" />
+                    <TextInput
+                        id="password"
+                        v-model="form.password"
+                        type="password"
+                        required
+                        autofocus
+                        autocomplete="new-password"
+                        placeholder="Mínimo 8 caracteres"
+                    />
+                    <InputError :message="form.errors.password" />
+                </div>
 
-                <TextInput
-                    id="password"
-                    type="password"
-                    class="mt-1 block w-full"
-                    v-model="form.password"
-                    required
-                    autocomplete="new-password"
-                />
+                <div class="auth-field">
+                    <InputLabel for="password_confirmation" value="Confirmar contraseña" />
+                    <TextInput
+                        id="password_confirmation"
+                        v-model="form.password_confirmation"
+                        type="password"
+                        required
+                        autocomplete="new-password"
+                        placeholder="Repetí la contraseña"
+                    />
+                    <InputError :message="form.errors.password_confirmation" />
+                </div>
 
-                <InputError class="mt-2" :message="form.errors.password" />
-            </div>
-
-            <div class="mt-4">
-                <InputLabel
-                    for="password_confirmation"
-                    value="Confirm Password"
-                />
-
-                <TextInput
-                    id="password_confirmation"
-                    type="password"
-                    class="mt-1 block w-full"
-                    v-model="form.password_confirmation"
-                    required
-                    autocomplete="new-password"
-                />
-
-                <InputError
-                    class="mt-2"
-                    :message="form.errors.password_confirmation"
-                />
-            </div>
-
-            <div class="mt-4 flex items-center justify-end">
-                <PrimaryButton
+                <button
+                    type="submit"
+                    class="auth-submit"
                     :class="{ 'opacity-25': form.processing }"
                     :disabled="form.processing"
                 >
-                    Reset Password
-                </PrimaryButton>
-            </div>
-        </form>
-    </GuestLayout>
+                    {{ form.processing ? 'Guardando...' : 'Guardar nueva contraseña' }}
+                </button>
+            </form>
+        </div>
+    </AuthShell>
 </template>

@@ -113,10 +113,12 @@ class PanelController extends Controller
             $idsPeriodo = DB::table('periodos_dictado as pd')
                 ->leftJoin('niveles_carrera as n', 'pd.id_nivel', '=', 'n.id_nivel')
                 ->whereRaw('pd.activo IS TRUE')
+                ->whereRaw("CURRENT_DATE BETWEEN pd.fecha_inicio AND pd.fecha_fin")
                 ->where(function ($q) use ($est) {
                     $q->where('n.id_carrera', $est->id_carrera_actual)
                       ->orWhere('pd.id_carrera', $est->id_carrera_actual);
                 })
+                ->distinct()
                 ->pluck('pd.id_periodo');
 
             if ($idsPeriodo->isNotEmpty()) {
@@ -129,7 +131,13 @@ class PanelController extends Controller
                     ->join('usuarios as u',          'p.id_usuario',  '=', 'u.id_usuario')
                     ->whereIn('g.id_periodo', $idsPeriodo)
                     ->whereRaw('g.activo IS TRUE')
-                    ->whereRaw('COALESCE(g.vacantes_ocupadas, 0) < g.vacantes_max');
+                    ->whereRaw('COALESCE(g.vacantes_ocupadas, 0) < g.vacantes_max')
+                    ->whereExists(function ($q) use ($est) {
+                        $q->select(DB::raw(1))
+                          ->from('malla_curricular')
+                          ->where('malla_curricular.id_carrera', $est->id_carrera_actual)
+                          ->whereColumn('malla_curricular.id_materia', 'g.id_materia');
+                    });
 
                 if (!empty($gruposInscritos)) {
                     $query->whereNotIn('g.id_oferta', $gruposInscritos);
@@ -204,6 +212,13 @@ class PanelController extends Controller
 
         $carrera    = DB::table('carreras')->where('id_carrera', $est->id_carrera_actual)->firstOrFail();
         $costoTotal = (float) $carrera->costo_carrera_completa;
+
+        // Expirar cualquier QR de carrera anterior pendiente (permite reintentar sin bloqueo)
+        DB::table('pagofacil_transacciones')
+            ->where('id_estudiante', $est->id_estudiante)
+            ->where('concepto', 'carrera')
+            ->where('estado', 'pendiente')
+            ->update(['estado' => 'expirado']);
 
         // Plan POR MATERIA: sin QR, crear afiliación directamente (sin pago_carrera_completa)
         if ($tipo === 'materia') {
@@ -352,11 +367,56 @@ class PanelController extends Controller
             return back()->withErrors(['general' => 'No hay vacantes disponibles en este grupo.']);
         }
 
-        // Excluir pendientes_matricula (QR en curso) y activos
+        // Caso 1: inscripción en pendiente_matricula pero ya tiene pago_materia_suelta
+        // (trigger corrió pero no actualizó el estado — activar manualmente)
+        $inscConPagoExistente = DB::table('inscripciones as i')
+            ->join('pago_materia_suelta as pms', 'i.id_inscripcion', '=', 'pms.id_inscripcion')
+            ->where('i.id_estudiante', $est->id_estudiante)
+            ->where('i.id_oferta', $idOferta)
+            ->where('i.estado', 'pendiente_matricula')
+            ->value('i.id_inscripcion');
+
+        if ($inscConPagoExistente) {
+            DB::table('inscripciones')
+                ->where('id_inscripcion', $inscConPagoExistente)
+                ->update(['estado' => 'activo']);
+            return redirect()->route('estudiante.panel')
+                ->with('success', 'Tu pago ya estaba registrado. ¡Inscripción activada correctamente!');
+        }
+
+        // Caso 2: inscripción en pendiente_matricula con QR expirado y sin pago → limpiar
+        $idsPendientesExpiradas = DB::table('inscripciones as i')
+            ->join('pagofacil_transacciones as t', 'i.id_inscripcion', '=', 't.id_inscripcion')
+            ->where('i.id_estudiante', $est->id_estudiante)
+            ->where('i.id_oferta', $idOferta)
+            ->whereIn('i.estado', ['pendiente_matricula', 'pendiente_pago'])
+            ->whereNotExists(function ($q) {
+                $q->select(DB::raw(1))
+                  ->from('pago_materia_suelta')
+                  ->whereColumn('pago_materia_suelta.id_inscripcion', 'i.id_inscripcion');
+            })
+            ->where(function ($q) {
+                $q->where('t.estado', 'expirado')
+                  ->orWhere(function ($q2) {
+                      $q2->where('t.estado', 'pendiente')
+                         ->where('t.fecha_generacion', '<', now()->subMinutes(15));
+                  });
+            })
+            ->pluck('i.id_inscripcion');
+
+        if ($idsPendientesExpiradas->isNotEmpty()) {
+            DB::table('pagofacil_transacciones')
+                ->whereIn('id_inscripcion', $idsPendientesExpiradas)
+                ->where('estado', 'pendiente')
+                ->update(['estado' => 'expirado']);
+            DB::table('inscripciones')->whereIn('id_inscripcion', $idsPendientesExpiradas)->delete();
+        }
+
+        // Bloquear solo si hay inscripción activa o QR genuinamente en curso (<15 min)
         if (DB::table('inscripciones')
             ->where('id_estudiante', $est->id_estudiante)
             ->where('id_oferta', $idOferta)
-            ->whereIn('estado', ['pendiente_matricula', 'activo'])
+            ->whereIn('estado', ['pendiente_matricula', 'pendiente_pago', 'activo'])
             ->exists()) {
             return back()->withErrors(['general' => 'Ya tienes una inscripción activa o en proceso para este grupo.']);
         }
