@@ -114,7 +114,7 @@ const showUserMenu   = ref(false);
                             <div class="px-4 py-2 border-b" style="border-color: var(--border-color);">
                                 <p class="text-xs truncate" style="color: var(--text-secondary);">{{ user?.email }}</p>
                             </div>
-                            <Link :href="route('profile.edit')"
+                            <Link :href="route('director.perfil')"
                                 class="block px-4 py-2 text-sm transition-colors"
                                 style="color: var(--text-color);"
                                 onmouseover="this.style.backgroundColor='color-mix(in srgb, var(--text-color) 5%, transparent)'"

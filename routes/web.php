@@ -141,6 +141,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/grupos/{id}', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'update'])->name('grupos.update');
         Route::patch('/grupos/{id}/toggle', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'toggleActivo'])->name('grupos.toggle');
         Route::delete('/grupos/{id}', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'destroy'])->name('grupos.destroy');
+
+        // Perfil Director
+        Route::get('/perfil',          [\App\Http\Controllers\Director\PerfilController::class, 'index'])           ->name('perfil');
+        Route::put('/perfil',          [\App\Http\Controllers\Director\PerfilController::class, 'update'])          ->name('perfil.update');
+        Route::put('/perfil/password', [\App\Http\Controllers\Director\PerfilController::class, 'cambiarPassword']) ->name('perfil.password');
     });
 
     // ── Panel Secretaria ───────────────────────────────────────────────────────
