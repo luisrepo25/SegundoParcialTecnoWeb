@@ -1049,6 +1049,7 @@ ALTER SEQUENCE public.consumo_materias_carrera_id_consumo_seq OWNED BY public.co
 -- Name: cronogramas; Type: TABLE; Schema: public; Owner: postgres
 --
 
+-- MIGRACIÓN 2026-06-28: eliminado id_carrera → reemplazado por modalidad (alcance por tipo de período)
 CREATE TABLE public.cronogramas (
     id_cronograma integer NOT NULL,
     id_periodo integer,
@@ -1057,8 +1058,9 @@ CREATE TABLE public.cronogramas (
     fecha_inicio date NOT NULL,
     fecha_fin date NOT NULL,
     activo boolean DEFAULT true,
-    id_carrera integer,
-    CONSTRAINT cronogramas_tipo_periodo_check CHECK (((tipo_periodo)::text = ANY ((ARRAY['inscripcion'::character varying, 'clases'::character varying, 'examenes'::character varying, 'receso'::character varying])::text[])))
+    modalidad character varying(20),
+    CONSTRAINT cronogramas_tipo_periodo_check CHECK (((tipo_periodo)::text = ANY ((ARRAY['inscripcion'::character varying, 'clases'::character varying, 'examenes'::character varying, 'receso'::character varying])::text[]))),
+    CONSTRAINT cronogramas_modalidad_check CHECK ((modalidad IS NULL OR (modalidad)::text = ANY ((ARRAY['mensual'::character varying, 'semestral'::character varying, 'anual'::character varying, 'intensivo'::character varying])::text[])))
 );
 
 
