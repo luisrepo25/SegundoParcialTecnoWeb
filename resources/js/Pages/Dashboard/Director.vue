@@ -1,5 +1,5 @@
 <script setup>
-import DirectorLayout from '@/Layouts/DirectorLayout.vue';
+import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -33,7 +33,7 @@ const modulos = [
 <template>
     <Head title="Panel Director" />
 
-    <DirectorLayout>
+    <AdminLayout>
         <template #header>
             <h2 class="text-xl font-semibold tracking-tight" style="color: var(--text-color);">
                 Panel de Dirección
@@ -90,5 +90,5 @@ const modulos = [
             </section>
 
         </div>
-    </DirectorLayout>
+    </AdminLayout>
 </template>

@@ -135,7 +135,7 @@ CREATE TABLE inscripciones (
 CREATE TABLE malla_curricular (
     id_malla                  integer              NOT NULL   DEFAULT nextval('malla_curricular_id_malla_seq'::regclass),
     id_carrera                integer              NOT NULL   ,
-    id_nivel                  integer              NOT NULL   ,
+    id_nivel                  integer              NULL       , -- NULL para cursos libres (sin nivel)
     id_materia                integer              NOT NULL   ,
     orden_en_nivel            integer              NULL       ,
     obligatoria               boolean              NULL       DEFAULT true
@@ -217,7 +217,9 @@ CREATE TABLE periodos_dictado (
     fecha_inicio              date                 NOT NULL   ,
     fecha_fin                 date                 NOT NULL   ,
     id_nivel                  integer              NULL       ,
-    activo                    boolean              NULL       DEFAULT true
+    activo                    boolean              NULL       DEFAULT true,
+    max_materias              integer              NULL       DEFAULT 5,
+    id_carrera                integer              NULL       -- FK → carreras (para cursos libres sin nivel)
 );
 
 CREATE TABLE personal_administrativo (

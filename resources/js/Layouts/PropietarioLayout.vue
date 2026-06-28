@@ -7,8 +7,29 @@ import ThemeBar from '@/Components/ThemeBar.vue';
 const page = usePage();
 const user = computed(() => page.props.auth?.user);
 
+// Adapta el dashboard según el rol del usuario autenticado
+const dashboardRoute = computed(() => {
+    const role = user.value?.role;
+    if (role === 'director')  return 'dashboard.director';
+    if (role === 'secretaria') return 'secretaria.dashboard';
+    return 'dashboard.propietario';
+});
+
+const dashboardUrl = computed(() => {
+    const role = user.value?.role;
+    if (role === 'director')  return '/panel/director';
+    if (role === 'secretaria') return '/secretaria/panel';
+    return '/panel/propietario';
+});
+
+const roleBadge = computed(() => {
+    const role = user.value?.role;
+    if (role === 'director')  return { emoji: '🎓', label: 'Director' };
+    if (role === 'secretaria') return { emoji: '📋', label: 'Secretaría' };
+    return { emoji: '🏛️', label: 'Propietario' };
+});
+
 const modulos = [
-    { name: 'Dashboard',           route: 'dashboard.propietario',        activeUrls: ['/panel/propietario'] },
     { name: 'Gestión de Usuarios', route: 'propietario.usuarios.index',   activeUrls: ['/propietario/usuarios'] },
     { name: 'Gestión de Aulas',    route: 'propietario.aulas.index',      activeUrls: ['/propietario/aulas'] },
     { name: 'Gestión de Horarios', route: 'propietario.horarios.index',   activeUrls: ['/propietario/horarios'] },
@@ -38,7 +59,7 @@ const showUserMenu   = ref(false);
 
             <!-- Logo -->
             <div class="h-16 flex items-center justify-between px-4 shrink-0 border-b" style="border-color: var(--border-color);">
-                <Link :href="route('dashboard.propietario')" class="flex items-center gap-3 w-full" @click="showMobileMenu = false">
+                <Link :href="route(dashboardRoute)" class="flex items-center gap-3 w-full" @click="showMobileMenu = false">
                     <InstituteLogo :size="38" />
                     <div class="leading-tight overflow-hidden">
                         <p class="font-bold text-sm leading-none truncate" style="color: var(--text-color);">Instituto San Pablo</p>
@@ -52,13 +73,25 @@ const showUserMenu   = ref(false);
             <div class="px-4 pt-4 pb-2">
                 <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
                       style="background-color: var(--primary-color); color: var(--primary-text);">
-                    🏛️ Propietario
+                    {{ roleBadge.emoji }} {{ roleBadge.label }}
                 </span>
             </div>
 
             <!-- Navegación -->
             <nav class="flex-1 overflow-y-auto pt-2 px-4 space-y-1">
                 <p class="px-2 mb-3 text-[11px] font-semibold uppercase tracking-widest opacity-50" style="color: var(--text-secondary);">Principal</p>
+
+                <!-- Dashboard dinámico según rol -->
+                <Link
+                    :href="route(dashboardRoute)"
+                    @click="showMobileMenu = false"
+                    class="block px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150"
+                    :style="page.url.startsWith(dashboardUrl)
+                        ? 'background-color: color-mix(in srgb, var(--text-color) 8%, transparent); color: var(--text-color);'
+                        : 'color: var(--text-secondary);'"
+                >
+                    ← Volver al Dashboard
+                </Link>
 
                 <Link
                     v-for="mod in modulos"
@@ -69,9 +102,6 @@ const showUserMenu   = ref(false);
                     :style="isRouteActive(mod.activeUrls)
                         ? 'background-color: color-mix(in srgb, var(--text-color) 8%, transparent); color: var(--text-color);'
                         : 'color: var(--text-secondary);'"
-                    onmouseover="this.style.backgroundColor='color-mix(in srgb, var(--text-color) 5%, transparent)'"
-                    onmouseout="this.style.backgroundColor=this.getAttribute('data-active') === 'true' ? 'color-mix(in srgb, var(--text-color) 8%, transparent)' : 'transparent'"
-                    :data-active="isRouteActive(mod.activeUrls)"
                 >
                     {{ mod.name }}
                 </Link>

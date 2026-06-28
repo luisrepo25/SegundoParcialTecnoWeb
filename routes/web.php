@@ -13,6 +13,20 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
+// ── Oferta académica pública (sin autenticación) ───────────────────────────
+Route::prefix('oferta')->name('oferta.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Public\OfertaController::class, 'index'])->name('index');
+    // /pago/* ANTES de /{id} para evitar colisión de rutas
+    Route::get('/pago/{transId}/estado', [\App\Http\Controllers\Public\OfertaController::class, 'estado'])->name('estado');
+    Route::get('/pago/{transId}', [\App\Http\Controllers\Public\OfertaController::class, 'pago'])->name('pago');
+    Route::get('/{id}', [\App\Http\Controllers\Public\OfertaController::class, 'show'])->where('id', '[0-9]+')->name('show');
+    Route::get('/{id}/inscribirse', [\App\Http\Controllers\Public\OfertaController::class, 'formulario'])->where('id', '[0-9]+')->name('formulario');
+    Route::post('/{id}/inscribirse', [\App\Http\Controllers\Public\OfertaController::class, 'registrar'])->where('id', '[0-9]+')->name('registrar');
+});
+
+// Callback PagoFácil (sin CSRF — excluido en bootstrap/app.php)
+Route::post('/pagofacil/callback', [\App\Http\Controllers\Public\CallbackController::class, 'handle'])->name('pagofacil.callback');
+
 Route::get('/dashboard', function () {
     $user = auth()->user();
 
@@ -35,6 +49,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'total_usuarios'   => Usuario::count(),
                 'usuarios_activos' => Usuario::whereRaw('activo IS TRUE')->count(),
                 'total_aulas'      => Aula::count(),
+                'total_carreras'   => \App\Models\Carrera::count(),
+                'total_materias'   => \App\Models\Materia::count(),
+                'total_horarios'   => \App\Models\Horario::count(),
             ],
         ]);
     })->middleware('role:propietario')->name('dashboard.propietario');
@@ -48,8 +65,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/usuarios/{id}/password', [UsuarioController::class, 'cambiarPassword'])->name('usuarios.password');
     });
 
-    // CU2 y CU11 — solo propietario
-    Route::middleware('role:propietario')->prefix('propietario')->name('propietario.')->group(function () {
+    // CU13 — Seguimiento Académico (propietario + director)
+    Route::middleware('role:propietario,director')->prefix('propietario')->name('propietario.')->group(function () {
+        Route::get('/seguimiento',                                    [\App\Http\Controllers\Propietario\CU13Seguimiento\SeguimientoController::class, 'index'])          ->name('seguimiento.index');
+        Route::get('/seguimiento/{id}',                               [\App\Http\Controllers\Propietario\CU13Seguimiento\SeguimientoController::class, 'show'])           ->name('seguimiento.show');
+        Route::post('/seguimiento/{id}/abandono',                     [\App\Http\Controllers\Propietario\CU13Seguimiento\SeguimientoController::class, 'registrarAbandono'])->name('seguimiento.abandono');
+        Route::get('/seguimiento/{id}/recurso/{idMateria}',           [\App\Http\Controllers\Propietario\CU13Seguimiento\SeguimientoController::class, 'validarRecurso']) ->name('seguimiento.recurso');
+    });
+
+    // CU14 — Reportes y Estadísticas (propietario + director; auditoría solo propietario)
+    Route::get('/propietario/reportes', [\App\Http\Controllers\Propietario\CU14Reportes\ReporteController::class, 'index'])
+        ->middleware('role:propietario,director')
+        ->name('propietario.reportes.index');
+
+    // CU2 y CU11 — todos los roles admin
+    Route::middleware('role:propietario,director,secretaria')->prefix('propietario')->name('propietario.')->group(function () {
         // CU2 — Gestión de Aulas
         Route::get('/aulas', [AulaController::class, 'index'])->name('aulas.index');
         Route::post('/aulas', [AulaController::class, 'store'])->name('aulas.store');
@@ -67,13 +97,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/panel/director', function () {
         return Inertia::render('Dashboard/Director', [
             'totalCarreras'   => \App\Models\Carrera::count(),
-            'carrerasActivas' => \App\Models\Carrera::where('activo', true)->count(),
+            'carrerasActivas' => \App\Models\Carrera::whereRaw('activo IS TRUE')->count(),
             'totalMaterias'   => \App\Models\Materia::count(),
         ]);
     })->middleware('role:director')->name('dashboard.director');
 
-    // CU4 — Gestión de Carreras + CU5 Materias (director)
-    Route::middleware('role:director')->prefix('director')->name('director.')->group(function () {
+    // CU4 — Gestión de Carreras + CU5 Materias + CU6 Malla — todos los roles admin
+    Route::middleware('role:propietario,director,secretaria')->prefix('director')->name('director.')->group(function () {
         // CU4 Carreras
         Route::get('/carreras', [\App\Http\Controllers\Director\CU4Carreras\CarreraController::class, 'index'])->name('carreras.index');
         Route::post('/carreras', [\App\Http\Controllers\Director\CU4Carreras\CarreraController::class, 'store'])->name('carreras.store');
@@ -93,10 +123,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/malla', [\App\Http\Controllers\Director\CU6Malla\MallaController::class, 'storeMalla'])->name('malla.store');
         Route::delete('/malla/{id}', [\App\Http\Controllers\Director\CU6Malla\MallaController::class, 'destroyMalla'])->name('malla.destroy');
         Route::post('/carreras/{id}/nueva-materia', [\App\Http\Controllers\Director\CU6Malla\MallaController::class, 'storeMateriaNueva'])->name('malla.materia.store');
+
+        // CU8 — Períodos Académicos
+        Route::get('/periodos', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'index'])->name('periodos.index');
+        Route::post('/periodos', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'store'])->name('periodos.store');
+        Route::post('/periodos/lote', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'storeLote'])->name('periodos.lote');
+        Route::put('/periodos/{id}', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'update'])->name('periodos.update');
+        Route::patch('/periodos/{id}/toggle', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'toggleActivo'])->name('periodos.toggle');
+        Route::delete('/periodos/{id}', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'destroy'])->name('periodos.destroy');
+
+        // CU9 — Gestión de Grupos / Oferta Académica
+        Route::get('/grupos', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'index'])->name('grupos.index');
+        Route::post('/grupos', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'store'])->name('grupos.store');
+        Route::post('/grupos/clonar', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'clonar'])->name('grupos.clonar');
+        Route::put('/grupos/{id}', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'update'])->name('grupos.update');
+        Route::patch('/grupos/{id}/toggle', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'toggleActivo'])->name('grupos.toggle');
+        Route::delete('/grupos/{id}', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'destroy'])->name('grupos.destroy');
     });
 
     // ── Panel Secretaria ───────────────────────────────────────────────────────
-    Route::middleware('role:secretaria')->prefix('secretaria')->name('secretaria.')->group(function () {
+    Route::middleware('role:propietario,director,secretaria')->prefix('secretaria')->name('secretaria.')->group(function () {
         Route::get('/panel', function () {
             return Inertia::render('Dashboard/Secretaria');
         })->name('dashboard');
@@ -107,7 +153,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/cronogramas/{id}/toggle-activo', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'toggleActivo'])->name('cronogramas.toggle-activo');
 
         Route::get('/inscripciones', [\App\Http\Controllers\Secretaria\CU2Inscripciones\InscripcionController::class, 'index'])->name('inscripciones.index');
-        Route::get('/pagos', [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'index'])->name('pagos.index');
+
+        // CU7 — Gestión de Pagos (fase 1: lado admin)
+        Route::get('/pagos',                                      [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'index'])             ->name('pagos.index');
+        Route::get('/pagos/{id}',                                 [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'show'])              ->name('pagos.show');
+        Route::post('/pagos/{id}/matricula',                      [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'registrarMatricula'])->name('pagos.matricula');
+        Route::post('/pagos/{id}/carrera',                        [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'registrarCarrera'])  ->name('pagos.carrera');
+        Route::post('/pagos/cuota/{idPago}/{numCuota}',           [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'pagarCuota'])        ->name('pagos.cuota');
     });
 
     // ── Panel Docente ──────────────────────────────────────────────────────────
@@ -116,8 +168,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->middleware('role:profesor')->name('dashboard.profesor');
 
     // ── Panel Estudiante ───────────────────────────────────────────────────────
+    Route::middleware('role:estudiante')->prefix('estudiante')->name('estudiante.')->group(function () {
+        Route::get('/panel',                          [\App\Http\Controllers\Estudiante\PanelController::class, 'index'])             ->name('panel');
+        // Plan de pago de carrera
+        Route::post('/plan/{tipo}',                   [\App\Http\Controllers\Estudiante\PanelController::class, 'elegirPlan'])        ->name('plan')->where('tipo', 'contado|credito|materia');
+        Route::get('/pago-carrera/{transId}',         [\App\Http\Controllers\Estudiante\PanelController::class, 'pagoCarrera'])       ->name('pago.carrera');
+        Route::get('/pago-carrera/{transId}/estado',  [\App\Http\Controllers\Estudiante\PanelController::class, 'estadoPlan'])        ->name('pago.carrera.estado');
+        // Inscripción de materias
+        Route::post('/inscribir/{idOferta}',          [\App\Http\Controllers\Estudiante\PanelController::class, 'inscribir'])         ->name('inscribir');
+        Route::get('/pago/{transId}',                 [\App\Http\Controllers\Estudiante\PanelController::class, 'pagoInscripcion'])   ->name('pago');
+        Route::get('/pago/{transId}/estado',          [\App\Http\Controllers\Estudiante\PanelController::class, 'estadoInscripcion'])->name('pago.estado');
+    });
+
     Route::get('/panel/estudiante', function () {
-        return Inertia::render('Dashboard/Estudiante');
+        return redirect()->route('estudiante.panel');
     })->middleware('role:estudiante')->name('dashboard.estudiante');
 
 });

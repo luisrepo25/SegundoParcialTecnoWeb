@@ -1,5 +1,5 @@
 <script setup>
-import SecretariaLayout from '@/Layouts/SecretariaLayout.vue';
+import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, router, useForm, Link } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 import { formatFecha } from '@/Composables/useFecha';
@@ -70,26 +70,22 @@ function toggleActivo(id) {
 <template>
     <Head title="Gestión de Cronogramas" />
 
-    <SecretariaLayout>
-        <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-            <!-- Header de la página -->
-            <div class="flex justify-between items-center mb-8">
-                <div>
-                    <h2 class="text-3xl font-light text-[var(--text-color)] tracking-tight">Cronogramas Académicos</h2>
-                    <p class="text-[var(--text-muted)] mt-1 font-light">Gestiona las ventanas de tiempo del instituto.</p>
-                </div>
-            </div>
+    <AdminLayout>
+        <template #header>
+            <h2 class="text-xl font-semibold leading-tight" style="color: var(--text-color);">Cronogramas Académicos</h2>
+        </template>
 
+        <div class="max-w-7xl mx-auto">
             <!-- Filtros -->
             <div class="bg-[var(--card-bg)] p-4 rounded-sm border border-[var(--border-color)] mb-6 flex flex-col sm:flex-row gap-4 items-center">
-                <input 
-                    v-model="buscar" 
-                    type="text" 
-                    placeholder="Buscar cronograma..." 
+                <input
+                    v-model="buscar"
+                    type="text"
+                    placeholder="Buscar cronograma..."
                     class="w-full sm:w-1/3 bg-transparent border border-[var(--border-color)] rounded-sm px-4 py-2 text-[var(--text-color)] focus:outline-none focus:border-[var(--primary-color)] font-light"
                 >
-                <select 
-                    v-model="faseFiltro" 
+                <select
+                    v-model="faseFiltro"
                     class="w-full sm:w-48 bg-transparent border border-[var(--border-color)] rounded-sm px-4 py-2 text-[var(--text-color)] focus:outline-none focus:border-[var(--primary-color)] font-light appearance-none"
                 >
                     <option value="todas" class="bg-[var(--bg-color)] text-[var(--text-color)]">Todas las fases</option>
@@ -155,11 +151,11 @@ function toggleActivo(id) {
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right">
                                     <div class="flex items-center justify-end gap-2">
-                                        <button @click="toggleActivo(c.id_cronograma)" 
+                                        <button @click="toggleActivo(c.id_cronograma)"
                                                 class="px-3 py-1.5 text-xs font-medium uppercase tracking-wider border border-[var(--border-color)] rounded-sm text-[var(--text-secondary)] hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] transition-all duration-200">
                                             {{ c.activo ? 'Desactivar' : 'Activar' }}
                                         </button>
-                                        <button @click="abrirModalEditar(c)" 
+                                        <button @click="abrirModalEditar(c)"
                                                 class="px-3 py-1.5 text-xs font-medium uppercase tracking-wider border border-[var(--border-color)] rounded-sm text-[var(--text-color)] hover:bg-[var(--text-color)] hover:border-[var(--text-color)] hover:text-[var(--bg-color)] transition-all duration-200">
                                             Editar
                                         </button>
@@ -178,41 +174,43 @@ function toggleActivo(id) {
         </div>
 
         <!-- Modal de Editar Cronograma -->
-        <div v-if="mostrarModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div class="bg-[var(--card-bg)] w-full max-w-md rounded-sm border border-[var(--border-color)] shadow-2xl">
-                <div class="px-6 py-4 border-b border-[var(--border-color)] flex justify-between items-center">
-                    <h3 class="text-lg font-medium text-[var(--text-color)]">Editar Cronograma</h3>
-                    <button @click="cerrarModal" class="text-[var(--text-muted)] hover:text-[var(--text-color)] transition-colors">&times;</button>
+        <Teleport to="body">
+            <div v-if="mostrarModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                <div class="bg-[var(--card-bg)] w-full max-w-md rounded-sm border border-[var(--border-color)] shadow-2xl">
+                    <div class="px-6 py-4 border-b border-[var(--border-color)] flex justify-between items-center">
+                        <h3 class="text-lg font-medium text-[var(--text-color)]">Editar Cronograma</h3>
+                        <button @click="cerrarModal" class="text-[var(--text-muted)] hover:text-[var(--text-color)] transition-colors">&times;</button>
+                    </div>
+
+                    <form @submit.prevent="guardar" class="p-6 space-y-4">
+                        <div>
+                            <label class="block text-sm font-light text-[var(--text-muted)] mb-1">Nombre</label>
+                            <input v-model="form.nombre" type="text" class="w-full bg-transparent border border-[var(--border-color)] rounded-sm px-3 py-2 text-[var(--text-color)] focus:outline-none focus:border-[var(--primary-color)] font-light" required>
+                            <div v-if="form.errors.nombre" class="text-rose-500 text-xs mt-1">{{ form.errors.nombre }}</div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-light text-[var(--text-muted)] mb-1">Fecha Inicio</label>
+                                <input v-model="form.fecha_inicio" type="date" class="w-full bg-[var(--bg-color)] border border-[var(--border-color)] rounded-sm px-3 py-2 text-[var(--text-color)] focus:outline-none focus:border-[var(--primary-color)] font-light" required>
+                                <div v-if="form.errors.fecha_inicio" class="text-rose-500 text-xs mt-1">{{ form.errors.fecha_inicio }}</div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-light text-[var(--text-muted)] mb-1">Fecha Fin</label>
+                                <input v-model="form.fecha_fin" type="date" class="w-full bg-[var(--bg-color)] border border-[var(--border-color)] rounded-sm px-3 py-2 text-[var(--text-color)] focus:outline-none focus:border-[var(--primary-color)] font-light" required>
+                                <div v-if="form.errors.fecha_fin" class="text-rose-500 text-xs mt-1">{{ form.errors.fecha_fin }}</div>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 flex justify-end gap-3">
+                            <button type="button" @click="cerrarModal" class="px-4 py-2 text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text-color)] transition-colors">Cancelar</button>
+                            <button type="submit" :disabled="form.processing" class="bg-[var(--primary-color)] text-[var(--primary-text)] px-5 py-2 rounded-sm text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
+                                Guardar Cronograma
+                            </button>
+                        </div>
+                    </form>
                 </div>
-                
-                <form @submit.prevent="guardar" class="p-6 space-y-4">
-                    <div>
-                        <label class="block text-sm font-light text-[var(--text-muted)] mb-1">Nombre</label>
-                        <input v-model="form.nombre" type="text" class="w-full bg-transparent border border-[var(--border-color)] rounded-sm px-3 py-2 text-[var(--text-color)] focus:outline-none focus:border-[var(--primary-color)] font-light" required>
-                        <div v-if="form.errors.nombre" class="text-rose-500 text-xs mt-1">{{ form.errors.nombre }}</div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-light text-[var(--text-muted)] mb-1">Fecha Inicio</label>
-                            <input v-model="form.fecha_inicio" type="date" class="w-full bg-[var(--bg-color)] border border-[var(--border-color)] rounded-sm px-3 py-2 text-[var(--text-color)] focus:outline-none focus:border-[var(--primary-color)] font-light" required>
-                            <div v-if="form.errors.fecha_inicio" class="text-rose-500 text-xs mt-1">{{ form.errors.fecha_inicio }}</div>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-light text-[var(--text-muted)] mb-1">Fecha Fin</label>
-                            <input v-model="form.fecha_fin" type="date" class="w-full bg-[var(--bg-color)] border border-[var(--border-color)] rounded-sm px-3 py-2 text-[var(--text-color)] focus:outline-none focus:border-[var(--primary-color)] font-light" required>
-                            <div v-if="form.errors.fecha_fin" class="text-rose-500 text-xs mt-1">{{ form.errors.fecha_fin }}</div>
-                        </div>
-                    </div>
-
-                    <div class="pt-4 flex justify-end gap-3">
-                        <button type="button" @click="cerrarModal" class="px-4 py-2 text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text-color)] transition-colors">Cancelar</button>
-                        <button type="submit" :disabled="form.processing" class="bg-[var(--primary-color)] text-[var(--primary-text)] px-5 py-2 rounded-sm text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
-                            Guardar Cronograma
-                        </button>
-                    </div>
-                </form>
             </div>
-        </div>
-    </SecretariaLayout>
+        </Teleport>
+    </AdminLayout>
 </template>

@@ -100,23 +100,51 @@ class MateriaController extends Controller
     {
         $carrera = Carrera::findOrFail($id);
 
-        // Todos los niveles de la carrera (incluso vacíos)
+        $materiasDisponibles = Materia::where('activo', true)
+            ->orderBy('nombre')
+            ->get(['id_materia', 'codigo', 'nombre', 'id_materia_requisito']);
+
+        $selectMalla = [
+            'm.id_materia', 'm.codigo', 'm.nombre',
+            'm.duracion_meses', 'm.costo_mensual', 'm.creditos',
+            'm.id_materia_requisito',
+            DB::raw('req.nombre as nombre_requisito'),
+            DB::raw('req.codigo as codigo_requisito'),
+            'mc.id_malla', 'mc.id_nivel', 'mc.orden_en_nivel', 'mc.obligatoria',
+        ];
+
+        // ── Curso libre: lista plana sin niveles ─────────────────────────────
+        if ($carrera->tipo === 'curso_libre') {
+            $materiasLibres = DB::table('malla_curricular as mc')
+                ->join('materias as m', 'mc.id_materia', '=', 'm.id_materia')
+                ->leftJoin('materias as req', 'm.id_materia_requisito', '=', 'req.id_materia')
+                ->where('mc.id_carrera', $id)
+                ->whereNull('mc.id_nivel')
+                ->orderByRaw('mc.orden_en_nivel NULLS LAST, mc.id_malla')
+                ->select($selectMalla)
+                ->get();
+
+            return Inertia::render('Director/CU5Materias/PorCarrera', [
+                'carrera'             => $carrera,
+                'porNivel'            => [],
+                'materiasLibres'      => $materiasLibres,
+                'materiasDisponibles' => $materiasDisponibles,
+            ]);
+        }
+
+        // ── Carrera con niveles ───────────────────────────────────────────────
         $niveles = DB::table('niveles_carrera')
             ->where('id_carrera', $id)
             ->orderBy('numero_nivel')
             ->get();
 
-        // Materias asignadas a la malla de esta carrera
         $mallaPorNivel = DB::table('malla_curricular as mc')
             ->join('materias as m', 'mc.id_materia', '=', 'm.id_materia')
+            ->leftJoin('materias as req', 'm.id_materia_requisito', '=', 'req.id_materia')
             ->where('mc.id_carrera', $id)
-            ->orderByRaw('mc.orden_en_nivel NULLS LAST')
-            ->select(
-                'm.id_materia', 'm.codigo', 'm.nombre',
-                'm.duracion_meses', 'm.costo_mensual', 'm.creditos',
-                'm.id_materia_requisito',
-                'mc.id_malla', 'mc.id_nivel', 'mc.orden_en_nivel', 'mc.obligatoria'
-            )
+            ->whereNotNull('mc.id_nivel')
+            ->orderByRaw('mc.orden_en_nivel NULLS LAST, mc.id_malla')
+            ->select($selectMalla)
             ->get()
             ->groupBy('id_nivel');
 
@@ -130,13 +158,10 @@ class MateriaController extends Controller
             ];
         })->values();
 
-        $materiasDisponibles = Materia::where('activo', true)
-            ->orderBy('nombre')
-            ->get(['id_materia', 'codigo', 'nombre', 'id_materia_requisito']);
-
         return Inertia::render('Director/CU5Materias/PorCarrera', [
             'carrera'             => $carrera,
             'porNivel'            => $porNivel,
+            'materiasLibres'      => [],
             'materiasDisponibles' => $materiasDisponibles,
         ]);
     }

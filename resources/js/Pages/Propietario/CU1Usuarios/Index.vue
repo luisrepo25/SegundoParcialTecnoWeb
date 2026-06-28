@@ -1,13 +1,9 @@
 <script setup>
-import PropietarioLayout from '@/Layouts/PropietarioLayout.vue';
-import SecretariaLayout from '@/Layouts/SecretariaLayout.vue';
-import { Head, router, useForm, usePage } from '@inertiajs/vue3';
+import AdminLayout from '@/Layouts/AdminLayout.vue';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
 
 const page = usePage();
-const CurrentLayout = computed(() => {
-    return page.props.auth.user.role === 'secretaria' ? SecretariaLayout : PropietarioLayout;
-});
 
 const props = defineProps({
     usuarios: Object,
@@ -132,7 +128,7 @@ function toggleActivo(u) {
 <template>
     <Head title="Gestión de Usuarios" />
 
-    <component :is="CurrentLayout">
+    <AdminLayout>
         <template #header>
             <h2 class="text-xl font-semibold leading-tight" style="color: var(--text-color);">
                 Gestión de Usuarios
@@ -141,6 +137,15 @@ function toggleActivo(u) {
 
         <div class="py-8">
             <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+
+                <!-- Volver -->
+                <div class="mb-5">
+                    <Link :href="route('dashboard.propietario')"
+                        class="inline-flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-70"
+                        style="color: var(--text-secondary);">
+                        ← Volver al Dashboard
+                    </Link>
+                </div>
 
                 <!-- Flash -->
                 <div v-if="$page.props.flash?.success" class="mb-4 rounded-lg p-4 text-sm font-medium"
@@ -438,7 +443,7 @@ function toggleActivo(u) {
                 </div>
             </div>
         </Teleport>
-    </component>
+    </AdminLayout>
 </template>
 
 <style scoped>

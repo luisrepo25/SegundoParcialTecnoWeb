@@ -1,5 +1,5 @@
 <script setup>
-import DirectorLayout from '@/Layouts/DirectorLayout.vue';
+import AdminLayout from '@/Layouts/AdminLayout.vue';
 import ComboSelect from '@/Components/ComboSelect.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
@@ -87,7 +87,7 @@ function formatCosto(val) {
 <template>
     <Head title="Gestión de Materias" />
 
-    <DirectorLayout>
+    <AdminLayout>
         <template #header>
             <h2 class="text-xl font-semibold leading-tight" style="color: var(--text-color);">
                 Gestión de Materias
@@ -136,7 +136,7 @@ function formatCosto(val) {
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--text-secondary);">Código</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--text-secondary);">Materia</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell" style="color: var(--text-secondary);">Duración</th>
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell" style="color: var(--text-secondary);">Costo/mes</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell" style="color: var(--text-secondary);">Precio sugerido</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden lg:table-cell" style="color: var(--text-secondary);">Requisito</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--text-secondary);">Estado</th>
                                 <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style="color: var(--text-secondary);">Acciones</th>
@@ -244,8 +244,9 @@ function formatCosto(val) {
                                 <p v-if="form.errors.duracion_meses" class="field-error">{{ form.errors.duracion_meses }}</p>
                             </div>
                             <div>
-                                <label class="field-label">Costo mensual (Bs) *</label>
+                                <label class="field-label">Precio sugerido (Bs) *</label>
                                 <input v-model="form.costo_mensual" type="number" min="0" step="0.01" class="field-input" placeholder="Ej: 500.00" />
+                                <p class="text-xs mt-1" style="color: var(--text-secondary);">Solo para materia suelta. En carrera, el sistema calcula el costo automáticamente.</p>
                                 <p v-if="form.errors.costo_mensual" class="field-error">{{ form.errors.costo_mensual }}</p>
                             </div>
                         </div>
@@ -273,7 +274,7 @@ function formatCosto(val) {
                 </div>
             </div>
         </Teleport>
-    </DirectorLayout>
+    </AdminLayout>
 </template>
 
 <style scoped>

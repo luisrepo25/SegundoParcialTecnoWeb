@@ -1,5 +1,5 @@
 <script setup>
-import SecretariaLayout from '@/Layouts/SecretariaLayout.vue';
+import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
 
 const modulos = [
@@ -30,7 +30,7 @@ const resumen = [
 <template>
     <Head title="Panel Secretaría" />
 
-    <SecretariaLayout>
+    <AdminLayout>
         <template #header>
             <h2 class="text-xl font-semibold tracking-tight" style="color: var(--text-color);">
                 Panel de Operaciones
@@ -118,5 +118,5 @@ const resumen = [
 
             </div>
         </div>
-    </SecretariaLayout>
+    </AdminLayout>
 </template>
