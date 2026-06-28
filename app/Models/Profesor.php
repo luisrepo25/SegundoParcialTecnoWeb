@@ -12,7 +12,7 @@ class Profesor extends Model
 
     protected $fillable = [
         'id_usuario', 'legajo_profesor', 'especialidad',
-        'titulo_maximo', 'fecha_contratacion', 'sueldo_base', 'observaciones',
+        'titulo_maximo', 'fecha_contratacion', 'sueldo_base', 'observaciones', 'archivo_cv',
     ];
 
     public function usuario()

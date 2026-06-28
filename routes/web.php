@@ -31,11 +31,11 @@ Route::get('/dashboard', function () {
     $user = auth()->user();
 
     return match ($user?->role) {
-        'propietario' => redirect()->route('dashboard.propietario'),
-        'director'    => redirect()->route('dashboard.director'),
-        'secretaria'  => redirect()->route('secretaria.dashboard'),
-        'profesor'    => redirect()->route('dashboard.profesor'),
-        default       => redirect()->route('dashboard.estudiante'),
+        'propietario' => Inertia::render('Dashboard/Propietario'),
+        'director'    => Inertia::render('Dashboard/Director'),
+        'secretaria'  => Inertia::render('Dashboard/Secretaria'),
+        'profesor'    => Inertia::render('Dashboard/Docente'),
+        default       => Inertia::render('Dashboard/Estudiante'),
     };
 })->middleware(['auth', 'verified'])->name('dashboard');
 
@@ -153,6 +153,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/cronogramas/{id}/toggle-activo', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'toggleActivo'])->name('cronogramas.toggle-activo');
 
         Route::get('/inscripciones', [\App\Http\Controllers\Secretaria\CU2Inscripciones\InscripcionController::class, 'index'])->name('inscripciones.index');
+        Route::post('/inscripciones/manual', [\App\Http\Controllers\Secretaria\CU2Inscripciones\InscripcionController::class, 'storeManual'])->name('inscripciones.manual');
 
         // CU7 — Gestión de Pagos (fase 1: lado admin)
         Route::get('/pagos',                                      [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'index'])             ->name('pagos.index');
@@ -162,10 +163,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/pagos/cuota/{idPago}/{numCuota}',           [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'pagarCuota'])        ->name('pagos.cuota');
     });
 
-    // ── Panel Docente ──────────────────────────────────────────────────────────
-    Route::get('/panel/docente', function () {
-        return Inertia::render('Dashboard/Docente');
-    })->middleware('role:profesor')->name('dashboard.profesor');
+    // ──────────────── Panel Docente ──────────────────────────────────────────────────────────────────────────
+    Route::middleware('role:profesor')->prefix('profesor')->name('dashboard.')->group(function () {
+        Route::get('/panel', [\App\Http\Controllers\Profesor\PanelController::class, 'index'])->name('profesor');
+        Route::get('/grupos/{id_oferta}', [\App\Http\Controllers\Profesor\PanelController::class, 'grupoDetalle'])->name('profesor.grupo');
+    });
 
     // ── Panel Estudiante ───────────────────────────────────────────────────────
     Route::middleware('role:estudiante')->prefix('estudiante')->name('estudiante.')->group(function () {
@@ -190,6 +192,18 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    
+    // Foto de perfil
+    Route::post('/profile/photo', [ProfileController::class, 'updatePhoto'])->name('profile.photo.update');
+    Route::delete('/profile/photo', [ProfileController::class, 'deletePhoto'])->name('profile.photo.delete');
+
+    // Currículum Vitae (solo para docentes, manejado en el controlador o vista)
+    Route::post('/profile/cv', [ProfileController::class, 'updateCv'])->name('profile.cv.update');
+    Route::delete('/profile/cv', [ProfileController::class, 'deleteCv'])->name('profile.cv.delete');
+    
+    // Forzar cambio de contraseña
+    Route::get('/cambiar-password-inicial', [\App\Http\Controllers\Auth\ForcePasswordChangeController::class, 'show'])->name('password.change.show');
+    Route::post('/cambiar-password-inicial', [\App\Http\Controllers\Auth\ForcePasswordChangeController::class, 'update'])->name('password.change.update');
 });
 
 require __DIR__.'/auth.php';

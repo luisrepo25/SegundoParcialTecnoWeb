@@ -15,10 +15,15 @@ const form = useForm({
     password_confirmation: '',
 });
 
+const emit = defineEmits(['password-updated']);
+
 const updatePassword = () => {
     form.put(route('password.update'), {
         preserveScroll: true,
-        onSuccess: () => form.reset(),
+        onSuccess: () => {
+            form.reset();
+            emit('password-updated');
+        },
         onError: () => {
             if (form.errors.password) {
                 form.reset('password', 'password_confirmation');

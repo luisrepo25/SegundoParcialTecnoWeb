@@ -14,6 +14,7 @@ const props = defineProps({
 
 const page  = usePage();
 const user  = computed(() => page.props.auth?.user);
+const assetUrl = computed(() => page.props.asset_url || '');
 const flash = computed(() => page.props.flash ?? {});
 const errs  = computed(() => page.props.errors ?? {});
 
@@ -121,7 +122,8 @@ function elegirPlan(tipo) {
                 <div class="rounded-xl p-5" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
                     <div class="flex flex-col sm:flex-row sm:items-center gap-4">
                         <!-- Avatar -->
-                        <div class="flex items-center justify-center w-12 h-12 rounded-full text-lg font-bold shrink-0"
+                        <img v-if="user?.foto_perfil" :src="($page.props.asset_url || '') + '/imagenes/' + user.foto_perfil" class="w-12 h-12 rounded-full object-cover shrink-0">
+                        <div v-else class="flex items-center justify-center w-12 h-12 rounded-full text-lg font-bold shrink-0"
                              style="background-color: var(--primary-color); color: var(--primary-text);">
                             {{ (user?.name ?? 'E')[0].toUpperCase() }}
                         </div>
@@ -390,7 +392,14 @@ function elegirPlan(tipo) {
                                         <div class="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5 text-xs" style="color: var(--text-secondary);">
                                             <span>{{ cap(g.dia_semana) }} {{ fmtHora(g.hora_inicio) }}–{{ fmtHora(g.hora_fin) }}</span>
                                             <span>{{ g.aula_nombre }}</span>
-                                            <span>{{ g.profesor_nombre }}</span>
+                                        <span class="flex items-center gap-1">
+                                            {{ g.profesor_nombre }}
+                                            <a v-if="g.profesor_cv" :href="assetUrl + '/cvs/' + g.profesor_cv" target="_blank" title="Ver CV del Docente" class="text-indigo-600 hover:text-indigo-800 transition-colors">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                                </svg>
+                                            </a>
+                                        </span>
                                         </div>
                                     </div>
                                     <div class="text-center shrink-0">
@@ -443,7 +452,14 @@ function elegirPlan(tipo) {
                                         <span>{{ ins.periodo_nombre }}</span>
                                         <span>{{ cap(ins.dia_semana) }} {{ fmtHora(ins.hora_inicio) }}–{{ fmtHora(ins.hora_fin) }}</span>
                                         <span>{{ ins.aula_nombre }}</span>
-                                        <span>{{ ins.profesor_nombre }}</span>
+                                        <span class="flex items-center gap-1">
+                                            {{ ins.profesor_nombre }}
+                                            <a v-if="ins.profesor_cv" :href="assetUrl + '/cvs/' + ins.profesor_cv" target="_blank" title="Ver CV del Docente" class="text-indigo-600 hover:text-indigo-800 transition-colors">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                                </svg>
+                                            </a>
+                                        </span>
                                     </div>
                                 </div>
                                 <div v-if="ins.calificacion_final !== null" class="text-center shrink-0">

@@ -98,7 +98,8 @@ class PanelController extends Controller
                 'pd.nombre as periodo_nombre', 'pd.fecha_inicio as periodo_inicio', 'pd.fecha_fin as periodo_fin',
                 'h.dia_semana', 'h.hora_inicio', 'h.hora_fin',
                 'a.nombre as aula_nombre',
-                DB::raw("u.nombre || ' ' || u.apellido as profesor_nombre")
+                DB::raw("u.nombre || ' ' || u.apellido as profesor_nombre"),
+                DB::raw("p.archivo_cv /* v2 */ as profesor_cv")
             )
             ->orderBy('pd.fecha_inicio', 'desc')
             ->get()
@@ -143,7 +144,8 @@ class PanelController extends Controller
                         'pd.fecha_inicio as periodo_inicio', 'pd.fecha_fin as periodo_fin',
                         'h.dia_semana', 'h.hora_inicio', 'h.hora_fin',
                         'a.nombre as aula_nombre',
-                        DB::raw("u.nombre || ' ' || u.apellido as profesor_nombre")
+                        DB::raw("u.nombre || ' ' || u.apellido as profesor_nombre"),
+                        DB::raw("p.archivo_cv /* v2 */ as profesor_cv")
                     )
                     ->orderBy('pd.fecha_inicio', 'desc')
                     ->orderBy('m.nombre')

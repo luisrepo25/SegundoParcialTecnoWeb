@@ -68,10 +68,11 @@ const roleInfo = computed(() => roleLabels[userRole.value] ?? { label: 'Panel', 
                                     <button type="button"
                                         class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200"
                                         style="background-color: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color);">
-                                        <div class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold"
-                                            style="background-color: var(--primary-color); color: var(--primary-text);">
-                                            {{ ($page.props.auth.user.name ?? 'U')[0].toUpperCase() }}
-                                        </div>
+                                          <img v-if="$page.props.auth.user.foto_perfil" :src="($page.props.asset_url || '') + '/imagenes/' + $page.props.auth.user.foto_perfil" alt="User" class="w-6 h-6 rounded-full object-cover border border-[var(--border-color)]">
+                                          <div v-else class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold"
+                                              style="background-color: var(--primary-color); color: var(--primary-text);">
+                                              {{ ($page.props.auth.user.name ?? 'U')[0].toUpperCase() }}
+                                          </div>
                                         <span class="hidden lg:block max-w-[120px] truncate">{{ $page.props.auth.user.name }}</span>
                                         <svg class="h-3.5 w-3.5 opacity-60" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                             <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />

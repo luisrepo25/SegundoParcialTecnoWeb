@@ -34,6 +34,12 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'asset_url' => rtrim(asset(''), '/'),
+            'flash' => [
+                'credenciales' => $request->session()->get('credenciales'),
+                'success' => $request->session()->get('success'),
+                'error' => $request->session()->get('error'),
+            ],
         ];
     }
 }

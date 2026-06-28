@@ -16,7 +16,7 @@ class Usuario extends Authenticatable implements JWTSubject
     protected $primaryKey = 'id_usuario';
     public $timestamps = false;
 
-    protected $appends = ['role', 'name'];
+    protected $appends = ['role', 'name', 'archivo_cv'];
 
     /**
      * The attributes that are mass assignable.
@@ -91,6 +91,11 @@ class Usuario extends Authenticatable implements JWTSubject
         $parts = explode(' ', trim($value), 2);
         $this->attributes['nombre'] = $parts[0];
         $this->attributes['apellido'] = $parts[1] ?? '';
+    }
+
+    public function getArchivoCvAttribute()
+    {
+        return $this->id_rol == 4 && $this->profesor ? $this->profesor->archivo_cv : null;
     }
 
     public function getPasswordAttribute()

@@ -7,25 +7,11 @@ import ThemeBar from '@/Components/ThemeBar.vue';
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 
-const dashboardRoute = computed(() => {
-    const role = user.value?.role;
-    if (role === 'director')    return 'dashboard.director';
-    if (role === 'propietario') return 'dashboard.propietario';
-    return 'secretaria.dashboard';
-});
-
-const dashboardUrl = computed(() => {
-    const role = user.value?.role;
-    if (role === 'director')    return '/panel/director';
-    if (role === 'propietario') return '/panel/propietario';
-    return '/secretaria/panel';
-});
+const dashboardRoute = computed(() => 'dashboard.profesor');
+const dashboardUrl = computed(() => '/profesor/panel');
 
 const modulos = [
-    { name: 'Gestión de Usuarios', route: 'propietario.usuarios.index',   activeUrls: ['/propietario/usuarios'] },
-    { name: 'Cronogramas',         route: 'secretaria.cronogramas.index', activeUrls: ['/secretaria/cronogramas'] },
-    { name: 'Inscripciones',       route: 'secretaria.inscripciones.index', activeUrls: ['/secretaria/inscripciones'] },
-    { name: 'Caja y Pagos',        route: 'secretaria.pagos.index',       activeUrls: ['/secretaria/pagos'] },
+    { name: 'Mis Materias', route: 'dashboard.profesor', activeUrls: ['/profesor/panel'] },
 ];
 
 const isRouteActive = (urls) => urls.some(url => page.url.startsWith(url));
@@ -76,25 +62,13 @@ const showUserMenu = ref(false);
             <!-- Badge rol -->
             <div class="px-4 py-3 border-b" style="border-color: var(--border-color);">
                 <span class="text-[10px] font-semibold px-2.5 py-1 rounded-sm uppercase tracking-widest" style="background-color: var(--primary-color); color: var(--primary-text);">
-                    Secretaria
+                    Docente
                 </span>
             </div>
 
-            <!-- Navegación de Módulos (Solo texto, mucho padding) -->
+            <!-- Navegación de Módulos -->
             <nav class="flex-1 overflow-y-auto pt-6 px-4 space-y-1">
-                <p class="px-2 mb-3 text-[11px] font-semibold uppercase tracking-widest opacity-50" style="color: var(--text-secondary);">Principal</p>
-
-                <!-- Dashboard dinámico según rol -->
-                <Link
-                    :href="route(dashboardRoute)"
-                    @click="showMobileMenu = false"
-                    class="block px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150"
-                    :style="page.url.startsWith(dashboardUrl)
-                        ? 'background-color: color-mix(in srgb, var(--text-color) 8%, transparent); color: var(--text-color);'
-                        : 'color: var(--text-secondary);'"
-                >
-                    ← Volver al Dashboard
-                </Link>
+                <p class="px-2 mb-3 text-[11px] font-semibold uppercase tracking-widest opacity-50" style="color: var(--text-secondary);">Módulos</p>
 
                 <Link
                     v-for="mod in modulos"
@@ -219,3 +193,4 @@ const showUserMenu = ref(false);
     border-radius: 4px;
 }
 </style>
+

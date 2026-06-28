@@ -145,7 +145,8 @@ const showUserMenu   = ref(false);
                     onmouseover="this.style.backgroundColor='color-mix(in srgb, var(--text-color) 5%, transparent)'"
                     onmouseout="this.style.backgroundColor='transparent'">
                     <div class="flex items-center gap-3 flex-1 overflow-hidden">
-                        <div class="flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold shrink-0"
+                        <img v-if="user?.foto_perfil" :src="($page.props.asset_url || '') + '/imagenes/' + user.foto_perfil" alt="User" class="w-8 h-8 rounded-full object-cover">
+                        <div v-else class="flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold shrink-0"
                              style="background-color: var(--primary-color); color: var(--primary-text);">
                             {{ (user?.name ?? 'P')[0].toUpperCase() }}
                         </div>

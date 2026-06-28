@@ -195,8 +195,16 @@ function toggleActivo(u) {
                                 class="border-t transition-colors hover:opacity-90"
                                 style="border-color: var(--border-color);">
                                 <td class="px-4 py-3">
-                                    <div class="font-medium text-sm" style="color: var(--text-color);">{{ u.nombre }} {{ u.apellido }}</div>
-                                    <div class="text-xs" style="color: var(--text-secondary);">ID: {{ u.id_usuario }}</div>
+                                    <div class="flex items-center gap-3">
+                                        <img v-if="u.foto_perfil" :src="($page.props.asset_url || '') + '/imagenes/' + u.foto_perfil" class="w-8 h-8 rounded-full object-cover">
+                                        <div v-else class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style="background-color: var(--primary-color); color: var(--primary-text);">
+                                            {{ u.nombre.charAt(0).toUpperCase() }}
+                                        </div>
+                                        <div>
+                                            <div class="font-medium text-sm" style="color: var(--text-color);">{{ u.nombre }} {{ u.apellido }}</div>
+                                            <div class="text-xs" style="color: var(--text-secondary);">ID: {{ u.id_usuario }}</div>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3 text-sm" style="color: var(--text-secondary);">{{ u.email }}</td>
                                 <td class="px-4 py-3 text-sm hidden md:table-cell" style="color: var(--text-secondary);">{{ u.dni }}</td>
