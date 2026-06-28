@@ -168,8 +168,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->middleware('role:profesor')->name('dashboard.profesor');
 
     // ── Panel Estudiante ───────────────────────────────────────────────────────
+    Route::middleware('role:estudiante')->prefix('estudiante')->name('estudiante.')->group(function () {
+        Route::get('/panel',                          [\App\Http\Controllers\Estudiante\PanelController::class, 'index'])             ->name('panel');
+        // Plan de pago de carrera
+        Route::post('/plan/{tipo}',                   [\App\Http\Controllers\Estudiante\PanelController::class, 'elegirPlan'])        ->name('plan')->where('tipo', 'contado|credito|materia');
+        Route::get('/pago-carrera/{transId}',         [\App\Http\Controllers\Estudiante\PanelController::class, 'pagoCarrera'])       ->name('pago.carrera');
+        Route::get('/pago-carrera/{transId}/estado',  [\App\Http\Controllers\Estudiante\PanelController::class, 'estadoPlan'])        ->name('pago.carrera.estado');
+        // Inscripción de materias
+        Route::post('/inscribir/{idOferta}',          [\App\Http\Controllers\Estudiante\PanelController::class, 'inscribir'])         ->name('inscribir');
+        Route::get('/pago/{transId}',                 [\App\Http\Controllers\Estudiante\PanelController::class, 'pagoInscripcion'])   ->name('pago');
+        Route::get('/pago/{transId}/estado',          [\App\Http\Controllers\Estudiante\PanelController::class, 'estadoInscripcion'])->name('pago.estado');
+    });
+
     Route::get('/panel/estudiante', function () {
-        return Inertia::render('Dashboard/Estudiante');
+        return redirect()->route('estudiante.panel');
     })->middleware('role:estudiante')->name('dashboard.estudiante');
 
 });
