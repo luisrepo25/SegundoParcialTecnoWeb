@@ -21,6 +21,7 @@ class ProfileController extends Controller
         return match ($request->user()->id_rol) {
             5       => redirect()->route('estudiante.perfil'),
             3       => redirect()->route('secretaria.perfil'),
+            2       => redirect()->route('director.perfil'),
             default => Inertia::render('Profile/Edit', [
                 'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
                 'status'          => session('status'),
