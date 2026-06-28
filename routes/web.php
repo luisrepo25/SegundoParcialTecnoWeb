@@ -4,6 +4,7 @@ use App\Http\Controllers\Propietario\CU1Usuarios\UsuarioController;
 use App\Http\Controllers\Propietario\CU2Aulas\AulaController;
 use App\Http\Controllers\Propietario\CU11Horarios\HorarioController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Estudiante\PerfilController;
 use App\Models\Aula;
 use App\Models\Usuario;
 use Illuminate\Support\Facades\Route;
@@ -26,6 +27,7 @@ Route::prefix('oferta')->name('oferta.')->group(function () {
 
 // Callback PagoFácil (sin CSRF — excluido en bootstrap/app.php)
 Route::post('/pagofacil/callback', [\App\Http\Controllers\Public\CallbackController::class, 'handle'])->name('pagofacil.callback');
+
 
 Route::get('/dashboard', function () {
     $user = auth()->user();
@@ -180,6 +182,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/inscribir/{idOferta}',          [\App\Http\Controllers\Estudiante\PanelController::class, 'inscribir'])         ->name('inscribir');
         Route::get('/pago/{transId}',                 [\App\Http\Controllers\Estudiante\PanelController::class, 'pagoInscripcion'])   ->name('pago');
         Route::get('/pago/{transId}/estado',          [\App\Http\Controllers\Estudiante\PanelController::class, 'estadoInscripcion'])->name('pago.estado');
+        // Perfil
+        Route::get('/perfil',             [PerfilController::class, 'index'])           ->name('perfil');
+        Route::put('/perfil',             [PerfilController::class, 'update'])          ->name('perfil.update');
+        Route::put('/perfil/password',    [PerfilController::class, 'cambiarPassword']) ->name('perfil.password');
     });
 
     Route::get('/panel/estudiante', function () {

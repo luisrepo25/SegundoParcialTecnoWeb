@@ -1,0 +1,245 @@
+<script setup>
+import { ref, computed } from 'vue';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+
+const props = defineProps({
+    perfil: { type: Object, required: true },
+});
+
+const page    = usePage();
+const flash   = computed(() => page.props.flash ?? {});
+const errors  = computed(() => page.props.errors ?? {});
+const seccion = ref('datos'); // 'datos' | 'password'
+
+// ── Formulario datos personales ──────────────────────────────────────────────
+const formDatos = useForm({
+    nombre:         props.perfil.nombre   ?? '',
+    apellido:       props.perfil.apellido ?? '',
+    telefono:       props.perfil.telefono ?? '',
+    tutor_nombre:   props.perfil.tutor_nombre   ?? '',
+    tutor_telefono: props.perfil.tutor_telefono ?? '',
+    observaciones:  props.perfil.observaciones  ?? '',
+});
+
+function guardarDatos() {
+    formDatos.put(route('estudiante.perfil.update'), { preserveScroll: true });
+}
+
+// ── Formulario cambio de contraseña ─────────────────────────────────────────
+const formPwd = useForm({
+    password_actual:              '',
+    password_nuevo:               '',
+    password_nuevo_confirmation:  '',
+});
+
+function cambiarPassword() {
+    formPwd.put(route('estudiante.perfil.password'), {
+        preserveScroll: true,
+        onSuccess: () => formPwd.reset(),
+    });
+}
+
+const tipoLabel = (tipo) => ({ tecnico_superior: 'Técnico Superior', tecnico_medio: 'Técnico Medio' }[tipo] ?? tipo);
+</script>
+
+<template>
+    <Head title="Mi Perfil" />
+    <AuthenticatedLayout>
+        <template #header>
+            <span class="font-semibold text-lg" style="color: var(--text-color);">Mi Perfil</span>
+        </template>
+
+        <div class="py-8 px-4 sm:px-6 lg:px-8 mx-auto max-w-3xl space-y-5">
+
+            <!-- Flash messages -->
+            <div v-if="flash.success || flash.success_password"
+                 class="rounded-lg px-4 py-3 text-sm font-medium"
+                 style="background-color: #dcfce7; color: #15803d; border: 1px solid #86efac;">
+                {{ flash.success || flash.success_password }}
+            </div>
+
+            <!-- ── Encabezado con avatar ── -->
+            <div class="rounded-xl p-5 flex items-center gap-4"
+                 style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                <div class="flex items-center justify-center w-16 h-16 rounded-full text-2xl font-bold shrink-0"
+                     style="background-color: var(--primary-color); color: var(--primary-text);">
+                    {{ (perfil.nombre ?? 'E')[0].toUpperCase() }}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h1 class="text-xl font-bold truncate" style="color: var(--text-color);">
+                        {{ perfil.nombre }} {{ perfil.apellido }}
+                    </h1>
+                    <p class="text-sm" style="color: var(--text-secondary);">{{ perfil.email }}</p>
+                    <div class="flex flex-wrap gap-2 mt-1.5">
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                              style="background-color: color-mix(in srgb, var(--primary-color) 15%, transparent); color: var(--primary-color);">
+                            {{ perfil.legajo }}
+                        </span>
+                        <span v-if="perfil.carrera_nombre"
+                              class="px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                              style="background-color: color-mix(in srgb, #3b82f6 15%, transparent); color: #3b82f6;">
+                            {{ perfil.carrera_nombre }}
+                        </span>
+                        <span v-if="perfil.carrera_tipo"
+                              class="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                              style="background-color: color-mix(in srgb, var(--text-color) 8%, transparent); color: var(--text-secondary);">
+                            {{ tipoLabel(perfil.carrera_tipo) }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Datos académicos (solo lectura) ── -->
+            <div class="rounded-xl p-5" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                <p class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--text-secondary);">Datos académicos</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div>
+                        <p style="color: var(--text-secondary);">Legajo</p>
+                        <p class="font-medium" style="color: var(--text-color);">{{ perfil.legajo ?? '—' }}</p>
+                    </div>
+                    <div>
+                        <p style="color: var(--text-secondary);">DNI / CI</p>
+                        <p class="font-medium" style="color: var(--text-color);">{{ perfil.dni ?? '—' }}</p>
+                    </div>
+                    <div>
+                        <p style="color: var(--text-secondary);">Fecha de inscripción</p>
+                        <p class="font-medium" style="color: var(--text-color);">{{ perfil.fecha_inscripcion_inicial ?? '—' }}</p>
+                    </div>
+                    <div>
+                        <p style="color: var(--text-secondary);">Correo</p>
+                        <p class="font-medium truncate" style="color: var(--text-color);">{{ perfil.email ?? '—' }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Pestañas ── -->
+            <div class="flex gap-1 rounded-lg p-1" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                <button @click="seccion = 'datos'"
+                    class="flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all"
+                    :style="seccion === 'datos'
+                        ? 'background-color: var(--primary-color); color: var(--primary-text);'
+                        : 'color: var(--text-secondary);'">
+                    Datos personales
+                </button>
+                <button @click="seccion = 'password'"
+                    class="flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all"
+                    :style="seccion === 'password'
+                        ? 'background-color: var(--primary-color); color: var(--primary-text);'
+                        : 'color: var(--text-secondary);'">
+                    Cambiar contraseña
+                </button>
+            </div>
+
+            <!-- ══ Sección: Datos personales ══ -->
+            <form v-if="seccion === 'datos'" @submit.prevent="guardarDatos"
+                  class="rounded-xl p-5 space-y-4"
+                  style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+
+                <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Información personal</p>
+
+                <!-- Nombre + Apellido -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Nombre</label>
+                        <input v-model="formDatos.nombre" type="text" required
+                               class="w-full rounded-lg px-3 py-2 text-sm"
+                               style="background-color: color-mix(in srgb, var(--text-color) 5%, transparent); border: 1px solid var(--border-color); color: var(--text-color);" />
+                        <p v-if="errors.nombre" class="text-xs mt-1" style="color: #ef4444;">{{ errors.nombre }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Apellido</label>
+                        <input v-model="formDatos.apellido" type="text" required
+                               class="w-full rounded-lg px-3 py-2 text-sm"
+                               style="background-color: color-mix(in srgb, var(--text-color) 5%, transparent); border: 1px solid var(--border-color); color: var(--text-color);" />
+                        <p v-if="errors.apellido" class="text-xs mt-1" style="color: #ef4444;">{{ errors.apellido }}</p>
+                    </div>
+                </div>
+
+                <!-- Teléfono -->
+                <div>
+                    <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Teléfono</label>
+                    <input v-model="formDatos.telefono" type="text"
+                           class="w-full rounded-lg px-3 py-2 text-sm"
+                           style="background-color: color-mix(in srgb, var(--text-color) 5%, transparent); border: 1px solid var(--border-color); color: var(--text-color);" />
+                    <p v-if="errors.telefono" class="text-xs mt-1" style="color: #ef4444;">{{ errors.telefono }}</p>
+                </div>
+
+                <hr style="border-color: var(--border-color);" />
+                <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Datos del tutor / apoderado</p>
+
+                <!-- Tutor -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Nombre del tutor</label>
+                        <input v-model="formDatos.tutor_nombre" type="text"
+                               class="w-full rounded-lg px-3 py-2 text-sm"
+                               style="background-color: color-mix(in srgb, var(--text-color) 5%, transparent); border: 1px solid var(--border-color); color: var(--text-color);" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Teléfono del tutor</label>
+                        <input v-model="formDatos.tutor_telefono" type="text"
+                               class="w-full rounded-lg px-3 py-2 text-sm"
+                               style="background-color: color-mix(in srgb, var(--text-color) 5%, transparent); border: 1px solid var(--border-color); color: var(--text-color);" />
+                    </div>
+                </div>
+
+                <!-- Observaciones -->
+                <div>
+                    <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Observaciones</label>
+                    <textarea v-model="formDatos.observaciones" rows="3"
+                              class="w-full rounded-lg px-3 py-2 text-sm resize-none"
+                              style="background-color: color-mix(in srgb, var(--text-color) 5%, transparent); border: 1px solid var(--border-color); color: var(--text-color);"></textarea>
+                </div>
+
+                <div class="flex justify-end">
+                    <button type="submit" :disabled="formDatos.processing"
+                            class="px-6 py-2.5 rounded-lg font-semibold text-sm transition-all disabled:opacity-50"
+                            style="background-color: var(--primary-color); color: var(--primary-text);">
+                        {{ formDatos.processing ? 'Guardando...' : 'Guardar cambios' }}
+                    </button>
+                </div>
+            </form>
+
+            <!-- ══ Sección: Cambiar contraseña ══ -->
+            <form v-if="seccion === 'password'" @submit.prevent="cambiarPassword"
+                  class="rounded-xl p-5 space-y-4"
+                  style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+
+                <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Cambiar contraseña</p>
+
+                <div>
+                    <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Contraseña actual</label>
+                    <input v-model="formPwd.password_actual" type="password" required autocomplete="current-password"
+                           class="w-full rounded-lg px-3 py-2 text-sm"
+                           style="background-color: color-mix(in srgb, var(--text-color) 5%, transparent); border: 1px solid var(--border-color); color: var(--text-color);" />
+                    <p v-if="errors.password_actual" class="text-xs mt-1" style="color: #ef4444;">{{ errors.password_actual }}</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Nueva contraseña</label>
+                    <input v-model="formPwd.password_nuevo" type="password" required autocomplete="new-password"
+                           class="w-full rounded-lg px-3 py-2 text-sm"
+                           style="background-color: color-mix(in srgb, var(--text-color) 5%, transparent); border: 1px solid var(--border-color); color: var(--text-color);" />
+                    <p v-if="errors.password_nuevo" class="text-xs mt-1" style="color: #ef4444;">{{ errors.password_nuevo }}</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Confirmar nueva contraseña</label>
+                    <input v-model="formPwd.password_nuevo_confirmation" type="password" required autocomplete="new-password"
+                           class="w-full rounded-lg px-3 py-2 text-sm"
+                           style="background-color: color-mix(in srgb, var(--text-color) 5%, transparent); border: 1px solid var(--border-color); color: var(--text-color);" />
+                </div>
+
+                <div class="flex justify-end pt-1">
+                    <button type="submit" :disabled="formPwd.processing"
+                            class="px-6 py-2.5 rounded-lg font-semibold text-sm transition-all disabled:opacity-50"
+                            style="background-color: var(--primary-color); color: var(--primary-text);">
+                        {{ formPwd.processing ? 'Actualizando...' : 'Cambiar contraseña' }}
+                    </button>
+                </div>
+            </form>
+
+        </div>
+    </AuthenticatedLayout>
+</template>

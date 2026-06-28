@@ -105,47 +105,79 @@ class OfertaController extends Controller
             'nombre'   => 'required|string|max:100',
             'apellido' => 'required|string|max:100',
             'dni'      => 'required|string|max:20',
-            'email'    => 'required|email|max:150|unique:usuarios,email',
+            'email'    => 'required|email|max:150',
             'telefono' => 'nullable|string|max:20',
-        ], [
-            'email.unique' => 'Ya existe una cuenta registrada con ese correo.',
         ]);
 
         $carrera = Carrera::whereRaw('activo IS TRUE')->where('id_carrera', $idCarrera)->firstOrFail();
 
-        // 1. Crear usuario inactivo + estudiante (en transacción DB)
+        // 1. Crear o reutilizar usuario inactivo (permite reintentar si el QR anterior expiró)
         $tempPassword = Str::random(10);
-        $usuario    = null;
-        $estudiante = null;
+        $usuario      = null;
+        $estudiante   = null;
+        $esReintento  = false;
 
-        DB::beginTransaction();
-        try {
-            $usuario = Usuario::create([
-                'nombre'        => $request->nombre,
-                'apellido'      => $request->apellido,
-                'email'         => $request->email,
-                'password_hash' => Hash::make($tempPassword), // fillable es 'password_hash', no 'password'
-                'dni'           => $request->dni,
-                'telefono'      => $request->telefono,
-                'id_rol'        => 5,
-                'activo'        => false,
+        $usuarioExistente = DB::table('usuarios')->where('email', $request->email)->first();
+
+        if ($usuarioExistente) {
+            $estExistente = DB::table('estudiantes')->where('id_usuario', $usuarioExistente->id_usuario)->first();
+
+            // Bloquear si la cuenta ya está activa o no es un estudiante
+            if ($usuarioExistente->activo || !$estExistente) {
+                return back()->withErrors(['email' => 'Ya existe una cuenta activa con ese correo. Ingresa desde el Login.']);
+            }
+            // Bloquear si ya tiene matrícula pagada
+            if (DB::table('matricula_unica')->where('id_estudiante', $estExistente->id_estudiante)->exists()) {
+                return back()->withErrors(['email' => 'Ya tienes una matrícula registrada. Ingresa desde el Login.']);
+            }
+
+            // Cuenta inactiva sin matrícula → es un reintento (QR expiró antes)
+            // Actualizar contraseña temporal y expirar transacciones viejas
+            DB::table('usuarios')->where('id_usuario', $usuarioExistente->id_usuario)->update([
+                'password_hash' => Hash::make($tempPassword),
             ]);
+            DB::table('pagofacil_transacciones')
+                ->where('id_estudiante', $estExistente->id_estudiante)
+                ->where('concepto', 'matricula')
+                ->where('estado', 'pendiente')
+                ->update(['estado' => 'expirado']);
 
-            $legajo = 'LEG-' . now()->year . '-' . str_pad($usuario->id_usuario, 5, '0', STR_PAD_LEFT);
-            $estudiante = Estudiante::create([
-                'id_usuario'                => $usuario->id_usuario,
-                'legajo'                    => $legajo,
-                'fecha_inscripcion_inicial' => now()->toDateString(),
-                'id_carrera_actual'         => $idCarrera,
-            ]);
+            $usuario     = $usuarioExistente;
+            $estudiante  = $estExistente;
+            $esReintento = true;
+        } else {
+            // Nuevo registro
+            DB::beginTransaction();
+            try {
+                $usuarioCreado = Usuario::create([
+                    'nombre'        => $request->nombre,
+                    'apellido'      => $request->apellido,
+                    'email'         => $request->email,
+                    'password_hash' => Hash::make($tempPassword),
+                    'dni'           => $request->dni,
+                    'telefono'      => $request->telefono,
+                    'id_rol'        => 5,
+                    'activo'        => false,
+                ]);
 
-            DB::commit();
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            return back()->withErrors(['general' => 'Error al registrar datos: ' . $e->getMessage()]);
+                $legajo = 'LEG-' . now()->year . '-' . str_pad($usuarioCreado->id_usuario, 5, '0', STR_PAD_LEFT);
+                $estCreado = Estudiante::create([
+                    'id_usuario'                => $usuarioCreado->id_usuario,
+                    'legajo'                    => $legajo,
+                    'fecha_inscripcion_inicial' => now()->toDateString(),
+                    'id_carrera_actual'         => $idCarrera,
+                ]);
+
+                DB::commit();
+                $usuario    = $usuarioCreado;
+                $estudiante = $estCreado;
+            } catch (\Throwable $e) {
+                DB::rollBack();
+                return back()->withErrors(['general' => 'Error al registrar datos: ' . $e->getMessage()]);
+            }
         }
 
-        // 2. Generar QR con PagoFácil PRIMERO (transaction_id_api es NOT NULL en la tabla)
+        // 2. Generar QR con PagoFácil
         $paymentNumber = 'MAT-' . $estudiante->id_estudiante . '-' . now()->timestamp;
 
         try {
@@ -160,9 +192,11 @@ class OfertaController extends Controller
                 'concepto'      => 'Matrícula — ' . $carrera->nombre,
             ]);
         } catch (\Throwable $e) {
-            // PagoFácil falló — limpiar usuario y estudiante creados
-            $estudiante->delete();
-            $usuario->delete();
+            // Si es registro nuevo, limpiar lo creado; si es reintento, dejar cuenta intacta
+            if (!$esReintento) {
+                $estudiante->delete();
+                $usuario->delete();
+            }
             return back()->withErrors(['general' => 'No se pudo conectar con el sistema de pago: ' . $e->getMessage()]);
         }
 
@@ -182,8 +216,10 @@ class OfertaController extends Controller
             : null;
 
         if (!$apiTransId) {
-            $estudiante->delete();
-            $usuario->delete();
+            if (!$esReintento) {
+                $estudiante->delete();
+                $usuario->delete();
+            }
             return back()->withErrors(['general' => 'PagoFácil no devolvió ID de transacción. Respuesta: ' . json_encode($qrResult)]);
         }
 
