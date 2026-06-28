@@ -60,6 +60,13 @@ const showUserMenu = ref(false);
                 </button>
             </div>
 
+            <!-- Badge rol -->
+            <div class="px-4 py-3 border-b" style="border-color: var(--border-color);">
+                <span class="text-[10px] font-semibold px-2.5 py-1 rounded-sm uppercase tracking-widest" style="background-color: var(--primary-color); color: var(--primary-text);">
+                    Secretaria
+                </span>
+            </div>
+
             <!-- Navegación de Módulos (Solo texto, mucho padding) -->
             <nav class="flex-1 overflow-y-auto pt-6 px-4 space-y-1">
                 <p class="px-2 mb-3 text-[11px] font-semibold uppercase tracking-widest opacity-50" style="color: var(--text-secondary);">Principal</p>
