@@ -15,7 +15,7 @@ class DatabaseSeeder extends Seeder
             [
                 'nombre'        => 'hebert',
                 'apellido'      => 'Suarez Burgos',
-                'password_hash' => Hash::make('admin123'),
+                'password_hash' => Hash::make('propietario123'),
                 'dni'           => '10000001',
                 'id_rol'        => 1,
                 'activo'        => true,

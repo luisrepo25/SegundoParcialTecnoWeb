@@ -3084,8 +3084,8 @@ COPY public.usuarios (id_usuario, nombre, apellido, email, password_hash, dni, t
 27	Evanz	Valcazar	evansbv1@gmail.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	09679565	89898989	\N	2	\N	t	f	2026-06-18 11:41:40.500586
 28	Evans	Balcazar Veizaga	evansbalcazar@uagrm.edu.bo	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	123456789	72107856	\N	5	\N	t	f	2026-06-18 12:26:42.405217
 2	Roly	Hernandez	roly.hernandez@ficct.uagrm.edu.bo	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	234567445	70000002	\N	2	\N	t	f	2026-06-16 01:05:49.18209
-4	Roly	Lijeron	lijeronhr10@gmail.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	99999765	70000099	\N	1	\N	t	f	2026-06-16 01:05:49.18209
-1	hebert	Suarez Burgos	suarezburgoshebert@gmail.com	$2y$12$ZFuC61uCTEl7SHEma48OR.vUwiEf.cwXpXEoAWu.gNR0EIwMbp/zq	10000001	70000001	\N	1	\N	t	f	2026-06-16 01:05:49.18209
+4	Roly	Lijeron	lijeronhr10@gmail.com	$2y$12$pIQKDf.l2vbUWOWaDrodi.68Q5p7.IE7ZK.DJop3Cm9vePpYcmVHq	99999765	70000099	\N	1	\N	t	f	2026-06-16 01:05:49.18209
+1	hebert	Suarez Burgos	suarezburgoshebert@gmail.com	$2y$12$XbBHjUbKuGeHY.gKLGt00.5l669LnPOG.29.NfRtEJrEphgy2YHOy	10000001	70000001	\N	1	\N	t	f	2026-06-16 01:05:49.18209
 3	hebert	Suarez	hebertsuarezb@gmail.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	345678332	70000003	\N	2	\N	t	f	2026-06-16 01:05:49.18209
 5	Juan	Perez	juan.perez@mail.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	5566778	70123456	\N	4	\N	t	f	2026-06-16 01:06:43.765348
 6	María	García	maria.garcia@mail.com	$2y$12$UBkCeQvpk/8CKzh6Zj47OOzUKJueAJOY6YUYDkpDU3mQJsUJ2F/f6	6677777	70234567	\N	4	\N	t	f	2026-06-16 01:06:43.765348
