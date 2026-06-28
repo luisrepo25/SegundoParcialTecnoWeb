@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
@@ -30,6 +31,7 @@ class PerfilController extends Controller
                 'email'                    => $usuario?->email,
                 'dni'                      => $usuario?->dni,
                 'telefono'                 => $usuario?->telefono,
+                'direccion'               => $usuario?->direccion,
                 'legajo'                   => $est?->legajo,
                 'fecha_inscripcion_inicial' => $est?->fecha_inscripcion_inicial,
                 'tutor_nombre'             => $est?->tutor_nombre,
@@ -44,21 +46,27 @@ class PerfilController extends Controller
     // ── Actualizar datos personales ───────────────────────────────────────────
     public function update(Request $request)
     {
+        $userId = auth()->id();
+
         $request->validate([
             'nombre'         => 'required|string|max:100',
             'apellido'       => 'required|string|max:100',
+            'email'          => ['required', 'email', 'max:150', Rule::unique('usuarios', 'email')->ignore($userId, 'id_usuario')],
             'telefono'       => 'nullable|string|max:20',
+            'direccion'      => 'nullable|string|max:255',
             'tutor_nombre'   => 'nullable|string|max:100',
             'tutor_telefono' => 'nullable|string|max:20',
             'observaciones'  => 'nullable|string|max:500',
+        ], [
+            'email.unique' => 'Este correo ya está en uso por otra cuenta.',
         ]);
 
-        $userId = auth()->id();
-
         DB::table('usuarios')->where('id_usuario', $userId)->update([
-            'nombre'   => $request->nombre,
-            'apellido' => $request->apellido,
-            'telefono' => $request->telefono,
+            'nombre'    => $request->nombre,
+            'apellido'  => $request->apellido,
+            'email'     => $request->email,
+            'telefono'  => $request->telefono,
+            'direccion' => $request->direccion,
         ]);
 
         $est = DB::table('estudiantes')->where('id_usuario', $userId)->first();

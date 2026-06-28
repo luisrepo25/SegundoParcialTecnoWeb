@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Head, useForm, usePage, Link } from '@inertiajs/vue3';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import SecretariaLayout from '@/Layouts/SecretariaLayout.vue';
 
 const props = defineProps({
     perfil: { type: Object, required: true },
@@ -36,14 +36,11 @@ function updatePhoto() {
 const isEditing = ref(false);
 
 const formDatos = useForm({
-    nombre:         props.perfil.nombre    ?? '',
-    apellido:       props.perfil.apellido  ?? '',
-    email:          props.perfil.email     ?? '',
-    telefono:       props.perfil.telefono  ?? '',
-    direccion:      props.perfil.direccion ?? '',
-    tutor_nombre:   props.perfil.tutor_nombre   ?? '',
-    tutor_telefono: props.perfil.tutor_telefono ?? '',
-    observaciones:  props.perfil.observaciones  ?? '',
+    nombre:    props.perfil.nombre    ?? '',
+    apellido:  props.perfil.apellido  ?? '',
+    email:     props.perfil.email     ?? '',
+    telefono:  props.perfil.telefono  ?? '',
+    direccion: props.perfil.direccion ?? '',
 });
 
 function toggleEditing() {
@@ -55,7 +52,7 @@ function toggleEditing() {
 }
 
 function guardarDatos() {
-    formDatos.put(route('estudiante.perfil.update'), {
+    formDatos.put(route('secretaria.perfil.update'), {
         preserveScroll: true,
         onSuccess: () => { isEditing.value = false; },
     });
@@ -63,27 +60,25 @@ function guardarDatos() {
 
 // ── Formulario cambio de contraseña ─────────────────────────────────────────
 const formPwd = useForm({
-    password_actual:              '',
-    password_nuevo:               '',
-    password_nuevo_confirmation:  '',
+    password_actual:             '',
+    password_nuevo:              '',
+    password_nuevo_confirmation: '',
 });
 
 function cambiarPassword() {
-    formPwd.put(route('estudiante.perfil.password'), {
+    formPwd.put(route('secretaria.perfil.password'), {
         preserveScroll: true,
         onSuccess: () => formPwd.reset(),
     });
 }
-
-const tipoLabel = (tipo) => ({ tecnico_superior: 'Técnico Superior', tecnico_medio: 'Técnico Medio' }[tipo] ?? tipo);
 </script>
 
 <template>
     <Head title="Mi Perfil" />
-    <AuthenticatedLayout>
+    <SecretariaLayout>
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('estudiante.panel')"
+                <Link :href="route('secretaria.dashboard')"
                       class="flex items-center justify-center w-8 h-8 rounded-lg transition-colors"
                       style="color: var(--text-secondary); background-color: color-mix(in srgb, var(--text-color) 8%, transparent);"
                       title="Volver al panel">
@@ -97,18 +92,17 @@ const tipoLabel = (tipo) => ({ tecnico_superior: 'Técnico Superior', tecnico_me
 
         <div class="py-8 px-4 sm:px-6 lg:px-8 mx-auto max-w-3xl space-y-5">
 
-            <!-- Flash messages -->
-            <div v-if="flash.success || flash.success_password"
+            <!-- Flash -->
+            <div v-if="flash.success"
                  class="rounded-lg px-4 py-3 text-sm font-medium"
                  style="background-color: #dcfce7; color: #15803d; border: 1px solid #86efac;">
-                {{ flash.success || flash.success_password }}
+                {{ flash.success }}
             </div>
 
-            <!-- ── Encabezado con avatar ── -->
+            <!-- ── Encabezado con foto ── -->
             <div class="rounded-xl p-5 flex items-center gap-4"
                  style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
 
-                <!-- Foto de perfil con lápiz -->
                 <div class="relative shrink-0">
                     <div class="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center text-2xl font-bold"
                          style="background-color: var(--primary-color); color: var(--primary-text);">
@@ -116,7 +110,7 @@ const tipoLabel = (tipo) => ({ tecnico_superior: 'Técnico Superior', tecnico_me
                              :src="assetUrl + '/imagenes/' + user.foto_perfil"
                              alt="Foto de perfil"
                              class="w-full h-full object-cover" />
-                        <span v-else>{{ (perfil.nombre ?? 'E')[0].toUpperCase() }}</span>
+                        <span v-else>{{ (perfil.nombre ?? 'S')[0].toUpperCase() }}</span>
                         <div v-if="formFoto.processing"
                              class="absolute inset-0 bg-black/50 flex items-center justify-center rounded-full">
                             <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -137,49 +131,30 @@ const tipoLabel = (tipo) => ({ tecnico_superior: 'Técnico Superior', tecnico_me
                            accept="image/jpeg,image/png,image/jpg"
                            @change="updatePhoto" />
                 </div>
+
                 <div class="flex-1 min-w-0">
                     <h1 class="text-xl font-bold truncate" style="color: var(--text-color);">
                         {{ perfil.nombre }} {{ perfil.apellido }}
                     </h1>
                     <p class="text-sm" style="color: var(--text-secondary);">{{ perfil.email }}</p>
-                    <div class="flex flex-wrap gap-2 mt-1.5">
-                        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold"
-                              style="background-color: color-mix(in srgb, var(--primary-color) 15%, transparent); color: var(--primary-color);">
-                            {{ perfil.legajo }}
-                        </span>
-                        <span v-if="perfil.carrera_nombre"
-                              class="px-2.5 py-0.5 rounded-full text-xs font-semibold"
-                              style="background-color: color-mix(in srgb, #3b82f6 15%, transparent); color: #3b82f6;">
-                            {{ perfil.carrera_nombre }}
-                        </span>
-                        <span v-if="perfil.carrera_tipo"
-                              class="px-2.5 py-0.5 rounded-full text-xs font-medium"
-                              style="background-color: color-mix(in srgb, var(--text-color) 8%, transparent); color: var(--text-secondary);">
-                            {{ tipoLabel(perfil.carrera_tipo) }}
-                        </span>
-                    </div>
+                    <span class="inline-block mt-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                          style="background-color: color-mix(in srgb, var(--primary-color) 15%, transparent); color: var(--primary-color);">
+                        Secretaria
+                    </span>
                 </div>
             </div>
 
-            <!-- ── Datos académicos (solo lectura) ── -->
+            <!-- ── Datos fijos (solo lectura) ── -->
             <div class="rounded-xl p-5" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
-                <p class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--text-secondary);">Datos académicos</p>
+                <p class="text-xs font-semibold uppercase tracking-wide mb-3" style="color: var(--text-secondary);">Información de cuenta</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                    <div>
-                        <p style="color: var(--text-secondary);">Legajo</p>
-                        <p class="font-medium" style="color: var(--text-color);">{{ perfil.legajo ?? '—' }}</p>
-                    </div>
                     <div>
                         <p style="color: var(--text-secondary);">DNI / CI</p>
                         <p class="font-medium" style="color: var(--text-color);">{{ perfil.dni ?? '—' }}</p>
                     </div>
                     <div>
-                        <p style="color: var(--text-secondary);">Fecha de inscripción</p>
-                        <p class="font-medium" style="color: var(--text-color);">{{ perfil.fecha_inscripcion_inicial ?? '—' }}</p>
-                    </div>
-                    <div>
-                        <p style="color: var(--text-secondary);">Correo</p>
-                        <p class="font-medium truncate" style="color: var(--text-color);">{{ perfil.email ?? '—' }}</p>
+                        <p style="color: var(--text-secondary);">Rol</p>
+                        <p class="font-medium" style="color: var(--text-color);">Secretaria</p>
                     </div>
                 </div>
             </div>
@@ -207,7 +182,6 @@ const tipoLabel = (tipo) => ({ tecnico_superior: 'Técnico Superior', tecnico_me
                  class="rounded-xl p-5 space-y-4"
                  style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
 
-                <!-- Cabecera con lápiz -->
                 <div class="flex items-center justify-between">
                     <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Información personal</p>
                     <button @click="toggleEditing" type="button"
@@ -226,7 +200,6 @@ const tipoLabel = (tipo) => ({ tecnico_superior: 'Técnico Superior', tecnico_me
                 </div>
 
                 <form @submit.prevent="guardarDatos" class="space-y-4">
-                    <!-- Nombre + Apellido -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Nombre</label>
@@ -246,7 +219,6 @@ const tipoLabel = (tipo) => ({ tecnico_superior: 'Técnico Superior', tecnico_me
                         </div>
                     </div>
 
-                    <!-- Email -->
                     <div>
                         <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Correo electrónico</label>
                         <p v-if="!isEditing" class="text-sm py-2 font-medium" style="color: var(--text-color);">{{ formDatos.email || '—' }}</p>
@@ -256,7 +228,6 @@ const tipoLabel = (tipo) => ({ tecnico_superior: 'Técnico Superior', tecnico_me
                         <p v-if="isEditing && errors.email" class="text-xs mt-1" style="color: #ef4444;">{{ errors.email }}</p>
                     </div>
 
-                    <!-- Teléfono + Dirección -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Teléfono</label>
@@ -274,35 +245,6 @@ const tipoLabel = (tipo) => ({ tecnico_superior: 'Técnico Superior', tecnico_me
                         </div>
                     </div>
 
-                    <hr style="border-color: var(--border-color);" />
-                    <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Datos del tutor / apoderado</p>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Nombre del tutor</label>
-                            <p v-if="!isEditing" class="text-sm py-2 font-medium" style="color: var(--text-color);">{{ formDatos.tutor_nombre || '—' }}</p>
-                            <input v-else v-model="formDatos.tutor_nombre" type="text"
-                                   class="w-full rounded-lg px-3 py-2 text-sm"
-                                   style="background-color: color-mix(in srgb, var(--text-color) 5%, transparent); border: 1px solid var(--border-color); color: var(--text-color);" />
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Teléfono del tutor</label>
-                            <p v-if="!isEditing" class="text-sm py-2 font-medium" style="color: var(--text-color);">{{ formDatos.tutor_telefono || '—' }}</p>
-                            <input v-else v-model="formDatos.tutor_telefono" type="text"
-                                   class="w-full rounded-lg px-3 py-2 text-sm"
-                                   style="background-color: color-mix(in srgb, var(--text-color) 5%, transparent); border: 1px solid var(--border-color); color: var(--text-color);" />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Observaciones</label>
-                        <p v-if="!isEditing" class="text-sm py-2 font-medium" style="color: var(--text-color);">{{ formDatos.observaciones || '—' }}</p>
-                        <textarea v-else v-model="formDatos.observaciones" rows="3"
-                                  class="w-full rounded-lg px-3 py-2 text-sm resize-none"
-                                  style="background-color: color-mix(in srgb, var(--text-color) 5%, transparent); border: 1px solid var(--border-color); color: var(--text-color);"></textarea>
-                    </div>
-
-                    <!-- Botón guardar solo visible en modo edición -->
                     <div v-if="isEditing" class="flex justify-end pt-1">
                         <button type="submit" :disabled="formDatos.processing"
                                 class="px-6 py-2.5 rounded-lg font-semibold text-sm transition-all disabled:opacity-50"
@@ -353,5 +295,5 @@ const tipoLabel = (tipo) => ({ tecnico_superior: 'Técnico Superior', tecnico_me
             </form>
 
         </div>
-    </AuthenticatedLayout>
+    </SecretariaLayout>
 </template>

@@ -154,6 +154,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/cronogramas/{id}', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'update'])->name('cronogramas.update');
         Route::patch('/cronogramas/{id}/toggle-activo', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'toggleActivo'])->name('cronogramas.toggle-activo');
 
+        Route::get('/perfil',           [\App\Http\Controllers\Secretaria\PerfilController::class, 'index'])           ->name('perfil');
+        Route::put('/perfil',           [\App\Http\Controllers\Secretaria\PerfilController::class, 'update'])          ->name('perfil.update');
+        Route::put('/perfil/password',  [\App\Http\Controllers\Secretaria\PerfilController::class, 'cambiarPassword']) ->name('perfil.password');
+
         Route::get('/inscripciones', [\App\Http\Controllers\Secretaria\CU2Inscripciones\InscripcionController::class, 'index'])->name('inscripciones.index');
         Route::post('/inscripciones/manual', [\App\Http\Controllers\Secretaria\CU2Inscripciones\InscripcionController::class, 'storeManual'])->name('inscripciones.manual');
 
@@ -195,18 +199,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+    // Perfil general (propietario, director, secretaria, docente — estudiante va a su propia ruta)
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-    
-    // Foto de perfil
+
+    // Foto de perfil (todos los roles)
     Route::post('/profile/photo', [ProfileController::class, 'updatePhoto'])->name('profile.photo.update');
     Route::delete('/profile/photo', [ProfileController::class, 'deletePhoto'])->name('profile.photo.delete');
 
-    // Currículum Vitae (solo para docentes, manejado en el controlador o vista)
+    // Currículum Vitae (solo docentes)
     Route::post('/profile/cv', [ProfileController::class, 'updateCv'])->name('profile.cv.update');
     Route::delete('/profile/cv', [ProfileController::class, 'deleteCv'])->name('profile.cv.delete');
-    
+
     // Forzar cambio de contraseña
     Route::get('/cambiar-password-inicial', [\App\Http\Controllers\Auth\ForcePasswordChangeController::class, 'show'])->name('password.change.show');
     Route::post('/cambiar-password-inicial', [\App\Http\Controllers\Auth\ForcePasswordChangeController::class, 'update'])->name('password.change.update');

@@ -43,7 +43,14 @@ class ForcePasswordChangeController extends Controller
 
         session()->forget('needs_password_change');
 
-        // Redirigir al dashboard según el rol
-        return redirect()->route('login');
+        $destino = match ($user->role) {
+            'propietario' => route('dashboard.propietario'),
+            'director'    => route('dashboard.director'),
+            'secretaria'  => route('secretaria.dashboard'),
+            'profesor'    => route('dashboard.profesor'),
+            default       => route('dashboard.estudiante'),
+        };
+
+        return redirect($destino)->with('status', '¡Contraseña actualizada! Bienvenido al sistema.');
     }
 }
