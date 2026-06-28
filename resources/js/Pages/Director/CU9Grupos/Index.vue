@@ -156,12 +156,40 @@ const guardarNuevo = () => {
 // ── Modal Editar ──────────────────────────────────────────────────────────────
 const showEdit  = ref(false);
 const grupoEdit = ref(null);
-const formEdit  = useForm({ vacantes_max: 30, codigo_grupo: '' });
+const formEdit  = useForm({
+    vacantes_max: 30,
+    codigo_grupo: '',
+    id_aula:      '',
+    id_profesor:  '',
+    id_horario:   '',
+});
+
+const aulaEditSeleccionada = computed(() =>
+    props.aulas.find(a => a.id_aula === formEdit.id_aula)
+);
+const aulaEditCapacidad = computed(() => aulaEditSeleccionada.value?.capacidad ?? 200);
+
+function generarCodigoEdit() {
+    const matCode = (grupoEdit.value?.materia_codigo ?? '').replace(/[-\s]/g, '');
+    const aula = aulaEditSeleccionada.value;
+    if (!matCode || !aula) return;
+    const aulaPart = aula.nombre.replace(/^aula\s+/i, '').replace(/[-\s]/g, '');
+    formEdit.codigo_grupo = matCode + '-' + aulaPart;
+}
+
+watch(() => formEdit.id_aula, (newId) => {
+    const aula = props.aulas.find(a => a.id_aula === newId);
+    if (aula) formEdit.vacantes_max = aula.capacidad;
+    generarCodigoEdit();
+});
 
 const abrirEditar = (grupo) => {
     grupoEdit.value       = grupo;
     formEdit.vacantes_max = grupo.vacantes_max;
     formEdit.codigo_grupo = grupo.codigo_grupo ?? '';
+    formEdit.id_aula      = grupo.id_aula;
+    formEdit.id_profesor  = grupo.id_profesor;
+    formEdit.id_horario   = grupo.id_horario;
     showEdit.value = true;
 };
 
@@ -639,7 +667,7 @@ const fmtFecha = (f) => {
                 class="fixed inset-0 z-50 flex items-center justify-center p-4"
                 style="background-color: rgba(0,0,0,0.5);"
                 @click.self="showEdit = false">
-                <div class="w-full max-w-sm rounded-2xl border shadow-xl"
+                <div class="w-full max-w-lg rounded-2xl border shadow-xl"
                     style="background-color: var(--card-bg); border-color: var(--border-color);">
                     <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: var(--border-color);">
                         <h2 class="font-bold text-base" style="color: var(--text-color);">Editar Grupo</h2>
@@ -647,7 +675,7 @@ const fmtFecha = (f) => {
                     </div>
                     <div class="px-6 pt-4 pb-2">
                         <p class="text-sm font-medium" style="color: var(--text-color);">{{ grupoEdit?.materia_nombre }}</p>
-                        <p class="text-xs" style="color: var(--text-secondary);">{{ grupoEdit?.codigo_grupo }}</p>
+                        <p class="text-xs" style="color: var(--text-secondary);">{{ grupoEdit?.materia_codigo }}</p>
                     </div>
                     <div class="px-6 py-4 space-y-4">
                         <div v-if="formEdit.errors.grupo"
@@ -655,18 +683,54 @@ const fmtFecha = (f) => {
                             style="background-color: color-mix(in srgb,#ef4444 12%,transparent); color:#ef4444; border:1px solid color-mix(in srgb,#ef4444 30%,transparent);">
                             {{ formEdit.errors.grupo }}
                         </div>
+
+                        <!-- Aula -->
+                        <div>
+                            <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">Aula *</label>
+                            <ComboSelect v-model="formEdit.id_aula" :options="optsAulas" placeholder="Seleccionar aula" />
+                            <p v-if="aulaEditSeleccionada" class="text-[11px] mt-1 opacity-60" style="color: var(--text-secondary);">
+                                Capacidad máx: {{ aulaEditSeleccionada.capacidad }}
+                            </p>
+                        </div>
+
+                        <!-- Profesor -->
+                        <div>
+                            <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">Profesor *</label>
+                            <ComboSelect v-model="formEdit.id_profesor" :options="optsProfesores" placeholder="Seleccionar profesor" />
+                        </div>
+
+                        <!-- Horario -->
+                        <div>
+                            <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">Horario *</label>
+                            <ComboSelect v-model="formEdit.id_horario" :options="optsHorarios" placeholder="Seleccionar horario" />
+                        </div>
+
+                        <!-- Vacantes -->
                         <div>
                             <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">Vacantes máximas *</label>
-                            <input v-model.number="formEdit.vacantes_max" type="number" min="1" max="200"
+                            <input v-model.number="formEdit.vacantes_max" type="number" min="1" :max="aulaEditCapacidad"
                                 class="w-full rounded-lg border px-3 py-2 text-sm outline-none"
                                 style="background-color: var(--card-bg); border-color: var(--border-color); color: var(--text-color);" />
                             <p class="text-[11px] mt-1 opacity-60" style="color: var(--text-secondary);">
                                 Ocupadas: {{ grupoEdit?.vacantes_ocupadas ?? 0 }}
+                                <span v-if="aulaEditSeleccionada"> · Máx aula: {{ aulaEditCapacidad }}</span>
+                            </p>
+                            <p v-if="formEdit.vacantes_max > aulaEditCapacidad" class="text-xs mt-1" style="color:#ef4444;">
+                                Supera la capacidad del aula ({{ aulaEditCapacidad }})
                             </p>
                             <p v-if="formEdit.errors.vacantes_max" class="text-xs mt-1" style="color:#ef4444;">{{ formEdit.errors.vacantes_max }}</p>
                         </div>
+
+                        <!-- Código grupo -->
                         <div>
-                            <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">Código grupo</label>
+                            <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">
+                                Código grupo
+                                <button type="button" @click="generarCodigoEdit"
+                                    class="ml-2 text-[10px] px-2 py-0.5 rounded"
+                                    style="background-color: var(--primary-color); color: var(--primary-text);">
+                                    ↺ Auto
+                                </button>
+                            </label>
                             <input v-model="formEdit.codigo_grupo" type="text" maxlength="20"
                                 class="w-full rounded-lg border px-3 py-2 text-sm outline-none"
                                 style="background-color: var(--card-bg); border-color: var(--border-color); color: var(--text-color);" />

@@ -2427,29 +2427,6 @@ COPY public.carreras (id_carrera, codigo, nombre, descripcion, tipo, duracion_ni
 --
 
 COPY public.consumo_materias_carrera (id_consumo, id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional, fecha_consumo) FROM stdin;
-1	6	79	1	1	f	2026-06-16
-2	7	68	2	1	f	2026-06-18
-3	7	69	3	1	f	2026-06-18
-4	8	68	4	1	f	2026-06-18
-5	8	69	5	1	f	2026-06-18
-6	9	68	6	1	f	2026-06-18
-7	9	69	7	1	f	2026-06-18
-8	10	79	8	1	f	2026-06-18
-9	10	80	9	1	f	2026-06-18
-10	11	79	10	1	f	2026-06-18
-11	11	80	11	1	f	2026-06-18
-12	12	79	12	1	f	2026-06-18
-13	12	79	13	2	t	2026-06-18
-14	13	79	14	1	f	2026-06-18
-15	13	80	15	1	f	2026-06-18
-16	14	79	16	1	f	2026-06-18
-17	14	80	17	1	f	2026-06-18
-18	15	68	18	1	f	2026-06-18
-19	15	69	19	1	f	2026-06-18
-20	16	66	20	1	f	2026-06-18
-21	17	66	21	1	f	2026-06-18
-22	17	82	22	1	f	2026-06-18
-23	17	83	23	1	f	2026-06-18
 \.
 
 
@@ -2458,9 +2435,6 @@ COPY public.consumo_materias_carrera (id_consumo, id_pago_carrera, id_materia, i
 --
 
 COPY public.cronogramas (id_cronograma, id_periodo, nombre, tipo_periodo, fecha_inicio, fecha_fin, activo, id_carrera) FROM stdin;
-1	58	Inscripciones Enero 2026	inscripcion	2026-06-16	2026-06-19	t	\N
-2	58	Clases Semestre 1 2026	clases	2026-06-22	2026-06-30	t	\N
-3	58	Evaluaciones Semestre 1 2026	examenes	2026-06-16	2026-06-30	t	\N
 \.
 
 
@@ -2519,51 +2493,6 @@ COPY public.estudiantes (id_estudiante, id_usuario, legajo, fecha_inscripcion_in
 --
 
 COPY public.evaluaciones (id_evaluacion, id_inscripcion, id_profesor, tipo, descripcion, calificacion, porcentaje, fecha) FROM stdin;
-1	2	1	parcial1	Parcial 1	78.00	30.00	2026-03-15
-2	2	1	parcial2	Parcial 2	76.00	30.00	2026-04-30
-3	2	1	final	Final	84.00	40.00	2026-06-10
-4	3	3	parcial1	Parcial 1	72.00	30.00	2026-03-15
-5	3	3	parcial2	Parcial 2	70.00	30.00	2026-04-30
-6	3	3	final	Final	78.00	40.00	2026-06-10
-7	4	2	parcial1	Parcial 1	73.00	30.00	2026-03-15
-8	4	2	parcial2	Parcial 2	71.00	30.00	2026-04-30
-9	4	2	final	Final	79.00	40.00	2026-06-10
-10	6	3	parcial1	Parcial 1	86.00	30.00	2026-03-15
-11	6	3	parcial2	Parcial 2	88.00	30.00	2026-04-30
-12	6	3	final	Final	91.00	40.00	2026-06-10
-13	8	2	parcial1	Parcial 1	68.00	30.00	2026-03-15
-14	8	2	parcial2	Parcial 2	70.00	30.00	2026-04-30
-15	8	2	final	Final	74.00	40.00	2026-06-10
-16	10	1	parcial1	Parcial 1	75.00	30.00	2026-03-15
-17	10	1	parcial2	Parcial 2	77.00	30.00	2026-04-30
-18	10	1	final	Final	81.00	40.00	2026-06-10
-19	12	2	parcial1	Parcial 1	42.00	30.00	2026-03-15
-20	12	2	parcial2	Parcial 2	40.00	30.00	2026-04-30
-21	12	2	final	Final	50.00	40.00	2026-06-10
-22	14	2	parcial1	Parcial 1	86.00	30.00	2026-03-15
-23	14	2	parcial2	Parcial 2	87.00	30.00	2026-04-30
-24	14	2	final	Final	91.00	40.00	2026-06-10
-25	16	3	parcial1	Parcial 1	68.00	30.00	2026-03-15
-26	16	3	parcial2	Parcial 2	65.00	30.00	2026-04-30
-27	16	3	final	Final	75.00	40.00	2026-06-10
-28	18	1	parcial1	Parcial 1	80.00	30.00	2026-03-15
-29	18	1	parcial2	Parcial 2	78.00	30.00	2026-04-30
-30	18	1	final	Final	86.00	40.00	2026-06-10
-31	20	2	parcial1	Parcial 1	65.00	30.00	2026-03-15
-32	20	2	parcial2	Parcial 2	64.00	30.00	2026-04-30
-33	20	2	final	Final	72.00	40.00	2026-06-10
-34	21	1	parcial1	Parcial 1	76.00	30.00	2026-03-15
-35	21	1	parcial2	Parcial 2	78.00	30.00	2026-04-30
-36	21	1	final	Final	82.00	40.00	2026-06-10
-37	22	2	parcial1	Parcial 1	74.00	30.00	2026-03-15
-38	22	2	parcial2	Parcial 2	72.00	30.00	2026-04-30
-39	22	2	final	Final	80.00	40.00	2026-06-10
-40	24	3	parcial1	Parcial 1	84.00	30.00	2026-03-15
-41	24	3	parcial2	Parcial 2	85.00	30.00	2026-04-30
-42	24	3	final	Final	88.00	40.00	2026-06-10
-43	25	2	parcial1	Parcial 1	71.00	30.00	2026-03-15
-44	25	2	parcial2	Parcial 2	70.00	30.00	2026-04-30
-45	25	2	final	Final	78.00	40.00	2026-06-10
 \.
 
 
@@ -2572,116 +2501,6 @@ COPY public.evaluaciones (id_evaluacion, id_inscripcion, id_profesor, tipo, desc
 --
 
 COPY public.grupos (id_oferta, id_materia, id_aula, id_periodo, id_profesor, id_horario, vacantes_max, vacantes_ocupadas, activo, codigo_grupo) FROM stdin;
-56	69	9	58	2	27	30	1	t	PROG-101-C
-20	79	19	58	2	37	30	2	t	ADM-101-A
-14	80	20	58	2	38	30	1	t	ADM-102-A
-71	79	17	58	1	17	30	1	t	ADM-101-B
-100	79	18	58	2	6	30	2	t	ADM-101-C
-74	80	18	58	1	18	30	1	t	ADM-102-C
-107	79	20	58	3	26	30	2	t	ADM-101-D
-69	80	19	58	2	7	30	2	t	ADM-102-B
-102	68	7	58	1	37	30	1	t	PROG-100-D
-106	69	8	58	1	38	30	1	t	PROG-101-D
-18	66	6	58	2	24	30	1	t	FIS-101-A
-58	66	4	58	1	4	30	1	t	FIS-101-C
-37	82	22	58	2	40	30	1	t	ELEC-101-A
-44	83	22	58	2	10	30	1	t	ELEC-102-A
-22	85	25	58	3	1	30	1	t	WEB-101-A
-33	86	25	58	2	13	30	1	t	WEB-102-A
-34	87	27	58	3	3	30	1	t	WEB-103-A
-26	68	6	58	1	6	30	1	t	PROG-100-A
-16	69	10	58	3	16	30	1	t	PROG-101-A
-57	68	8	58	2	26	30	1	t	PROG-100-B
-54	69	7	58	1	7	30	1	t	PROG-101-B
-30	63	3	58	2	21	30	0	t	MAT-101-A
-62	63	1	58	1	1	30	0	t	MAT-101-B
-104	63	2	58	1	32	30	0	t	MAT-101-C
-118	63	4	58	3	10	30	0	t	MAT-101-D
-70	64	3	58	1	33	30	0	t	MAT-102-A
-84	64	2	58	1	2	30	0	t	MAT-102-B
-87	64	4	58	2	22	30	0	t	MAT-102-C
-110	64	5	58	3	11	30	0	t	MAT-102-D
-40	65	3	58	1	3	30	0	t	MAT-103-A
-77	65	4	58	1	34	30	0	t	MAT-103-B
-93	65	5	58	2	23	30	0	t	MAT-103-C
-120	65	6	58	3	12	30	0	t	MAT-103-D
-47	66	5	58	1	35	30	0	t	FIS-101-B
-82	66	7	58	3	13	30	0	t	FIS-101-D
-28	67	8	58	3	14	30	0	t	FIS-102-A
-59	67	6	58	1	36	30	0	t	FIS-102-B
-60	67	7	58	2	25	30	0	t	FIS-102-C
-121	67	5	58	1	5	30	0	t	FIS-102-D
-27	70	8	58	1	8	30	0	t	PROG-102-A
-66	70	9	58	1	39	30	0	t	PROG-102-B
-109	70	11	58	3	17	30	0	t	PROG-102-C
-114	70	10	58	2	28	30	0	t	PROG-102-D
-50	71	9	58	1	9	30	0	t	PROG-103-A
-99	71	11	58	2	29	30	0	t	PROG-103-B
-112	71	10	58	1	40	30	0	t	PROG-103-C
-117	71	12	58	3	18	30	0	t	PROG-103-D
-24	72	11	58	1	41	30	0	t	PROG-104-A
-76	72	10	58	1	10	30	0	t	PROG-104-B
-85	72	13	58	3	19	30	0	t	PROG-104-C
-113	72	12	58	2	30	30	0	t	PROG-104-D
-19	73	12	58	1	42	30	0	t	PROG-105-A
-51	73	13	58	2	31	30	0	t	PROG-105-B
-67	73	11	58	1	11	30	0	t	PROG-105-C
-97	73	14	58	3	20	30	0	t	PROG-105-D
-17	74	14	58	2	32	30	0	t	PROG-106-A
-75	74	12	58	1	12	30	0	t	PROG-106-B
-81	74	15	58	3	21	30	0	t	PROG-106-C
-86	74	13	58	2	1	30	0	t	PROG-106-D
-23	75	16	58	3	22	30	0	t	CONT-101-A
-39	75	14	58	2	2	30	0	t	CONT-101-B
-48	75	15	58	2	33	30	0	t	CONT-101-C
-115	75	13	58	1	13	30	0	t	CONT-101-D
-15	76	17	58	3	23	30	0	t	CONT-102-A
-45	76	14	58	1	14	30	0	t	CONT-102-B
-46	76	16	58	2	34	30	0	t	CONT-102-C
-83	76	15	58	2	3	30	0	t	CONT-102-D
-80	77	17	58	2	35	30	0	t	CONT-103-A
-90	77	16	58	2	4	30	0	t	CONT-103-B
-96	77	18	58	3	24	30	0	t	CONT-103-C
-111	77	15	58	1	15	30	0	t	CONT-103-D
-29	78	17	58	2	5	30	0	t	CONT-104-A
-55	78	16	58	1	16	30	0	t	CONT-104-B
-91	78	18	58	2	36	30	0	t	CONT-104-C
-108	78	19	58	3	25	30	0	t	CONT-104-D
-52	81	21	58	2	39	30	0	t	ADM-103-A
-103	81	19	58	1	19	30	0	t	ADM-103-B
-119	81	20	58	2	8	30	0	t	ADM-103-C
-72	82	21	58	2	9	30	0	t	ELEC-101-B
-88	82	20	58	1	20	30	0	t	ELEC-101-C
-98	83	23	58	2	41	30	0	t	ELEC-102-B
-122	83	21	58	1	21	30	0	t	ELEC-102-C
-53	84	23	58	2	11	30	0	t	ELEC-103-A
-63	84	22	58	1	22	30	0	t	ELEC-103-B
-101	84	24	58	2	42	30	0	t	ELEC-103-C
-42	85	24	58	2	12	30	0	t	WEB-101-B
-61	85	23	58	1	23	30	0	t	WEB-101-C
-105	86	24	58	1	24	30	0	t	WEB-102-B
-116	86	26	58	3	2	30	0	t	WEB-102-C
-78	87	26	58	2	14	30	0	t	WEB-103-B
-92	87	25	58	1	25	30	0	t	WEB-103-C
-13	88	28	58	3	4	30	0	t	OFFICE-101-A
-35	88	27	58	2	15	30	0	t	OFFICE-101-B
-89	88	26	58	1	26	30	0	t	OFFICE-101-C
-79	89	29	58	3	5	30	0	t	OFFICE-102-A
-94	89	28	58	2	16	30	0	t	OFFICE-102-B
-95	89	27	58	1	27	30	0	t	OFFICE-102-C
-32	90	28	58	1	28	30	0	t	OFFICE-103-A
-49	90	29	58	2	17	30	0	t	OFFICE-103-B
-65	90	30	58	3	6	30	0	t	OFFICE-103-C
-25	91	29	58	1	29	30	0	t	DESIGN-101-A
-68	68	9	58	3	15	30	1	t	PROG-100-C
-36	91	1	58	3	7	30	0	t	DESIGN-101-B
-41	91	30	58	2	18	30	0	t	DESIGN-101-C
-21	92	1	58	2	19	30	0	t	DESIGN-102-A
-31	92	30	58	1	30	30	0	t	DESIGN-102-B
-43	92	2	58	3	8	30	0	t	DESIGN-102-C
-38	93	3	58	3	9	30	0	t	DESIGN-103-A
-64	93	2	58	2	20	30	0	t	DESIGN-103-B
-73	93	1	58	1	31	30	0	t	DESIGN-103-C
 \.
 
 
@@ -2740,32 +2559,6 @@ COPY public.horarios (id_horario, dia_semana, hora_inicio, hora_fin, activo) FRO
 --
 
 COPY public.inscripciones (id_inscripcion, id_estudiante, id_oferta, fecha_inscripcion, estado, calificacion_final, aprobado, observaciones, fecha_aprobacion) FROM stdin;
-1	4	20	2026-06-16 23:47:29.512758	activo	\N	\N	\N	\N
-2	5	26	2026-02-10 08:00:00	aprobado	80.00	t	\N	2026-06-15
-3	5	16	2026-02-10 08:00:00	aprobado	74.00	t	\N	2026-06-15
-4	6	57	2026-02-10 08:00:00	aprobado	75.00	t	\N	2026-06-15
-5	6	54	2026-02-10 08:00:00	activo	\N	\N	\N	\N
-6	7	68	2026-02-10 08:00:00	aprobado	88.00	t	\N	2026-06-15
-7	7	56	2026-02-10 08:00:00	activo	\N	\N	\N	\N
-8	8	20	2026-02-10 08:00:00	aprobado	71.00	t	\N	2026-06-15
-9	8	14	2026-02-10 08:00:00	activo	\N	\N	\N	\N
-10	9	71	2026-02-10 08:00:00	aprobado	78.00	t	\N	2026-06-15
-11	9	69	2026-02-10 08:00:00	activo	\N	\N	\N	\N
-12	10	100	2026-02-10 08:00:00	reprobado	45.00	f	\N	\N
-13	10	107	2026-02-10 08:00:00	activo	\N	\N	\N	\N
-14	11	100	2026-02-10 08:00:00	aprobado	88.00	t	\N	2026-06-15
-15	11	74	2026-02-10 08:00:00	activo	\N	\N	\N	\N
-16	12	107	2026-02-10 08:00:00	aprobado	70.00	t	\N	2026-06-15
-17	12	69	2026-02-10 08:00:00	activo	\N	\N	\N	\N
-18	13	102	2026-02-10 08:00:00	aprobado	82.00	t	\N	2026-06-15
-19	13	106	2026-02-10 08:00:00	activo	\N	\N	\N	\N
-20	14	18	2026-02-10 08:00:00	aprobado	68.00	t	\N	2026-06-15
-21	15	58	2026-02-10 08:00:00	aprobado	79.00	t	\N	2026-06-15
-22	15	37	2026-02-10 08:00:00	aprobado	76.00	t	\N	2026-06-15
-23	15	44	2026-02-10 08:00:00	activo	\N	\N	\N	\N
-24	16	22	2026-02-10 08:00:00	aprobado	86.00	t	\N	2026-06-15
-25	16	33	2026-02-10 08:00:00	aprobado	74.00	t	\N	2026-06-15
-26	16	34	2026-02-10 08:00:00	activo	\N	\N	\N	\N
 \.
 
 
@@ -2937,10 +2730,6 @@ COPY public.pago_carrera_completa (id_pago_carrera, id_estudiante, id_carrera, m
 --
 
 COPY public.pago_materia_suelta (id_pago_materia, id_inscripcion, monto_pagado, fecha_pago, estado) FROM stdin;
-7	13	1666.67	2026-06-18	pendiente
-8	24	120.00	2026-06-18	pendiente
-9	25	130.00	2026-06-18	pendiente
-10	26	150.00	2026-06-18	pendiente
 \.
 
 
@@ -2963,8 +2752,6 @@ COPY public.pagofacil_transacciones (id_transaccion_pf, transaction_id_api, paym
 --
 
 COPY public.periodos_dictado (id_periodo, nombre, tipo_periodo, fecha_inicio, fecha_fin, id_nivel, activo) FROM stdin;
-58	Período 1 - 2026	semestral	2026-02-01	2026-06-30	\N	t
-59	Período 2 - 2026	semestral	2026-08-01	2026-12-15	\N	t
 \.
 
 
@@ -3010,32 +2797,6 @@ COPY public.roles (id_rol, nombre_rol, descripcion, activo) FROM stdin;
 --
 
 COPY public.seguimiento_estudiante (id_seguimiento, id_inscripcion, calificacion_final, estado_actual, observaciones, fecha_aprobacion, created_at, updated_at) FROM stdin;
-1	1	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-2	2	80.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-3	3	74.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-4	4	75.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-5	5	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-6	6	88.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-7	7	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-8	8	71.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-9	9	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-10	10	78.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-11	11	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-12	12	45.00	reprobado	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-13	13	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-14	14	88.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-15	15	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-16	16	70.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-17	17	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-18	18	82.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-19	19	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-20	20	68.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-21	21	79.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-22	22	76.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-23	23	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-24	24	86.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-25	25	74.00	aprobado	\N	2026-06-15	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
-26	26	\N	en_curso	\N	\N	2026-06-18 10:04:26.235688	2026-06-18 10:04:26.235688
 \.
 
 
@@ -3123,7 +2884,7 @@ SELECT pg_catalog.setval('public.carreras_id_carrera_seq', 24, true);
 -- Name: consumo_materias_carrera_id_consumo_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.consumo_materias_carrera_id_consumo_seq', 23, true);
+SELECT pg_catalog.setval('public.consumo_materias_carrera_id_consumo_seq', 1, false);
 
 
 --
@@ -3151,7 +2912,7 @@ SELECT pg_catalog.setval('public.estudiantes_id_estudiante_seq', 17, true);
 -- Name: evaluaciones_id_evaluacion_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.evaluaciones_id_evaluacion_seq', 45, true);
+SELECT pg_catalog.setval('public.evaluaciones_id_evaluacion_seq', 1, false);
 
 
 --
@@ -3165,7 +2926,7 @@ SELECT pg_catalog.setval('public.horarios_id_horario_seq', 42, true);
 -- Name: inscripciones_id_inscripcion_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.inscripciones_id_inscripcion_seq', 26, true);
+SELECT pg_catalog.setval('public.inscripciones_id_inscripcion_seq', 1, false);
 
 
 --
@@ -3207,7 +2968,7 @@ SELECT pg_catalog.setval('public.niveles_carrera_id_nivel_seq', 48, true);
 -- Name: oferta_academica_id_oferta_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.oferta_academica_id_oferta_seq', 122, true);
+SELECT pg_catalog.setval('public.oferta_academica_id_oferta_seq', 1, false);
 
 
 --
@@ -3221,7 +2982,7 @@ SELECT pg_catalog.setval('public.pago_carrera_completa_id_pago_carrera_seq', 6, 
 -- Name: pago_materia_suelta_id_pago_materia_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.pago_materia_suelta_id_pago_materia_seq', 8, true);
+SELECT pg_catalog.setval('public.pago_materia_suelta_id_pago_materia_seq', 1, false);
 
 
 --
@@ -3235,7 +2996,7 @@ SELECT pg_catalog.setval('public.pagofacil_transacciones_id_transaccion_pf_seq',
 -- Name: periodos_dictado_id_periodo_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.periodos_dictado_id_periodo_seq', 59, true);
+SELECT pg_catalog.setval('public.periodos_dictado_id_periodo_seq', 1, false);
 
 
 --
@@ -3263,7 +3024,7 @@ SELECT pg_catalog.setval('public.roles_id_rol_seq', 5, true);
 -- Name: seguimiento_estudiante_id_seguimiento_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.seguimiento_estudiante_id_seguimiento_seq', 26, true);
+SELECT pg_catalog.setval('public.seguimiento_estudiante_id_seguimiento_seq', 1, false);
 
 
 --

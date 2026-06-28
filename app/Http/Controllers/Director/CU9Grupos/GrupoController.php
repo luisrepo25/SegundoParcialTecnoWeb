@@ -232,8 +232,11 @@ class GrupoController extends Controller
     public function update(Request $request, int $id)
     {
         $request->validate([
-            'vacantes_max'  => 'required|integer|min:1|max:200',
-            'codigo_grupo'  => 'nullable|string|max:20',
+            'vacantes_max' => 'required|integer|min:1|max:500',
+            'codigo_grupo' => 'nullable|string|max:20',
+            'id_aula'      => 'required|integer|exists:aulas,id_aula',
+            'id_profesor'  => 'required|integer|exists:profesores,id_profesor',
+            'id_horario'   => 'required|integer|exists:horarios,id_horario',
         ]);
 
         $grupo = DB::table('grupos')->where('id_oferta', $id)->first();
@@ -246,9 +249,47 @@ class GrupoController extends Controller
             ]);
         }
 
+        $aula = DB::table('aulas')->where('id_aula', $request->id_aula)->first();
+        if ($aula && $request->vacantes_max > $aula->capacidad) {
+            return redirect()->back()->withErrors([
+                'grupo' => "Las vacantes ({$request->vacantes_max}) superan la capacidad del aula ({$aula->capacidad}).",
+            ]);
+        }
+
+        $confAula = DB::table('grupos')
+            ->where('id_aula',    $request->id_aula)
+            ->where('id_horario', $request->id_horario)
+            ->where('id_periodo', $grupo->id_periodo)
+            ->where('id_oferta',  '!=', $id)
+            ->whereRaw('activo IS TRUE')
+            ->exists();
+
+        if ($confAula) {
+            return redirect()->back()->withErrors([
+                'grupo' => 'Conflicto: esa aula ya tiene un grupo en ese horario y período.',
+            ]);
+        }
+
+        $confProf = DB::table('grupos')
+            ->where('id_profesor', $request->id_profesor)
+            ->where('id_horario',  $request->id_horario)
+            ->where('id_periodo',  $grupo->id_periodo)
+            ->where('id_oferta',   '!=', $id)
+            ->whereRaw('activo IS TRUE')
+            ->exists();
+
+        if ($confProf) {
+            return redirect()->back()->withErrors([
+                'grupo' => 'Conflicto: ese profesor ya tiene un grupo en ese horario y período.',
+            ]);
+        }
+
         DB::table('grupos')->where('id_oferta', $id)->update([
             'vacantes_max' => $request->vacantes_max,
             'codigo_grupo' => $request->codigo_grupo ?: $grupo->codigo_grupo,
+            'id_aula'      => $request->id_aula,
+            'id_profesor'  => $request->id_profesor,
+            'id_horario'   => $request->id_horario,
         ]);
 
         return redirect()->route('director.grupos.index')->with('success', 'Grupo actualizado.');

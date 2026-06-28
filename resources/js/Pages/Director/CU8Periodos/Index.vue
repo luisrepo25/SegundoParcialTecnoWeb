@@ -288,6 +288,26 @@ function duracionDias(inicio, fin) {
     if (d <= 0) return '';
     return `${d} días`;
 }
+
+// ── Accordion carreras ────────────────────────────────────────────────────────
+const carreraAbierta = ref(null);
+const buscarCarrera  = ref('');
+
+const toggleCarreraPanel = (id) => {
+    carreraAbierta.value = carreraAbierta.value === id ? null : id;
+};
+
+const carrerasFiltradas = computed(() => {
+    const q = buscarCarrera.value.trim().toLowerCase();
+    if (!q) return props.carreras;
+    return props.carreras.filter(c => c.nombre.toLowerCase().includes(q));
+});
+
+function totalPeriodosCarrera(carrera) {
+    const dePeriodos = carrera.periodos_directos?.length ?? 0;
+    const deNiveles  = (carrera.niveles ?? []).reduce((s, n) => s + n.periodos.length, 0);
+    return dePeriodos + deNiveles;
+}
 </script>
 
 <template>
@@ -326,46 +346,67 @@ function duracionDias(inicio, fin) {
             </button>
         </div>
 
-        <div class="space-y-6">
+        <!-- Buscador de carrera -->
+        <div class="mb-3">
+            <input v-model="buscarCarrera" type="text" placeholder="Buscar carrera..."
+                class="w-full max-w-xs rounded-lg border px-3 py-2 text-sm outline-none"
+                style="background-color: var(--card-bg); border-color: var(--border-color); color: var(--text-color);" />
+        </div>
 
-            <div v-if="carreras.length === 0"
+        <div class="space-y-2">
+
+            <div v-if="carrerasFiltradas.length === 0"
                  class="rounded-xl p-12 text-center"
                  style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
                 <p class="text-3xl mb-3">📅</p>
                 <p class="font-semibold text-sm" style="color: var(--text-color);">Sin carreras registradas</p>
             </div>
 
-            <!-- Card por carrera -->
-            <div v-for="carrera in carreras" :key="carrera.id_carrera"
+            <!-- Card por carrera (accordion) -->
+            <div v-for="carrera in carrerasFiltradas" :key="carrera.id_carrera"
                  class="rounded-xl overflow-hidden"
                  style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
 
-                <!-- Cabecera -->
-                <div class="px-5 py-3 flex items-center justify-between"
-                     style="background-color: var(--bg-color); border-bottom: 1px solid var(--border-color);">
-                    <div>
-                        <span class="font-semibold text-sm" style="color: var(--text-color);">{{ carrera.nombre }}</span>
-                        <span class="ml-2 text-xs" style="color: var(--text-muted);">
-                            {{ CARRERA_TIPOS[carrera.tipo] ?? carrera.tipo }}
-                        </span>
+                <!-- Cabecera CLICKEABLE -->
+                <div class="px-5 py-3 flex items-center justify-between cursor-pointer select-none"
+                     style="background-color: var(--bg-color);"
+                     :style="carreraAbierta === carrera.id_carrera ? 'border-bottom: 1px solid var(--border-color);' : ''"
+                     @click="toggleCarreraPanel(carrera.id_carrera)">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <!-- Flecha -->
+                        <span class="text-xs shrink-0 transition-transform duration-200"
+                              :style="carreraAbierta === carrera.id_carrera ? 'transform:rotate(90deg);' : ''"
+                              style="color: var(--text-secondary);">▶</span>
+                        <div class="min-w-0">
+                            <span class="font-semibold text-sm" style="color: var(--text-color);">{{ carrera.nombre }}</span>
+                            <span class="ml-2 text-xs" style="color: var(--text-muted);">
+                                {{ CARRERA_TIPOS[carrera.tipo] ?? carrera.tipo }}
+                            </span>
+                        </div>
                     </div>
-                    <!-- Botón + para curso libre (solo si aún no tiene período) -->
-                    <button v-if="carrera.tipo === 'curso_libre' && carrera.periodos_directos.length === 0"
-                        @click="abrirAgregar('', carrera.id_carrera, true, carrera.nombre)"
-                        class="text-xs font-semibold px-2.5 py-1 rounded-md transition"
-                        style="background-color: color-mix(in srgb, var(--primary-color) 12%, transparent); color: var(--primary-color);">
-                        + Período
-                    </button>
-                    <span v-else-if="carrera.tipo === 'curso_libre'" class="text-xs font-medium" style="color: #10b981;">
-                        Período único definido ✓
-                    </span>
-                    <span v-else class="text-xs" style="color: var(--text-secondary);">
-                        {{ carrera.niveles.length }} nivel(es)
-                    </span>
+                    <div class="flex items-center gap-3 shrink-0">
+                        <!-- Resumen rápido -->
+                        <span class="text-xs" style="color: var(--text-secondary);">
+                            <span v-if="carrera.tipo !== 'curso_libre'">{{ carrera.niveles.length }} año(s) · </span>
+                            <span :style="totalPeriodosCarrera(carrera) > 0 ? 'color:#10b981;font-weight:600;' : 'color:var(--text-muted);'">
+                                {{ totalPeriodosCarrera(carrera) }} período(s)
+                            </span>
+                        </span>
+                        <!-- Botón + para curso libre -->
+                        <button v-if="carrera.tipo === 'curso_libre' && carrera.periodos_directos.length === 0"
+                            @click.stop="abrirAgregar('', carrera.id_carrera, true, carrera.nombre)"
+                            class="text-xs font-semibold px-2.5 py-1 rounded-md transition"
+                            style="background-color: color-mix(in srgb, var(--primary-color) 12%, transparent); color: var(--primary-color);">
+                            + Período
+                        </button>
+                        <span v-else-if="carrera.tipo === 'curso_libre'" class="text-xs font-medium" style="color: #10b981;">✓</span>
+                    </div>
                 </div>
 
                 <!-- ── CURSO LIBRE: período directo ──────────────────────────── -->
-                <div v-if="carrera.tipo === 'curso_libre'" class="px-5 py-4">
+                <div v-if="carrera.tipo === 'curso_libre'"
+                     v-show="carreraAbierta === carrera.id_carrera"
+                     class="px-5 py-4">
                     <p v-if="carrera.periodos_directos.length === 0"
                        class="text-sm italic" style="color: var(--text-muted);">
                         Sin período — agrega el período único de este curso.
@@ -408,7 +449,9 @@ function duracionDias(inicio, fin) {
                 </div>
 
                 <!-- ── CARRERA NORMAL: niveles ───────────────────────────────── -->
-                <div v-else class="divide-y" style="border-color: var(--border-color);">
+                <div v-else
+                     v-show="carreraAbierta === carrera.id_carrera"
+                     class="divide-y" style="border-color: var(--border-color);">
                     <div v-for="nivel in carrera.niveles" :key="nivel.id_nivel" class="px-5 py-4">
 
                         <div class="flex items-center justify-between mb-3">
