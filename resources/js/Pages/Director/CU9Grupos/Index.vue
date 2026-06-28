@@ -24,8 +24,11 @@ const periodosAbiertos = ref({});
 props.periodos.forEach(p => { periodosAbiertos.value[p.id_periodo] = p.activo; });
 const togglePeriodo = (id) => { periodosAbiertos.value[id] = !periodosAbiertos.value[id]; };
 
-// ── Filtro por carrera ────────────────────────────────────────────────────────
+// ── Filtros ───────────────────────────────────────────────────────────────────
 const filtroCarrera = ref('');
+const soloActivos   = ref(true);
+const hoy      = new Date().toISOString().slice(0, 10);
+const anoActual = new Date().getFullYear();
 
 const optsCarrerasFiltro = computed(() => {
     const seen = new Set();
@@ -39,16 +42,58 @@ const optsCarrerasFiltro = computed(() => {
     return opts.sort((a, b) => a.label.localeCompare(b.label));
 });
 
+// Lista filtrada plana (usada por modales de clonar, etc.)
 const periodosFiltrados = computed(() => {
-    if (!filtroCarrera.value) return props.periodos;
-    return props.periodos.filter(p => p.id_carrera === filtroCarrera.value);
+    let lista = props.periodos;
+    if (soloActivos.value) {
+        lista = lista.filter(p =>
+            p.activo && (
+                new Date(p.fecha_inicio).getFullYear() <= anoActual || // año actual o anterior
+                p.grupos.length > 0                                     // o ya tiene grupos
+            )
+        );
+    }
+    if (filtroCarrera.value) lista = lista.filter(p => p.id_carrera === filtroCarrera.value);
+    return lista;
 });
 
+// Agrupado por carrera para el accordion principal
+const periodosPorCarrera = computed(() => {
+    const map = {};
+    for (const p of periodosFiltrados.value) {
+        const key = p.id_carrera ?? '__libre__';
+        if (!map[key]) {
+            map[key] = {
+                id_carrera: p.id_carrera ?? key,
+                nombre: p.carrera_nombre ?? 'Sin carrera',
+                periodos: [],
+                totalGrupos: 0,
+            };
+        }
+        map[key].periodos.push(p);
+        map[key].totalGrupos += p.grupos.length;
+    }
+    return Object.values(map).sort((a, b) => a.nombre.localeCompare(b.nombre));
+});
+
+// Accordion externo: qué carrera está abierta
+const carrerasAbiertas = ref({});
+const toggleCarreraGrupos = (id) => {
+    carrerasAbiertas.value[id] = !carrerasAbiertas.value[id];
+};
+
 // ── Options para ComboSelect ──────────────────────────────────────────────────
-const optsPeriodos = computed(() => props.periodos.map(p => ({
-    value: p.id_periodo,
-    label: p.nombre + (p.carrera_nombre ? ' · ' + p.carrera_nombre : ''),
-})));
+const optsPeriodos = computed(() =>
+    props.periodos
+        .filter(p => p.activo)
+        .sort((a, b) => (b.fecha_inicio ?? '').localeCompare(a.fecha_inicio ?? ''))
+        .map(p => ({
+            value: p.id_periodo,
+            label: (p.carrera_nombre ? p.carrera_nombre + ' · ' : '')
+                 + (p.nivel_nombre ? p.nivel_nombre + ' — ' : '')
+                 + p.nombre,
+        }))
+);
 
 const optsAulas = computed(() => props.aulas.map(a => ({
     value: a.id_aula,
@@ -274,20 +319,31 @@ const fmtFecha = (f) => {
             </div>
         </div>
 
-        <!-- Filtro + acciones -->
+        <!-- Filtros + acciones -->
         <div class="flex items-center gap-3 mb-4 flex-wrap">
-            <div class="flex-1 min-w-50 max-w-xs">
+            <div class="flex-1 min-w-44 max-w-xs">
                 <ComboSelect
                     v-model="filtroCarrera"
                     :options="optsCarrerasFiltro"
                     placeholder="Todas las carreras"
                     emptyLabel="Todas las carreras" />
             </div>
-            <p v-if="filtroCarrera" class="text-xs" style="color: var(--text-secondary);">
-                {{ periodosFiltrados.length }} período(s) ·
-                <button @click="filtroCarrera = ''" class="underline" style="color: var(--primary-color);">Limpiar</button>
+            <!-- Toggle solo activos -->
+            <label class="flex items-center gap-2 cursor-pointer select-none text-sm shrink-0"
+                   style="color: var(--text-secondary);">
+                <span class="relative inline-block w-9 h-5">
+                    <input type="checkbox" v-model="soloActivos" class="sr-only peer" />
+                    <span class="block w-full h-full rounded-full transition peer-checked:opacity-100"
+                          :style="soloActivos ? 'background-color: var(--primary-color);' : 'background-color: var(--border-color);'"></span>
+                    <span class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform"
+                          :style="soloActivos ? 'transform:translateX(16px)' : ''"></span>
+                </span>
+                Solo vigentes
+            </label>
+            <p v-if="filtroCarrera" class="text-xs shrink-0" style="color: var(--text-secondary);">
+                <button @click="filtroCarrera = ''" class="underline" style="color: var(--primary-color);">Limpiar filtro</button>
             </p>
-            <div class="ml-auto flex items-center gap-2">
+            <div class="ml-auto flex items-center gap-2 shrink-0">
                 <button @click="showClonar = true"
                     class="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border transition"
                     style="border-color: var(--primary-color); color: var(--primary-color); background: transparent;">
@@ -314,21 +370,66 @@ const fmtFecha = (f) => {
         </div>
 
         <!-- Sin períodos -->
-        <div v-if="periodosFiltrados.length === 0"
+        <div v-if="periodosPorCarrera.length === 0"
             class="rounded-xl border p-10 text-center"
             style="background-color: var(--card-bg); border-color: var(--border-color);">
             <p class="text-4xl mb-3">📅</p>
-            <p class="font-medium mb-1" style="color: var(--text-color);">Sin períodos configurados</p>
-            <p class="text-sm" style="color: var(--text-secondary);">
-                Primero crea períodos académicos en <strong>Períodos Académicos</strong>.
-            </p>
+            <template v-if="props.periodos.length === 0">
+                <p class="font-medium mb-1" style="color: var(--text-color);">Sin períodos configurados</p>
+                <p class="text-sm" style="color: var(--text-secondary);">
+                    Primero crea períodos académicos en <strong>Períodos Académicos</strong>.
+                </p>
+            </template>
+            <template v-else>
+                <p class="font-medium mb-1" style="color: var(--text-color);">Sin períodos vigentes</p>
+                <p class="text-sm mb-3" style="color: var(--text-secondary);">
+                    No hay períodos activos en la fecha actual ni con grupos creados.
+                </p>
+                <button @click="soloActivos = false"
+                    class="text-sm font-medium underline"
+                    style="color: var(--primary-color);">
+                    Mostrar todos los períodos
+                </button>
+            </template>
         </div>
 
-        <!-- Lista de períodos -->
-        <div v-else class="space-y-4">
-            <div v-for="periodo in periodosFiltrados" :key="periodo.id_periodo"
-                class="rounded-xl border overflow-hidden"
-                style="background-color: var(--card-bg); border-color: var(--border-color);">
+        <!-- Lista agrupada por carrera -->
+        <div v-else class="space-y-3">
+            <div v-for="carrera in periodosPorCarrera" :key="carrera.id_carrera"
+                 class="rounded-xl border overflow-hidden"
+                 style="background-color: var(--card-bg); border-color: var(--border-color);">
+
+                <!-- ── Cabecera carrera (accordion externo) ── -->
+                <div class="flex items-center justify-between px-5 py-3 cursor-pointer select-none transition-colors"
+                     style="background-color: var(--bg-color);"
+                     :style="carrerasAbiertas[carrera.id_carrera] ? 'border-bottom:1px solid var(--border-color);' : ''"
+                     @click="toggleCarreraGrupos(carrera.id_carrera)">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <span class="text-xs shrink-0 transition-transform duration-200"
+                              :style="carrerasAbiertas[carrera.id_carrera] ? 'transform:rotate(90deg);' : ''"
+                              style="color: var(--text-secondary);">▶</span>
+                        <span class="font-semibold text-sm truncate" style="color: var(--text-color);">
+                            {{ carrera.nombre }}
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-3 shrink-0">
+                        <span class="text-xs" style="color: var(--text-secondary);">
+                            {{ carrera.periodos.length }} período(s)
+                        </span>
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                              :style="carrera.totalGrupos > 0
+                                ? 'background-color:color-mix(in srgb,var(--primary-color) 12%,transparent);color:var(--primary-color);'
+                                : 'background-color:color-mix(in srgb,#6b7280 12%,transparent);color:#6b7280;'">
+                            {{ carrera.totalGrupos }} grupo{{ carrera.totalGrupos !== 1 ? 's' : '' }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- ── Períodos de esta carrera ── -->
+                <div v-show="carrerasAbiertas[carrera.id_carrera]" class="space-y-2 p-3">
+                    <div v-for="periodo in carrera.periodos" :key="periodo.id_periodo"
+                        class="rounded-lg border overflow-hidden"
+                        style="border-color: var(--border-color); background-color: var(--card-bg);">
 
                 <!-- Header período -->
                 <button @click="togglePeriodo(periodo.id_periodo)"
@@ -467,8 +568,10 @@ const fmtFecha = (f) => {
                             </tbody>
                         </table>
                     </div>
-                </div>
-            </div>
+                    </div>
+                    </div> <!-- fin período -->
+                </div> <!-- fin lista períodos carrera -->
+            </div> <!-- fin carrera -->
         </div>
 
         <!-- ══ MODAL: Nuevo Grupo ══════════════════════════════════════════════ -->

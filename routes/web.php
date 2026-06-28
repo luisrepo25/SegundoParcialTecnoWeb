@@ -130,6 +130,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/periodos', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'index'])->name('periodos.index');
         Route::post('/periodos', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'store'])->name('periodos.store');
         Route::post('/periodos/lote', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'storeLote'])->name('periodos.lote');
+        Route::post('/periodos/siguiente-anio', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'clonarSiguienteAnio'])->name('periodos.siguiente-anio');
         Route::put('/periodos/{id}', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'update'])->name('periodos.update');
         Route::patch('/periodos/{id}/toggle', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'toggleActivo'])->name('periodos.toggle');
         Route::delete('/periodos/{id}', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'destroy'])->name('periodos.destroy');

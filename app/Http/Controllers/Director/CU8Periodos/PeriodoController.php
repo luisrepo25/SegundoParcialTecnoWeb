@@ -328,6 +328,70 @@ class PeriodoController extends Controller
             ->with('success', "{$n} período(s) creados correctamente.");
     }
 
+    public function clonarSiguienteAnio()
+    {
+        $anoActual    = (int) date('Y');
+        $anoSiguiente = $anoActual + 1;
+
+        $periodos = DB::table('periodos_dictado')
+            ->whereNotNull('id_nivel')
+            ->where('activo', true)
+            ->whereYear('fecha_inicio', $anoActual)
+            ->get();
+
+        if ($periodos->isEmpty()) {
+            return redirect()->back()
+                ->withErrors(['periodo' => "No hay períodos activos del año {$anoActual} para clonar."]);
+        }
+
+        $rows     = [];
+        $omitidos = 0;
+
+        foreach ($periodos as $p) {
+            $yaExiste = DB::table('periodos_dictado')
+                ->where('id_nivel', $p->id_nivel)
+                ->whereYear('fecha_inicio', $anoSiguiente)
+                ->exists();
+
+            if ($yaExiste) {
+                $omitidos++;
+                continue;
+            }
+
+            $nuevoNombre = preg_replace('/\b' . $anoActual . '\b/', (string) $anoSiguiente, $p->nombre);
+            $nuevaInicio = date('Y-m-d', strtotime($p->fecha_inicio . ' +1 year'));
+            $nuevaFin    = date('Y-m-d', strtotime($p->fecha_fin    . ' +1 year'));
+
+            $rows[] = [
+                'id_nivel'     => $p->id_nivel,
+                'id_carrera'   => null,
+                'nombre'       => $nuevoNombre,
+                'tipo_periodo' => $p->tipo_periodo,
+                'fecha_inicio' => $nuevaInicio,
+                'fecha_fin'    => $nuevaFin,
+                'max_materias' => $p->max_materias,
+                'activo'       => true,
+            ];
+        }
+
+        if (empty($rows) && $omitidos > 0) {
+            return redirect()->back()
+                ->with('success', "Los períodos del año {$anoSiguiente} ya existen ({$omitidos} omitidos).");
+        }
+
+        if (!empty($rows)) {
+            DB::table('periodos_dictado')->insert($rows);
+        }
+
+        $creados = count($rows);
+        $msg = "{$creados} período(s) clonados para {$anoSiguiente}.";
+        if ($omitidos > 0) {
+            $msg .= " {$omitidos} omitido(s) (ya existían).";
+        }
+
+        return redirect()->route('director.periodos.index')->with('success', $msg);
+    }
+
     public function destroy(int $id)
     {
         $tieneGrupos = DB::table('grupos')->where('id_periodo', $id)->exists();

@@ -99,6 +99,7 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
             'options' => [
                 PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::PGSQL_ATTR_DISABLE_PREPARES => true,
             ],
         ],
 

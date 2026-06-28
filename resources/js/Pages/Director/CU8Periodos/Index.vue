@@ -289,6 +289,20 @@ function duracionDias(inicio, fin) {
     return `${d} días`;
 }
 
+// ── Clonar año siguiente ─────────────────────────────────────────────────────
+const confirmClonar = ref(false);
+const anoSiguiente  = new Date().getFullYear() + 1;
+const clonando      = ref(false);
+
+function clonarSiguienteAnio() {
+    clonando.value = true;
+    router.post(route('director.periodos.siguiente-anio'), {}, {
+        preserveScroll: true,
+        onSuccess: () => { confirmClonar.value = false; clonando.value = false; },
+        onError:   () => { confirmClonar.value = false; clonando.value = false; },
+    });
+}
+
 // ── Accordion carreras ────────────────────────────────────────────────────────
 const carreraAbierta = ref(null);
 const buscarCarrera  = ref('');
@@ -334,6 +348,11 @@ function totalPeriodosCarrera(carrera) {
         </div>
 
         <div class="flex justify-end gap-2 mb-4">
+            <button @click="confirmClonar = true"
+                class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition border"
+                style="border-color: #8b5cf6; color: #8b5cf6; background: transparent;">
+                📅 Clonar {{ anoSiguiente }}
+            </button>
             <button @click="abrirLote()"
                 class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition border"
                 style="border-color: var(--primary-color); color: var(--primary-color); background: transparent;">
@@ -818,6 +837,36 @@ function totalPeriodosCarrera(carrera) {
                             {{ formLote.processing ? 'Creando...' : `Crear ${formLote.id_niveles.length} período(s)` }}
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- ── Confirm Clonar año siguiente ───────────────────────────────────── -->
+    <Teleport to="body">
+        <div v-if="confirmClonar"
+             class="fixed inset-0 z-50 flex items-center justify-center p-4"
+             style="background: rgba(0,0,0,0.5);">
+            <div class="w-full max-w-sm rounded-2xl shadow-2xl p-6"
+                 style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                <p class="text-2xl mb-3 text-center">📅</p>
+                <p class="font-semibold text-center mb-1" style="color: var(--text-color);">
+                    Clonar períodos para {{ anoSiguiente }}
+                </p>
+                <p class="text-sm text-center mb-1" style="color: var(--text-secondary);">
+                    Se copiarán todos los períodos activos del año actual con fechas +1 año.
+                </p>
+                <p class="text-xs text-center mb-5" style="color: var(--text-muted);">
+                    Si ya existe un período para ese nivel en {{ anoSiguiente }} se omite automáticamente.
+                </p>
+                <div class="flex justify-center gap-3">
+                    <button @click="confirmClonar = false" class="btn-secondary">Cancelar</button>
+                    <button @click="clonarSiguienteAnio" :disabled="clonando"
+                        class="inline-flex items-center gap-1.5 rounded-lg px-5 py-2 text-sm font-semibold transition"
+                        style="background-color: #8b5cf6; color: #fff;"
+                        :style="clonando ? 'opacity:0.6;' : ''">
+                        {{ clonando ? 'Clonando...' : `Clonar ${anoSiguiente}` }}
+                    </button>
                 </div>
             </div>
         </div>
