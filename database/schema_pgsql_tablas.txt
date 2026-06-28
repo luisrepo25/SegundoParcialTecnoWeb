@@ -60,11 +60,12 @@ CREATE TABLE cronogramas (
     id_cronograma             integer              NOT NULL   DEFAULT nextval('cronogramas_id_cronograma_seq'::regclass),
     id_periodo                integer              NULL       ,
     nombre                    character varying(50) NOT NULL   ,
-    tipo_periodo              character varying(20) NOT NULL   ,
+    tipo_periodo              character varying(20) NOT NULL   ,  -- 'inscripcion' | 'clases' | 'examenes' | 'receso'
     fecha_inicio              date                 NOT NULL   ,
     fecha_fin                 date                 NOT NULL   ,
     activo                    boolean              NULL       DEFAULT true,
-    id_carrera                integer              NULL       
+    modalidad                 character varying(20) NULL          -- NULL = GLOBAL; valores: 'mensual' | 'semestral' | 'anual' | 'intensivo'
+    -- migración 2026-06-28: se eliminó id_carrera y se agregó modalidad
 );
 
 CREATE TABLE cuotas_carrera (

@@ -11,8 +11,8 @@ class Cronograma extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'id_periodo', 'nombre', 'tipo_periodo', 
-        'fecha_inicio', 'fecha_fin', 'activo', 'id_carrera'
+        'id_periodo', 'nombre', 'tipo_periodo',
+        'fecha_inicio', 'fecha_fin', 'activo', 'modalidad',
     ];
 
     protected $casts = [
@@ -22,11 +22,6 @@ class Cronograma extends Model
     ];
 
     protected $appends = ['estado', 'alcance'];
-
-    public function carrera()
-    {
-        return $this->belongsTo(Carrera::class, 'id_carrera', 'id_carrera');
-    }
 
     public function getEstadoAttribute(): string
     {
@@ -51,10 +46,13 @@ class Cronograma extends Model
 
     public function getAlcanceAttribute(): string
     {
-        if (!$this->id_carrera) {
-            return 'GLOBAL';
-        }
+        $labels = [
+            'semestral'  => 'Semestral',
+            'mensual'    => 'Mensual',
+            'anual'      => 'Anual',
+            'intensivo'  => 'Intensivo',
+        ];
 
-        return $this->carrera ? $this->carrera->nombre : 'ESPECÍFICO';
+        return $this->modalidad ? ($labels[$this->modalidad] ?? strtoupper($this->modalidad)) : 'GLOBAL';
     }
 }

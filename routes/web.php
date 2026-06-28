@@ -151,9 +151,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         })->name('dashboard');
 
         // Cronogramas (CU10)
-        Route::get('/cronogramas', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'index'])->name('cronogramas.index');
-        Route::put('/cronogramas/{id}', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'update'])->name('cronogramas.update');
-        Route::patch('/cronogramas/{id}/toggle-activo', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'toggleActivo'])->name('cronogramas.toggle-activo');
+        Route::get('/cronogramas',                      [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'index'])       ->name('cronogramas.index');
+        Route::post('/cronogramas',                     [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'store'])        ->name('cronogramas.store');
+        Route::put('/cronogramas/{id}',                 [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'update'])       ->name('cronogramas.update');
+        Route::patch('/cronogramas/{id}/toggle-activo', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'toggleActivo']) ->name('cronogramas.toggle-activo');
+        Route::delete('/cronogramas/{id}',              [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'destroy'])      ->name('cronogramas.destroy');
 
         Route::get('/perfil',           [\App\Http\Controllers\Secretaria\PerfilController::class, 'index'])           ->name('perfil');
         Route::put('/perfil',           [\App\Http\Controllers\Secretaria\PerfilController::class, 'update'])          ->name('perfil.update');

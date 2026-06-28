@@ -27,12 +27,13 @@ class InscripcionController extends Controller
         $request->validate([
             'nombre'     => 'required|string|max:100',
             'apellido'   => 'required|string|max:100',
-            'dni'        => 'required|string|max:20',
+            'dni'        => 'required|string|max:20|unique:usuarios,dni',
             'email'      => 'required|email|max:150|unique:usuarios,email',
             'telefono'   => 'nullable|string|max:20',
             'id_carrera' => 'required|exists:carreras,id_carrera',
         ], [
-            'email.unique' => 'Ya existe una cuenta con este correo.',
+            'dni.unique'   => 'Ya existe un usuario registrado con este número de carnet (CI/DNI).',
+            'email.unique' => 'Ya existe una cuenta con este correo electrónico.',
         ]);
 
         $carrera = Carrera::findOrFail($request->id_carrera);
@@ -42,6 +43,9 @@ class InscripcionController extends Controller
         $usuario = null;
         $estudiante = null;
 
+        // PgBouncer (Supabase port 6543) recicla conexiones que pueden quedar en estado
+        // abortado de requests anteriores. Forzamos reconexión limpia antes de la transacción.
+        DB::reconnect();
         DB::beginTransaction();
         try {
             // 1. Crear Usuario
