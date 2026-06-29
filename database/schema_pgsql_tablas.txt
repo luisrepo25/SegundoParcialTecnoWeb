@@ -41,6 +41,9 @@ CREATE TABLE carreras (
     nombre                    character varying(150) NOT NULL   ,
     descripcion               text                 NULL       ,
     tipo                      character varying(20) NULL       DEFAULT 'tecnico_superior'::character varying,
+    modalidad                 character varying(20) NULL       ,                           -- NULL para curso_libre
+    max_materias              integer              NOT NULL   DEFAULT 5,
+    duracion_unidad           character varying(5) NOT NULL   DEFAULT 'anos'::character varying, -- 'anos' | 'meses' (meses para curso_libre)
     duracion_niveles          integer              NOT NULL   ,
     costo_carrera_completa    numeric              NULL       ,
     activo                    boolean              NULL       DEFAULT true
@@ -110,8 +113,9 @@ CREATE TABLE grupos (
     vacantes_max              integer              NOT NULL   ,
     vacantes_ocupadas         integer              NULL       ,
     activo                    boolean              NULL       DEFAULT true,
-    codigo_grupo              character varying(20) NULL       ,
-    CONSTRAINT grupos_codigo_grupo_periodo_key UNIQUE (codigo_grupo, id_periodo)
+    codigo_grupo              character varying(20) NULL
+    -- NOTA: UNIQUE (codigo_grupo, id_periodo) fue ELIMINADO (migración 2026_06_29_000005)
+    -- Grupos multi-día comparten mismo codigo_grupo en el mismo período
 );
 
 CREATE TABLE horarios (
@@ -224,6 +228,8 @@ CREATE TABLE periodos_dictado (
     tipo_periodo              character varying(20) NULL       DEFAULT 'semestral'::character varying,
     fecha_inicio              date                 NOT NULL   ,
     fecha_fin                 date                 NOT NULL   ,
+    fecha_inicio_inscripcion  date                 NULL       ,
+    fecha_fin_inscripcion     date                 NULL       ,
     id_nivel                  integer              NULL       ,
     activo                    boolean              NULL       DEFAULT true,
     max_materias              integer              NULL       DEFAULT 5,

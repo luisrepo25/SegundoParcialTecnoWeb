@@ -12,7 +12,7 @@ class Carrera extends Model
 
     protected $fillable = [
         'codigo', 'nombre', 'descripcion',
-        'tipo', 'modalidad', 'max_materias', 'duracion_niveles',
+        'tipo', 'modalidad', 'duracion_unidad', 'max_materias', 'duracion_niveles',
         'costo_carrera_completa', 'activo',
     ];
 

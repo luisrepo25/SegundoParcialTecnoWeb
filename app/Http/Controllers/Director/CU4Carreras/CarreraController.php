@@ -40,14 +40,17 @@ class CarreraController extends Controller
 
     public function store(Request $request)
     {
+        $esCurso = $request->tipo === 'curso_libre';
+
         $request->validate([
             'codigo'                 => 'required|string|max:20|unique:carreras,codigo',
             'nombre'                 => 'required|string|max:150',
             'descripcion'            => 'nullable|string',
             'tipo'                   => 'required|string|in:tecnico,tecnico_superior,curso_libre',
-            'modalidad'              => 'nullable|string|in:anual,semestral,mensual',
+            'modalidad'              => $esCurso ? 'nullable' : 'required|string|in:anual,semestral,mensual',
+            'duracion_unidad'        => 'nullable|string|in:anos,meses',
             'max_materias'           => 'required|integer|min:1|max:30',
-            'duracion_niveles'       => 'required|integer|min:1',
+            'duracion_niveles'       => 'required|integer|min:1|max:' . ($esCurso ? '60' : '20'),
             'costo_carrera_completa' => 'nullable|numeric|min:0',
         ]);
 
@@ -56,7 +59,8 @@ class CarreraController extends Controller
             'nombre'                 => $request->nombre,
             'descripcion'            => $request->descripcion,
             'tipo'                   => $request->tipo,
-            'modalidad'              => $request->modalidad ?: null,
+            'modalidad'              => $esCurso ? null : ($request->modalidad ?: null),
+            'duracion_unidad'        => $esCurso ? 'meses' : 'anos',
             'max_materias'           => $request->max_materias,
             'duracion_niveles'       => $request->duracion_niveles,
             'costo_carrera_completa' => $request->costo_carrera_completa,
@@ -68,16 +72,18 @@ class CarreraController extends Controller
 
     public function update(Request $request, int $id)
     {
-        $carrera = Carrera::findOrFail($id);
+        $carrera  = Carrera::findOrFail($id);
+        $esCurso  = $request->tipo === 'curso_libre';
 
         $request->validate([
             'codigo'                 => ['required', 'string', 'max:20', Rule::unique('carreras', 'codigo')->ignore($id, 'id_carrera')],
             'nombre'                 => 'required|string|max:150',
             'descripcion'            => 'nullable|string',
             'tipo'                   => 'required|string|in:tecnico,tecnico_superior,curso_libre',
-            'modalidad'              => 'nullable|string|in:anual,semestral,mensual',
+            'modalidad'              => $esCurso ? 'nullable' : 'required|string|in:anual,semestral,mensual',
+            'duracion_unidad'        => 'nullable|string|in:anos,meses',
             'max_materias'           => 'required|integer|min:1|max:30',
-            'duracion_niveles'       => 'required|integer|min:1',
+            'duracion_niveles'       => 'required|integer|min:1|max:' . ($esCurso ? '60' : '20'),
             'costo_carrera_completa' => 'nullable|numeric|min:0',
         ]);
 
@@ -86,7 +92,8 @@ class CarreraController extends Controller
             'nombre'                 => $request->nombre,
             'descripcion'            => $request->descripcion,
             'tipo'                   => $request->tipo,
-            'modalidad'              => $request->modalidad ?: null,
+            'modalidad'              => $esCurso ? null : ($request->modalidad ?: null),
+            'duracion_unidad'        => $esCurso ? 'meses' : 'anos',
             'max_materias'           => $request->max_materias,
             'duracion_niveles'       => $request->duracion_niveles,
             'costo_carrera_completa' => $request->costo_carrera_completa,

@@ -148,13 +148,22 @@ class GrupoController extends Controller
             ];
         }
 
+        // ── Slots ocupados por período (para filtrado anti-conflicto client-side) ──
+        $ocupadosPorPeriodo = DB::table('grupos')
+            ->whereRaw('activo IS TRUE')
+            ->select('id_oferta', 'id_periodo', 'id_horario', 'id_aula', 'id_profesor')
+            ->get()
+            ->groupBy('id_periodo')
+            ->map(fn($rows) => $rows->values()->toArray());
+
         return Inertia::render('Director/CU9Grupos/Index', [
-            'periodos'        => $periodos,
-            'materias'        => $materias,
-            'aulas'           => $aulas,
-            'profesores'      => $profesores,
-            'horarios'        => $horarios,
-            'mallaPorCarrera' => $mallaPorCarrera,
+            'periodos'           => $periodos,
+            'materias'           => $materias,
+            'aulas'              => $aulas,
+            'profesores'         => $profesores,
+            'horarios'           => $horarios,
+            'mallaPorCarrera'    => $mallaPorCarrera,
+            'ocupadosPorPeriodo' => $ocupadosPorPeriodo,
         ]);
     }
 
@@ -168,6 +177,8 @@ class GrupoController extends Controller
             'id_horario'   => 'required|integer|exists:horarios,id_horario',
             'vacantes_max' => 'required|integer|min:1|max:500',
             'codigo_grupo' => 'nullable|string|max:20',
+            'dias_extra'   => 'nullable|array',
+            'dias_extra.*' => 'integer|exists:horarios,id_horario',
         ]);
 
         // Validar que vacantes_max no supere la capacidad del aula
@@ -238,29 +249,84 @@ class GrupoController extends Controller
             ]);
         }
 
-        return redirect()->route('director.grupos.index')->with('success', 'Grupo registrado.');
+        // Código definitivo del grupo principal (para compartir con los extras)
+        $codigoPrincipal = $request->codigo_grupo ?: ('G-' . $id);
+
+        // Grupos adicionales por días de la semana (misma hora, diferente día)
+        // Todos comparten el mismo codigo_grupo que el grupo principal.
+        $diasExtra    = array_filter((array)($request->dias_extra ?? []),
+            fn($h) => (int)$h !== (int)$request->id_horario);
+        $extraCreados  = 0;
+        $extraOmitidos = 0;
+
+        foreach ($diasExtra as $idHorarioExtra) {
+            $cAula = DB::table('grupos')
+                ->where('id_aula',    $request->id_aula)
+                ->where('id_horario', $idHorarioExtra)
+                ->where('id_periodo', $request->id_periodo)
+                ->whereRaw('activo IS TRUE')->exists();
+
+            $cProf = DB::table('grupos')
+                ->where('id_profesor', $request->id_profesor)
+                ->where('id_horario',  $idHorarioExtra)
+                ->where('id_periodo',  $request->id_periodo)
+                ->whereRaw('activo IS TRUE')->exists();
+
+            if ($cAula || $cProf) { $extraOmitidos++; continue; }
+
+            DB::table('grupos')->insert([
+                'id_materia'        => $request->id_materia,
+                'id_aula'           => $request->id_aula,
+                'id_periodo'        => $request->id_periodo,
+                'id_profesor'       => $request->id_profesor,
+                'id_horario'        => $idHorarioExtra,
+                'vacantes_max'      => $request->vacantes_max,
+                'vacantes_ocupadas' => 0,
+                'activo'            => true,
+                'codigo_grupo'      => $codigoPrincipal,
+            ]);
+            $extraCreados++;
+        }
+
+        $msg = 'Grupo registrado.';
+        if ($extraCreados > 0) $msg = ($extraCreados + 1) . ' grupos creados (' . $extraCreados . ' día(s) adicional(es)).';
+        if ($extraOmitidos > 0) $msg .= " {$extraOmitidos} día(s) omitido(s) por conflicto.";
+
+        return redirect()->route('director.grupos.index')->with('success', $msg);
     }
 
     public function update(Request $request, int $id)
     {
         $request->validate([
-            'vacantes_max' => 'required|integer|min:1|max:500',
-            'codigo_grupo' => 'nullable|string|max:20',
-            'id_aula'      => 'required|integer|exists:aulas,id_aula',
-            'id_profesor'  => 'required|integer|exists:profesores,id_profesor',
-            'id_horario'   => 'required|integer|exists:horarios,id_horario',
+            'vacantes_max'    => 'required|integer|min:1|max:500',
+            'codigo_grupo'    => 'nullable|string|max:20',
+            'id_aula'         => 'required|integer|exists:aulas,id_aula',
+            'id_profesor'     => 'required|integer|exists:profesores,id_profesor',
+            'dias_mantener'   => 'nullable|array',
+            'dias_mantener.*' => 'integer',
+            'dias_agregar'    => 'nullable|array',
+            'dias_agregar.*'  => 'integer|exists:horarios,id_horario',
         ]);
 
         $grupo = DB::table('grupos')->where('id_oferta', $id)->first();
         if (!$grupo) abort(404);
 
-        $ocupadas = $grupo->vacantes_ocupadas ?? 0;
-        if ($request->vacantes_max < $ocupadas) {
+        // Todos los hermanos del bloque (mismo código, mismo período)
+        $hermanos    = DB::table('grupos')
+            ->where('id_periodo',   $grupo->id_periodo)
+            ->where('codigo_grupo', $grupo->codigo_grupo)
+            ->get();
+        $idsHermanos = $hermanos->pluck('id_oferta')->toArray();
+
+        // Validar vacantes vs ocupadas
+        $maxOcupadas = $hermanos->max('vacantes_ocupadas') ?? 0;
+        if ($request->vacantes_max < $maxOcupadas) {
             return redirect()->back()->withErrors([
-                'grupo' => "No se puede reducir vacantes por debajo de las ya ocupadas ({$ocupadas}).",
+                'grupo' => "No se puede reducir vacantes por debajo de las ya ocupadas ({$maxOcupadas}).",
             ]);
         }
 
+        // Validar capacidad del aula
         $aula = DB::table('aulas')->where('id_aula', $request->id_aula)->first();
         if ($aula && $request->vacantes_max > $aula->capacidad) {
             return redirect()->back()->withErrors([
@@ -268,57 +334,105 @@ class GrupoController extends Controller
             ]);
         }
 
-        $confAula = DB::table('grupos')
-            ->where('id_aula',    $request->id_aula)
-            ->where('id_horario', $request->id_horario)
-            ->where('id_periodo', $grupo->id_periodo)
-            ->where('id_oferta',  '!=', $id)
-            ->whereRaw('activo IS TRUE')
-            ->exists();
+        // Días a mantener y a eliminar
+        $diasMantener = !is_null($request->dias_mantener)
+            ? array_values(array_intersect($idsHermanos, (array)$request->dias_mantener))
+            : $idsHermanos;
 
-        if ($confAula) {
-            return redirect()->back()->withErrors([
-                'grupo' => 'Conflicto: esa aula ya tiene un grupo en ese horario y período.',
-            ]);
+        if (empty($diasMantener)) {
+            return redirect()->back()->withErrors(['grupo' => 'Debe mantener al menos un día.']);
         }
 
-        $confProf = DB::table('grupos')
-            ->where('id_profesor', $request->id_profesor)
-            ->where('id_horario',  $request->id_horario)
-            ->where('id_periodo',  $grupo->id_periodo)
-            ->where('id_oferta',   '!=', $id)
-            ->whereRaw('activo IS TRUE')
-            ->exists();
+        $diasEliminar = array_diff($idsHermanos, $diasMantener);
 
-        if ($confProf) {
-            return redirect()->back()->withErrors([
-                'grupo' => 'Conflicto: ese profesor ya tiene un grupo en ese horario y período.',
-            ]);
+        if (!empty($diasEliminar)) {
+            $tieneInscritos = DB::table('inscripciones')->whereIn('id_oferta', $diasEliminar)->exists();
+            if ($tieneInscritos) {
+                return redirect()->back()->withErrors([
+                    'grupo' => 'No se puede quitar un día que tiene estudiantes inscritos.',
+                ]);
+            }
+        }
+
+        // Verificar conflictos de aula/profesor en cada día que se mantiene
+        foreach ($hermanos->whereIn('id_oferta', $diasMantener) as $h) {
+            $confAula = DB::table('grupos')
+                ->where('id_aula',    $request->id_aula)
+                ->where('id_horario', $h->id_horario)
+                ->where('id_periodo', $grupo->id_periodo)
+                ->whereNotIn('id_oferta', $idsHermanos)
+                ->whereRaw('activo IS TRUE')->exists();
+            if ($confAula) {
+                return redirect()->back()->withErrors([
+                    'grupo' => "Conflicto: aula ya ocupada el " . ucfirst($h->dia_semana ?? '') . ".",
+                ]);
+            }
+            $confProf = DB::table('grupos')
+                ->where('id_profesor', $request->id_profesor)
+                ->where('id_horario',  $h->id_horario)
+                ->where('id_periodo',  $grupo->id_periodo)
+                ->whereNotIn('id_oferta', $idsHermanos)
+                ->whereRaw('activo IS TRUE')->exists();
+            if ($confProf) {
+                return redirect()->back()->withErrors([
+                    'grupo' => "Conflicto: el profesor ya tiene grupo el " . ucfirst($h->dia_semana ?? '') . ".",
+                ]);
+            }
         }
 
         $nuevoCodigo = $request->codigo_grupo ?: $grupo->codigo_grupo;
 
-        $codigoUsado = DB::table('grupos')
-            ->where('codigo_grupo', $nuevoCodigo)
-            ->where('id_periodo',   $grupo->id_periodo)
-            ->where('id_oferta',    '!=', $id)
-            ->exists();
-
-        if ($codigoUsado) {
-            return redirect()->back()->withErrors([
-                'grupo' => "El código '{$nuevoCodigo}' ya está en uso en este período.",
-            ]);
-        }
-
-        DB::table('grupos')->where('id_oferta', $id)->update([
+        // Actualizar todos los días que se mantienen
+        DB::table('grupos')->whereIn('id_oferta', $diasMantener)->update([
             'vacantes_max' => $request->vacantes_max,
             'codigo_grupo' => $nuevoCodigo,
             'id_aula'      => $request->id_aula,
             'id_profesor'  => $request->id_profesor,
-            'id_horario'   => $request->id_horario,
         ]);
 
-        return redirect()->route('director.grupos.index')->with('success', 'Grupo actualizado.');
+        // Eliminar días removidos
+        if (!empty($diasEliminar)) {
+            DB::table('grupos')->whereIn('id_oferta', $diasEliminar)->delete();
+        }
+
+        // Agregar nuevos días
+        $diasAgregar   = $request->dias_agregar ?? [];
+        $extraCreados  = 0;
+        $extraOmitidos = 0;
+
+        foreach ($diasAgregar as $idHorarioNuevo) {
+            $cAula = DB::table('grupos')
+                ->where('id_aula',    $request->id_aula)
+                ->where('id_horario', $idHorarioNuevo)
+                ->where('id_periodo', $grupo->id_periodo)
+                ->whereRaw('activo IS TRUE')->exists();
+            $cProf = DB::table('grupos')
+                ->where('id_profesor', $request->id_profesor)
+                ->where('id_horario',  $idHorarioNuevo)
+                ->where('id_periodo',  $grupo->id_periodo)
+                ->whereRaw('activo IS TRUE')->exists();
+            if ($cAula || $cProf) { $extraOmitidos++; continue; }
+
+            DB::table('grupos')->insert([
+                'id_materia'        => $grupo->id_materia,
+                'id_aula'           => $request->id_aula,
+                'id_periodo'        => $grupo->id_periodo,
+                'id_profesor'       => $request->id_profesor,
+                'id_horario'        => $idHorarioNuevo,
+                'vacantes_max'      => $request->vacantes_max,
+                'vacantes_ocupadas' => 0,
+                'activo'            => $grupo->activo,
+                'codigo_grupo'      => $nuevoCodigo,
+            ]);
+            $extraCreados++;
+        }
+
+        $msg = 'Grupo actualizado.';
+        if (!empty($diasEliminar))  $msg .= ' ' . count($diasEliminar) . ' día(s) eliminado(s).';
+        if ($extraCreados  > 0)     $msg .= " {$extraCreados} día(s) agregado(s).";
+        if ($extraOmitidos > 0)     $msg .= " {$extraOmitidos} día(s) con conflicto omitido(s).";
+
+        return redirect()->route('director.grupos.index')->with('success', $msg);
     }
 
     public function toggleActivo(int $id)
@@ -326,23 +440,41 @@ class GrupoController extends Controller
         $grupo = DB::table('grupos')->where('id_oferta', $id)->first();
         if (!$grupo) abort(404);
 
-        DB::table('grupos')->where('id_oferta', $id)
+        // Sincroniza todos los días del mismo bloque (mismo código en mismo período)
+        $hermanos = DB::table('grupos')
+            ->where('id_periodo',   $grupo->id_periodo)
+            ->where('codigo_grupo', $grupo->codigo_grupo)
+            ->pluck('id_oferta');
+
+        DB::table('grupos')->whereIn('id_oferta', $hermanos)
             ->update(['activo' => !$grupo->activo]);
 
         return redirect()->route('director.grupos.index')
-            ->with('success', $grupo->activo ? 'Grupo desactivado.' : 'Grupo activado.');
+            ->with('success', $grupo->activo ? 'Grupo(s) desactivado(s).' : 'Grupo(s) activado(s).');
     }
 
     public function destroy(int $id)
     {
-        $tieneInscritos = DB::table('inscripciones')->where('id_oferta', $id)->exists();
+        $grupo = DB::table('grupos')->where('id_oferta', $id)->first();
+        if (!$grupo) abort(404);
+
+        // Elimina todos los días del mismo bloque (mismo código en mismo período)
+        $hermanos = DB::table('grupos')
+            ->where('id_periodo',   $grupo->id_periodo)
+            ->where('codigo_grupo', $grupo->codigo_grupo)
+            ->pluck('id_oferta');
+
+        $tieneInscritos = DB::table('inscripciones')->whereIn('id_oferta', $hermanos)->exists();
         if ($tieneInscritos) {
             return redirect()->route('director.grupos.index')
                 ->withErrors(['grupo' => 'No se puede eliminar: tiene estudiantes inscritos.']);
         }
 
-        DB::table('grupos')->where('id_oferta', $id)->delete();
-        return redirect()->route('director.grupos.index')->with('success', 'Grupo eliminado.');
+        DB::table('grupos')->whereIn('id_oferta', $hermanos)->delete();
+
+        $n = $hermanos->count();
+        return redirect()->route('director.grupos.index')
+            ->with('success', $n > 1 ? "{$n} grupos (días) eliminados." : 'Grupo eliminado.');
     }
 
     public function clonar(Request $request)
@@ -358,50 +490,120 @@ class GrupoController extends Controller
 
         $grupos = DB::table('grupos')->where('id_periodo', $request->id_periodo_origen)->get();
 
-        $copiados = 0;
-        $omitidos = 0;
+        // UNA sola query: estado completo del período destino
+        $destinoRows = DB::table('grupos')
+            ->where('id_periodo', $request->id_periodo_destino)
+            ->get(['id_aula', 'id_horario', 'id_profesor', 'codigo_grupo']);
 
-        foreach ($grupos as $g) {
-            // Verificar conflicto aula+horario en destino
-            $confAula = DB::table('grupos')
-                ->where('id_aula',    $g->id_aula)
-                ->where('id_horario', $g->id_horario)
-                ->where('id_periodo', $request->id_periodo_destino)
-                ->whereRaw('activo IS TRUE')
-                ->exists();
+        $aulasOcupadas  = [];
+        $profesOcupados = [];
+        $codigosDestino = [];
 
-            // Verificar conflicto profesor+horario en destino
-            $confProf = DB::table('grupos')
-                ->where('id_profesor', $g->id_profesor)
-                ->where('id_horario',  $g->id_horario)
-                ->where('id_periodo',  $request->id_periodo_destino)
-                ->whereRaw('activo IS TRUE')
-                ->exists();
-
-            if ($confAula || $confProf) {
-                $omitidos++;
-                continue;
-            }
-
-            $id = DB::table('grupos')->insertGetId([
-                'id_materia'        => $g->id_materia,
-                'id_aula'           => $g->id_aula,
-                'id_periodo'        => $request->id_periodo_destino,
-                'id_profesor'       => $g->id_profesor,
-                'id_horario'        => $g->id_horario,
-                'vacantes_max'      => $g->vacantes_max,
-                'vacantes_ocupadas' => 0,
-                'activo'            => true,
-                'codigo_grupo'      => null,
-            ], 'id_oferta');
-            DB::table('grupos')->where('id_oferta', $id)->update(['codigo_grupo' => 'G-' . $id]);
-            $copiados++;
+        foreach ($destinoRows as $r) {
+            $aulasOcupadas[$r->id_aula . ':' . $r->id_horario]       = true;
+            $profesOcupados[$r->id_profesor . ':' . $r->id_horario]   = true;
+            if ($r->codigo_grupo) $codigosDestino[$r->codigo_grupo]   = true;
         }
 
-        $msg = "{$copiados} grupo(s) clonados al período destino.";
-        if ($omitidos > 0) $msg .= " {$omitidos} omitido(s) por conflicto de horario.";
+        // Agrupar filas origen por codigo_grupo para preservar bloques multi-día
+        $bloques = [];
+        foreach ($grupos as $g) {
+            $key = $g->codigo_grupo ?? ('__solo_' . $g->id_oferta);
+            $bloques[$key][] = $g;
+        }
+
+        $rowsBatch   = [];
+        $sinCodigo   = [];
+        $logicosOk   = 0;
+        $logicosOmit = 0;
+
+        foreach ($bloques as $codigoOrigen => $hermanos) {
+            // Determinar UN código para todo el bloque (compartido entre días)
+            $codigoFinal = null;
+            $esCodigoReal = !str_starts_with($codigoOrigen, '__solo_');
+
+            if ($esCodigoReal) {
+                if (!isset($codigosDestino[$codigoOrigen])) {
+                    $codigoFinal = $codigoOrigen;
+                } else {
+                    $base = substr($codigoOrigen, 0, 17);
+                    for ($i = 2; $i <= 99; $i++) {
+                        $c = $base . '-' . $i;
+                        if (!isset($codigosDestino[$c])) { $codigoFinal = $c; break; }
+                    }
+                }
+            }
+
+            $diasValidos = 0;
+            foreach ($hermanos as $g) {
+                if (isset($aulasOcupadas[$g->id_aula . ':' . $g->id_horario]) ||
+                    isset($profesOcupados[$g->id_profesor . ':' . $g->id_horario])) {
+                    continue;  // este día tiene conflicto → omitir solo ese día
+                }
+
+                $row = [
+                    'id_materia'        => $g->id_materia,
+                    'id_aula'           => $g->id_aula,
+                    'id_periodo'        => $request->id_periodo_destino,
+                    'id_profesor'       => $g->id_profesor,
+                    'id_horario'        => $g->id_horario,
+                    'vacantes_max'      => $g->vacantes_max,
+                    'vacantes_ocupadas' => 0,
+                    'activo'            => true,
+                    'codigo_grupo'      => $codigoFinal,
+                ];
+
+                // Marcar slot ocupado para detectar conflictos dentro del mismo lote
+                $aulasOcupadas[$g->id_aula . ':' . $g->id_horario]       = true;
+                $profesOcupados[$g->id_profesor . ':' . $g->id_horario]   = true;
+
+                if ($codigoFinal) {
+                    $rowsBatch[] = $row;
+                } else {
+                    $sinCodigo[] = $row;
+                }
+                $diasValidos++;
+            }
+
+            if ($diasValidos > 0) {
+                if ($codigoFinal) $codigosDestino[$codigoFinal] = true;
+                $logicosOk++;
+            } else {
+                $logicosOmit++;
+            }
+        }
+
+        if (!empty($rowsBatch)) {
+            DB::table('grupos')->insert($rowsBatch);
+        }
+
+        foreach ($sinCodigo as $row) {
+            $id = DB::table('grupos')->insertGetId($row, 'id_oferta');
+            DB::table('grupos')->where('id_oferta', $id)->update(['codigo_grupo' => 'G-' . $id]);
+        }
+
+        $msg = "{$logicosOk} grupo(s) clonados al período destino.";
+        if ($logicosOmit > 0) $msg .= " {$logicosOmit} omitido(s) por conflicto en todos sus días.";
 
         return redirect()->route('director.grupos.index')->with('success', $msg);
+    }
+
+    public function destroyPeriodo(int $id)
+    {
+        $tieneInscritos = DB::table('inscripciones')
+            ->join('grupos', 'inscripciones.id_oferta', '=', 'grupos.id_oferta')
+            ->where('grupos.id_periodo', $id)
+            ->exists();
+
+        if ($tieneInscritos) {
+            return redirect()->route('director.grupos.index')
+                ->withErrors(['grupo' => 'No se puede vaciar: hay estudiantes inscritos en grupos de este período.']);
+        }
+
+        $eliminados = DB::table('grupos')->where('id_periodo', $id)->delete();
+
+        return redirect()->route('director.grupos.index')
+            ->with('success', "{$eliminados} grupo(s) eliminados del período.");
     }
 
     // ── CU9: Ver inscritos en un grupo específico ──────────────────────────────

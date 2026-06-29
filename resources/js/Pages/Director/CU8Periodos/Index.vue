@@ -187,8 +187,9 @@ function toggleCarreraLote(id) {
     else formLote.id_carreras.splice(idx, 1);
 }
 
-// Mapea modalidad de carrera al tipo_periodo más probable
-function modalidadATipo(modalidad) {
+// Mapea tipo/modalidad de carrera al tipo_periodo más probable
+function modalidadATipo(tipo, modalidad) {
+    if (tipo === 'curso_libre') return 'mensual';
     const map = { anual: 'anual', semestral: 'semestral', mensual: 'mensual' };
     return map[modalidad] ?? 'semestral';
 }
@@ -201,7 +202,7 @@ function abrirLote() {
     const tipos  = {};
     const fechas = {};
     for (const c of props.carrerasSelect) {
-        tipos[c.id_carrera]  = modalidadATipo(c.modalidad);
+        tipos[c.id_carrera]  = modalidadATipo(c.tipo, c.modalidad);
         fechas[c.id_carrera] = { fecha_inicio: '', fecha_fin: '' };
     }
     tipoPorCarrera.value   = tipos;
@@ -272,6 +273,21 @@ function labelCronograma(c) {
     const mod = c.modalidad ? MODALIDAD_LABELS[c.modalidad] ?? c.modalidad : 'Global';
     return `${c.nombre}  (${fmtFecha(c.fecha_inicio)} → ${fmtFecha(c.fecha_fin)})  · ${mod}`;
 }
+
+// Options para ComboSelect del modal individual
+const optsClasesModal = computed(() =>
+    cronogramasFiltrados(form.tipo_periodo).map(c => ({
+        value: c.id_cronograma,
+        label: labelCronograma(c),
+    }))
+);
+
+const optsInscripcionModal = computed(() =>
+    cronogramasInscripcionFiltrados.value.map(c => ({
+        value: c.id_cronograma,
+        label: labelCronograma(c),
+    }))
+);
 
 function aplicarCronograma(idCronograma, targetForm) {
     if (!idCronograma) return;
@@ -549,15 +565,13 @@ const carrerasFiltradas = computed(() => {
                         <p class="text-[11px] font-semibold mb-2 flex items-center gap-1.5" style="color: #8b5cf6;">
                             📚 Fechas de clases
                         </p>
-                        <div v-if="cronogramasFiltrados(form.tipo_periodo).length > 0" class="mb-3">
-                            <select v-model="cronogramaModal" class="input-field text-xs w-full"
-                                    @change="aplicarCronograma(cronogramaModal, form)">
-                                <option value="">— Tomar fechas del cronograma de clases —</option>
-                                <option v-for="c in cronogramasFiltrados(form.tipo_periodo)"
-                                        :key="c.id_cronograma" :value="c.id_cronograma">
-                                    {{ labelCronograma(c) }}
-                                </option>
-                            </select>
+                        <div v-if="optsClasesModal.length > 0" class="mb-3">
+                            <ComboSelect
+                                v-model="cronogramaModal"
+                                :options="optsClasesModal"
+                                placeholder="— Tomar fechas del cronograma de clases —"
+                                emptyLabel="— Tomar fechas del cronograma de clases —"
+                                @update:modelValue="aplicarCronograma($event, form)" />
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
@@ -582,15 +596,13 @@ const carrerasFiltradas = computed(() => {
                         <p class="text-[11px] font-semibold mb-2 flex items-center gap-1.5" style="color: #10b981;">
                             📝 Período de inscripciones
                         </p>
-                        <div v-if="cronogramasInscripcionFiltrados.length > 0" class="mb-3">
-                            <select v-model="cronogramaInscripcionModal" class="input-field text-xs w-full"
-                                    @change="aplicarCronogramaInscripcion(cronogramaInscripcionModal, form)">
-                                <option value="">— Tomar fechas del cronograma de inscripciones —</option>
-                                <option v-for="c in cronogramasInscripcionFiltrados"
-                                        :key="c.id_cronograma" :value="c.id_cronograma">
-                                    {{ labelCronograma(c) }}
-                                </option>
-                            </select>
+                        <div v-if="optsInscripcionModal.length > 0" class="mb-3">
+                            <ComboSelect
+                                v-model="cronogramaInscripcionModal"
+                                :options="optsInscripcionModal"
+                                placeholder="— Tomar fechas del cronograma de inscripciones —"
+                                emptyLabel="— Tomar fechas del cronograma de inscripciones —"
+                                @update:modelValue="aplicarCronogramaInscripcion($event, form)" />
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
@@ -848,11 +860,16 @@ const carrerasFiltradas = computed(() => {
                 <p class="font-semibold text-center mb-1" style="color: var(--text-color);">
                     Clonar períodos para {{ anoSiguiente }}
                 </p>
-                <p class="text-sm text-center mb-1" style="color: var(--text-secondary);">
-                    Se copiarán todos los períodos activos del año actual con fechas +1 año.
+                <p class="text-sm text-center mb-2" style="color: var(--text-secondary);">
+                    Se clonarán <strong>todos</strong> los períodos activos del año {{ anoSiguiente - 1 }}:
                 </p>
+                <ul class="text-xs text-center mb-3 space-y-0.5" style="color: var(--text-secondary);">
+                    <li>📘 Períodos semestrales</li>
+                    <li>📗 Períodos anuales</li>
+                    <li>📙 Cursos libres / intensivos</li>
+                </ul>
                 <p class="text-xs text-center mb-5" style="color: var(--text-muted);">
-                    Si ya existe un período con el mismo nombre para esa carrera en {{ anoSiguiente }}, se omite.
+                    Las fechas se adelantan +1 año. Si ya existe un período con el mismo nombre para esa carrera en {{ anoSiguiente }}, se omite.
                 </p>
                 <div class="flex justify-center gap-3">
                     <button @click="confirmClonar = false" class="btn-secondary">Cancelar</button>

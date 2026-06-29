@@ -975,6 +975,9 @@ CREATE TABLE public.carreras (
     nombre character varying(150) NOT NULL,
     descripcion text,
     tipo character varying(20) DEFAULT 'tecnico_superior'::character varying,
+    modalidad character varying(20),
+    max_materias integer DEFAULT 5 NOT NULL,
+    duracion_unidad character varying(5) DEFAULT 'anos'::character varying NOT NULL,
     duracion_niveles integer NOT NULL,
     costo_carrera_completa numeric(10,2),
     activo boolean DEFAULT true,
@@ -1673,6 +1676,8 @@ CREATE TABLE public.periodos_dictado (
     tipo_periodo character varying(20) DEFAULT 'semestral'::character varying,
     fecha_inicio date NOT NULL,
     fecha_fin date NOT NULL,
+    fecha_inicio_inscripcion date,
+    fecha_fin_inscripcion date,
     id_nivel integer,
     activo boolean DEFAULT true,
     max_materias integer DEFAULT 5,
@@ -3155,13 +3160,9 @@ ALTER TABLE ONLY public.evaluaciones
     ADD CONSTRAINT evaluaciones_pkey PRIMARY KEY (id_evaluacion);
 
 
---
--- Name: grupos grupos_codigo_grupo_periodo_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.grupos
-    ADD CONSTRAINT grupos_codigo_grupo_periodo_key UNIQUE (codigo_grupo, id_periodo);
-
+-- NOTA: grupos_codigo_grupo_periodo_key fue ELIMINADO (migración 2026_06_29_000005)
+-- Los grupos multi-día comparten mismo codigo_grupo en el mismo período, por lo que
+-- el UNIQUE (codigo_grupo, id_periodo) fue incompatible con la estructura multi-día.
 
 --
 -- Name: horarios horarios_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres

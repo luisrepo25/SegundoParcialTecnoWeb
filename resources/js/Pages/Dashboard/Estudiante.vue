@@ -10,6 +10,7 @@ const props = defineProps({
     planOpciones:           { type: Object, default: () => ({}) },
     inscripciones:          { type: Array,  default: () => [] },
     gruposDisponibles:      { type: Array,  default: () => [] },
+    ofertaGeneral:          { type: Array,  default: () => [] },
     proximaMateria:         { type: Object, default: null },
     cronogramaInscripcion:  { type: Object, default: null },
 });
@@ -68,6 +69,57 @@ const planLabel = (fp) => ({
 
 const fmtHora = (t) => (t ?? '').substring(0, 5);
 const cap     = (s)  => s ? s[0].toUpperCase() + s.slice(1) : '';
+
+// Oferta general agrupada por nivel → materia → codigo_grupo (con días agregados)
+const ofertaAgrupada = computed(() => {
+    if (!props.ofertaGeneral.length) return [];
+    const niveles = new Map();
+    for (const row of props.ofertaGeneral) {
+        const nivelKey  = row.numero_nivel ?? '__libre';
+        const nivelLabel = row.nivel_nombre ?? (row.numero_nivel ? `Nivel ${row.numero_nivel}` : 'Módulos del Curso');
+        if (!niveles.has(nivelKey)) {
+            niveles.set(nivelKey, { numero_nivel: row.numero_nivel ?? 0, nivel_nombre: nivelLabel, materias: new Map() });
+        }
+        const nivel = niveles.get(nivelKey);
+        if (!nivel.materias.has(row.id_materia)) {
+            nivel.materias.set(row.id_materia, {
+                id_materia:      row.id_materia,
+                materia_nombre:  row.materia_nombre,
+                materia_codigo:  row.materia_codigo,
+                es_proxima:      props.proximaMateria?.id_materia === row.id_materia,
+                grupos:          new Map(),
+            });
+        }
+        const materia  = nivel.materias.get(row.id_materia);
+        const grupoKey = row.codigo_grupo ?? ('_' + row.id_oferta);
+        if (!materia.grupos.has(grupoKey)) {
+            materia.grupos.set(grupoKey, {
+                id_oferta:        row.id_oferta,
+                codigo_grupo:     row.codigo_grupo,
+                vacantes_max:     row.vacantes_max,
+                vacantes_ocupadas: row.vacantes_ocupadas,
+                aula_nombre:      row.aula_nombre,
+                profesor_nombre:  row.profesor_nombre,
+                profesor_cv:      row.profesor_cv,
+                horarios:         [],
+            });
+        }
+        materia.grupos.get(grupoKey).horarios.push({
+            dia_semana:  row.dia_semana,
+            hora_inicio: row.hora_inicio,
+            hora_fin:    row.hora_fin,
+        });
+    }
+    return Array.from(niveles.values())
+        .sort((a, b) => a.numero_nivel - b.numero_nivel)
+        .map(nv => ({
+            ...nv,
+            materias: Array.from(nv.materias.values()).map(mt => ({
+                ...mt,
+                grupos: Array.from(mt.grupos.values()),
+            })),
+        }));
+});
 
 // Inscripción directa (plan completo — sin QR)
 const inscribiendoId = ref(null);
@@ -171,13 +223,22 @@ function elegirPlan(tipo) {
                         Plan de Carrera
                         <span v-if="!afiliacion" class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500"></span>
                     </button>
-                    <!-- Grupos -->
+                    <!-- Oferta del semestre — solo cuando inscripciones abiertas -->
+                    <button v-if="ofertaGeneral.length > 0" @click="tabActiva = 'oferta'"
+                        class="flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all"
+                        :style="tabActiva === 'oferta'
+                            ? 'background-color: var(--primary-color); color: var(--primary-text);'
+                            : 'color: var(--text-secondary);'">
+                        Oferta del Semestre
+                        <span class="ml-1 text-xs opacity-75">({{ ofertaAgrupada.reduce((s,n)=>s+n.materias.length,0) }} mat.)</span>
+                    </button>
+                    <!-- Grupos disponibles para mí -->
                     <button @click="tabActiva = 'disponibles'"
                         class="flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all"
                         :style="tabActiva === 'disponibles'
                             ? 'background-color: var(--primary-color); color: var(--primary-text);'
                             : 'color: var(--text-secondary);'">
-                        Grupos Disponibles
+                        Mis Grupos
                         <span v-if="gruposDisponibles.length" class="ml-1 text-xs opacity-75">({{ gruposDisponibles.length }})</span>
                     </button>
                     <!-- Mis inscripciones -->
@@ -322,6 +383,125 @@ function elegirPlan(tipo) {
                                 </div>
                             </div>
 
+                        </div>
+                    </template>
+                </div>
+
+                <!-- ══ TAB: OFERTA DEL SEMESTRE ══ -->
+                <div v-if="tabActiva === 'oferta'">
+
+                    <!-- Sin período activo -->
+                    <div v-if="!ofertaGeneral.length" class="rounded-xl p-8 text-center"
+                         style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                        <p class="text-4xl mb-3">📅</p>
+                        <p class="font-medium" style="color: var(--text-color);">No hay grupos publicados en el período activo.</p>
+                        <p class="text-sm mt-1" style="color: var(--text-secondary);">El director aún no ha publicado el maestro de oferta para este semestre.</p>
+                    </div>
+
+                    <template v-else>
+                        <!-- Info banner -->
+                        <div class="rounded-xl px-4 py-3 mb-4 text-sm flex items-start gap-2"
+                             style="background-color: color-mix(in srgb,#6366f1 8%,transparent); border: 1px solid color-mix(in srgb,#6366f1 25%,transparent); color:#4338ca;">
+                            <span class="shrink-0 mt-0.5">📋</span>
+                            <span>
+                                Vista general de todos los grupos ofertados este semestre para tu carrera.
+                                Tu próxima materia está <strong>resaltada en verde</strong>.
+                                Para inscribirte ve a <button class="underline font-semibold" @click="tabActiva='disponibles'">Mis Grupos →</button>
+                            </span>
+                        </div>
+
+                        <!-- Niveles -->
+                        <div class="space-y-5">
+                            <div v-for="nivel in ofertaAgrupada" :key="nivel.numero_nivel">
+
+                                <!-- Cabecera nivel -->
+                                <div class="flex items-center gap-3 mb-2">
+                                    <div class="flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold shrink-0"
+                                         style="background-color: var(--primary-color); color: var(--primary-text);">
+                                        {{ nivel.numero_nivel || '★' }}
+                                    </div>
+                                    <h3 class="font-semibold text-sm" style="color: var(--text-color);">{{ nivel.nivel_nombre }}</h3>
+                                    <div class="flex-1 h-px" style="background-color: var(--border-color);"></div>
+                                    <span class="text-xs" style="color: var(--text-secondary);">{{ nivel.materias.length }} materia(s)</span>
+                                </div>
+
+                                <!-- Materias del nivel -->
+                                <div class="space-y-3">
+                                    <div v-for="materia in nivel.materias" :key="materia.id_materia"
+                                         class="rounded-xl overflow-hidden"
+                                         :style="materia.es_proxima
+                                            ? 'border: 2px solid #22c55e; background-color: color-mix(in srgb,#22c55e 5%,var(--card-bg));'
+                                            : 'border: 1px solid var(--border-color); background-color: var(--card-bg);'">
+
+                                        <!-- Header materia -->
+                                        <div class="flex items-center gap-3 px-4 py-2.5 border-b"
+                                             :style="materia.es_proxima
+                                                ? 'border-color: #86efac; background-color: color-mix(in srgb,#22c55e 10%,transparent);'
+                                                : 'border-color: var(--border-color);'">
+                                            <span class="font-mono text-xs font-semibold px-2 py-0.5 rounded"
+                                                  style="background-color: color-mix(in srgb,var(--text-color) 8%,transparent); color: var(--text-secondary);">
+                                                {{ materia.materia_codigo }}
+                                            </span>
+                                            <span class="font-semibold text-sm flex-1" :style="materia.es_proxima ? 'color:#15803d' : 'color:var(--text-color)'">
+                                                {{ materia.materia_nombre }}
+                                            </span>
+                                            <span v-if="materia.es_proxima"
+                                                  class="px-2.5 py-0.5 rounded-full text-xs font-bold"
+                                                  style="background-color:#22c55e; color:#fff;">
+                                                ← Tu próxima
+                                            </span>
+                                            <span class="text-xs" style="color: var(--text-secondary);">
+                                                {{ materia.grupos.length }} grupo(s)
+                                            </span>
+                                        </div>
+
+                                        <!-- Grupos de la materia -->
+                                        <div class="divide-y" style="border-color: var(--border-color);">
+                                            <div v-for="grupo in materia.grupos" :key="grupo.codigo_grupo"
+                                                 class="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3">
+                                                <!-- Código grupo -->
+                                                <span class="font-mono text-xs font-bold shrink-0"
+                                                      style="color: var(--primary-color); min-width:5rem;">
+                                                    {{ grupo.codigo_grupo ?? '—' }}
+                                                </span>
+                                                <!-- Horarios (multi-día) -->
+                                                <div class="flex-1">
+                                                    <div class="flex flex-wrap gap-1.5">
+                                                        <span v-for="h in grupo.horarios" :key="h.dia_semana"
+                                                              class="text-xs px-2 py-0.5 rounded-full font-medium"
+                                                              style="background-color: color-mix(in srgb, var(--primary-color) 10%, transparent); color: var(--primary-color);">
+                                                            {{ cap(h.dia_semana) }} {{ fmtHora(h.hora_inicio) }}–{{ fmtHora(h.hora_fin) }}
+                                                        </span>
+                                                    </div>
+                                                    <div class="flex flex-wrap gap-x-3 mt-1 text-xs" style="color: var(--text-secondary);">
+                                                        <span>{{ grupo.aula_nombre }}</span>
+                                                        <span class="flex items-center gap-1">
+                                                            {{ grupo.profesor_nombre }}
+                                                            <a v-if="grupo.profesor_cv" :href="assetUrl + '/cvs/' + grupo.profesor_cv" target="_blank" title="Ver CV" class="text-indigo-500 hover:text-indigo-700">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                                                            </a>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <!-- Vacantes -->
+                                                <div class="text-center shrink-0">
+                                                    <p class="text-xs" style="color: var(--text-secondary);">Vacantes</p>
+                                                    <p class="font-bold text-sm" :style="(grupo.vacantes_max - (grupo.vacantes_ocupadas??0)) > 0 ? 'color: var(--primary-color)' : 'color:#ef4444'">
+                                                        {{ grupo.vacantes_max - (grupo.vacantes_ocupadas ?? 0) }}
+                                                        <span class="text-xs font-normal" style="color: var(--text-secondary);">/ {{ grupo.vacantes_max }}</span>
+                                                    </p>
+                                                </div>
+                                                <!-- Badge "tu próxima" — solo informativo -->
+                                                <span v-if="materia.es_proxima"
+                                                      class="shrink-0 text-xs px-2.5 py-1 rounded-lg font-semibold"
+                                                      style="background-color: color-mix(in srgb,#22c55e 15%,transparent); color:#15803d; border:1px solid #86efac;">
+                                                    Tu próxima
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </template>
                 </div>

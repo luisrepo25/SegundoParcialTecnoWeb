@@ -169,6 +169,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/grupos/{id}', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'update'])->name('grupos.update');
         Route::patch('/grupos/{id}/toggle', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'toggleActivo'])->name('grupos.toggle');
         Route::delete('/grupos/{id}', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'destroy'])->name('grupos.destroy');
+        Route::delete('/periodos/{id}/grupos', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'destroyPeriodo'])->name('grupos.destroyPeriodo');
 
     });
 

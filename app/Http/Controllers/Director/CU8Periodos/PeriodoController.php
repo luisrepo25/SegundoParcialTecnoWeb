@@ -62,9 +62,11 @@ class PeriodoController extends Controller
             ->get();
 
         // ── Plantillas (períodos existentes para clonar configuración) ────────
+        $anioActual = now()->year;
         $periodosExistentes = DB::table('periodos_dictado as pd')
             ->join('carreras as c', 'pd.id_carrera', '=', 'c.id_carrera')
             ->whereNotNull('pd.id_carrera')
+            ->whereYear('pd.fecha_inicio', $anioActual)
             ->orderBy('pd.fecha_inicio', 'desc')
             ->select('pd.id_periodo', 'pd.nombre', 'pd.tipo_periodo',
                      'pd.fecha_inicio', 'pd.fecha_fin', 'c.id_carrera', 'c.nombre as carrera_nombre')
@@ -72,7 +74,7 @@ class PeriodoController extends Controller
 
         $plantillasMap = [];
         foreach ($periodosExistentes as $r) {
-            $key = $r->nombre . '||' . $r->tipo_periodo;
+            $key = strtolower(trim($r->nombre)) . '||' . $r->tipo_periodo;
             if (!isset($plantillasMap[$key])) {
                 $plantillasMap[$key] = [
                     'label'        => $r->nombre . ' (' . $r->tipo_periodo . ')',

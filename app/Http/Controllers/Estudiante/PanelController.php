@@ -220,6 +220,47 @@ class PanelController extends Controller
             }
         }
 
+        // Maestro de oferta general — todos los grupos de la carrera en el período con inscripción abierta
+        // Solo visible cuando las inscripciones están abiertas
+        $ofertaGeneral = [];
+        if ($carrera && $inscripcionesAbiertas && $idsPeriodoConInscripcionAbierta->isNotEmpty()) {
+            $idsPeriodo = $idsPeriodoConInscripcionAbierta;
+
+            $ofertaGeneral = DB::table('grupos as g')
+                ->join('materias as m',          'g.id_materia',  '=', 'm.id_materia')
+                ->join('periodos_dictado as pd', 'g.id_periodo',  '=', 'pd.id_periodo')
+                ->join('horarios as h',          'g.id_horario',  '=', 'h.id_horario')
+                ->join('aulas as a',             'g.id_aula',     '=', 'a.id_aula')
+                ->join('profesores as p',        'g.id_profesor', '=', 'p.id_profesor')
+                ->join('usuarios as u',          'p.id_usuario',  '=', 'u.id_usuario')
+                ->leftJoin('malla_curricular as mc', function ($join) use ($est) {
+                    $join->on('g.id_materia', '=', 'mc.id_materia')
+                         ->where('mc.id_carrera', $est->id_carrera_actual);
+                })
+                ->leftJoin('niveles_carrera as n', 'mc.id_nivel', '=', 'n.id_nivel')
+                ->whereIn('g.id_periodo', $idsPeriodo)
+                ->whereRaw('g.activo IS TRUE')
+                ->select(
+                    'g.id_oferta', 'g.codigo_grupo', 'g.vacantes_max', 'g.vacantes_ocupadas',
+                    'm.id_materia', 'm.nombre as materia_nombre', 'm.codigo as materia_codigo',
+                    'pd.nombre as periodo_nombre',
+                    'h.dia_semana', 'h.hora_inicio', 'h.hora_fin',
+                    'a.nombre as aula_nombre',
+                    DB::raw("u.nombre || ' ' || u.apellido as profesor_nombre"),
+                    DB::raw('p.archivo_cv as profesor_cv'),
+                    'n.numero_nivel', 'n.nombre as nivel_nombre',
+                    'mc.orden_en_nivel'
+                )
+                ->orderByRaw('COALESCE(n.numero_nivel, 0)')
+                ->orderByRaw('COALESCE(mc.orden_en_nivel, 0)')
+                ->orderBy('m.nombre')
+                ->orderBy('g.codigo_grupo')
+                ->orderBy('h.dia_semana')
+                ->get()
+                ->map(fn($r) => (array) $r)
+                ->toArray();
+        }
+
         return Inertia::render('Dashboard/Estudiante', [
             'estudiante' => [
                 'id_estudiante'   => $est->id_estudiante,
@@ -252,6 +293,7 @@ class PanelController extends Controller
             'planOpciones'           => $planOpciones,
             'inscripciones'          => $inscripciones,
             'gruposDisponibles'      => $gruposDisponibles,
+            'ofertaGeneral'          => $ofertaGeneral,
             'proximaMateria'         => $proximaMateriaInfo,
             'cronogramaInscripcion'  => $cronogramaInscripcion ? [
                 'nombre'      => $cronogramaInscripcion->nombre,

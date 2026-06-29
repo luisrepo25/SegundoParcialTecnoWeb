@@ -51,7 +51,23 @@ const MAX_SUGERIDO = { semestral: 5, anual: 10, mensual: 1 };
 const form = useForm({
     codigo: '', nombre: '', descripcion: '',
     tipo: 'tecnico_superior', modalidad: 'semestral',
+    duracion_unidad: 'anos',
     max_materias: 5, duracion_niveles: '', costo_carrera_completa: '',
+});
+
+const esCursoLibre = computed(() => form.tipo === 'curso_libre');
+
+// Cuando cambia tipo: ajustar defaults
+watch(() => form.tipo, (val) => {
+    if (val === 'curso_libre') {
+        form.modalidad       = '';
+        form.duracion_unidad = 'meses';
+        form.max_materias    = 6;
+        if (!form.duracion_niveles) form.duracion_niveles = 6;
+    } else {
+        form.modalidad       = form.modalidad || 'semestral';
+        form.duracion_unidad = 'anos';
+    }
 });
 
 // Cuando cambia modalidad, sugerir max_materias automáticamente
@@ -73,7 +89,8 @@ function abrirEditar(c) {
     form.nombre                 = c.nombre;
     form.descripcion            = c.descripcion ?? '';
     form.tipo                   = c.tipo;
-    form.modalidad              = c.modalidad ?? 'semestral';
+    form.modalidad              = c.modalidad ?? (c.tipo === 'curso_libre' ? '' : 'semestral');
+    form.duracion_unidad        = c.duracion_unidad ?? (c.tipo === 'curso_libre' ? 'meses' : 'anos');
     form.max_materias           = c.max_materias ?? 5;
     form.duracion_niveles       = c.duracion_niveles;
     form.costo_carrera_completa = c.costo_carrera_completa ?? '';
@@ -206,7 +223,10 @@ function formatCosto(val) {
                                     <span v-else class="text-xs" style="color: var(--text-muted);">—</span>
                                 </td>
                                 <td class="px-4 py-3 text-sm hidden md:table-cell" style="color: var(--text-color);">
-                                    {{ c.duracion_niveles }} <span class="text-xs" style="color: var(--text-secondary);">nivel(es)</span>
+                                    {{ c.duracion_niveles }}
+                                    <span class="text-xs" style="color: var(--text-secondary);">
+                                        {{ c.duracion_unidad === 'meses' ? 'mes(es)' : 'año(s)' }}
+                                    </span>
                                 </td>
                                 <td class="px-4 py-3 text-sm hidden lg:table-cell" style="color: var(--text-color);">
                                     {{ formatCosto(c.costo_carrera_completa) }}
@@ -285,7 +305,8 @@ function formatCosto(val) {
                             </div>
                         </div>
 
-                        <div>
+                        <!-- Modalidad: solo para carreras/técnicos, no para cursos -->
+                        <div v-if="!esCursoLibre">
                             <label class="field-label">Modalidad de períodos *</label>
                             <div class="grid grid-cols-3 gap-2 mt-1">
                                 <button v-for="m in MODALIDADES" :key="m.value"
@@ -308,6 +329,14 @@ function formatCosto(val) {
                             <p v-if="form.errors.modalidad" class="field-error">{{ form.errors.modalidad }}</p>
                         </div>
 
+                        <!-- Cursos libres: info de lanzamiento manual -->
+                        <div v-else class="rounded-lg border px-3 py-2.5 text-xs"
+                             style="border-color:color-mix(in srgb,#f59e0b 35%,transparent); background-color:color-mix(in srgb,#f59e0b 8%,transparent); color:var(--text-secondary);">
+                            <p class="font-semibold mb-0.5" style="color:#f59e0b;">Lanzamientos manuales</p>
+                            Cada vez que abras el curso se crea un período con fechas propias. No hay ciclo fijo anual.
+                            Podés clonar un período anterior para re-lanzar el mismo curso.
+                        </div>
+
                         <div>
                             <label class="field-label">Nombre *</label>
                             <input v-model="form.nombre" type="text" class="field-input" placeholder="Ej: Ingeniería de Sistemas" />
@@ -321,16 +350,28 @@ function formatCosto(val) {
 
                         <div class="grid grid-cols-3 gap-3">
                             <div>
-                                <label class="field-label">Duración (años) *</label>
-                                <input v-model="form.duracion_niveles" type="number" min="1" class="field-input" placeholder="Ej: 4" />
+                                <label class="field-label">
+                                    {{ esCursoLibre ? 'Duración (meses)' : 'Duración (años)' }} *
+                                </label>
+                                <input v-model="form.duracion_niveles" type="number"
+                                       :min="1" :max="esCursoLibre ? 60 : 20"
+                                       class="field-input"
+                                       :placeholder="esCursoLibre ? 'Ej: 6' : 'Ej: 4'" />
+                                <p class="text-[11px] mt-0.5" style="color: var(--text-secondary);">
+                                    <template v-if="esCursoLibre">duración de un lanzamiento</template>
+                                    <template v-else>años de la carrera</template>
+                                </p>
                                 <p v-if="form.errors.duracion_niveles" class="field-error">{{ form.errors.duracion_niveles }}</p>
                             </div>
                             <div>
                                 <label class="field-label">Materias por período *</label>
                                 <input v-model.number="form.max_materias" type="number" min="1" max="30" class="field-input" />
                                 <p class="text-[11px] mt-0.5" style="color: var(--text-secondary);">
-                                    {{ form.modalidad === 'semestral' ? '× 2 sem/año' : form.modalidad === 'mensual' ? '× 12 mes/año' : '× 1 año' }}
-                                    = {{ form.max_materias * (form.modalidad === 'semestral' ? 2 : form.modalidad === 'mensual' ? 12 : 1) }} mat/año por nivel
+                                    <template v-if="esCursoLibre">materias en el curso</template>
+                                    <template v-else>
+                                        {{ form.modalidad === 'semestral' ? '× 2 sem/año' : form.modalidad === 'mensual' ? '× 12 mes/año' : '× 1 año' }}
+                                        = {{ form.max_materias * (form.modalidad === 'semestral' ? 2 : form.modalidad === 'mensual' ? 12 : 1) }} mat/año por nivel
+                                    </template>
                                 </p>
                                 <p v-if="form.errors.max_materias" class="field-error">{{ form.errors.max_materias }}</p>
                             </div>

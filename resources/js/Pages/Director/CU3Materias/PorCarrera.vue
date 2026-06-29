@@ -39,8 +39,20 @@ const maxMateriasNivel = computed(() =>
 const costoPorMateria = computed(() => {
     const total = props.carrera.costo_carrera_completa;
     if (!total || totalMaterias.value === 0) return null;
-    return Math.round((parseFloat(total) / totalMaterias.value) * 100) / 100;
+    const exacto = parseFloat(total) / totalMaterias.value;
+    return Math.ceil(exacto / 10) * 10; // redondea al múltiplo de 10 superior
 });
+
+const costoExacto = computed(() => {
+    const total = props.carrera.costo_carrera_completa;
+    if (!total || totalMaterias.value === 0) return false;
+    return (parseFloat(total) % totalMaterias.value) === 0;
+});
+
+const cursoLibreLleno = computed(() =>
+    props.carrera.tipo === 'curso_libre' &&
+    (props.materiasLibres ?? []).length >= (props.carrera.max_materias ?? Infinity)
+);
 
 function formatCosto(val) {
     if (!val) return '—';
@@ -294,7 +306,7 @@ function confirmarEliminarNivel() {
                 </h2>
                 <p class="text-xs mt-0.5" style="color: var(--text-secondary);">
                     {{ TIPOS[carrera.tipo] ?? carrera.tipo }}
-                    · {{ carrera.duracion_niveles }} nivel(es)
+                    · {{ carrera.duracion_niveles }} {{ carrera.duracion_unidad === 'meses' ? 'mes(es)' : 'nivel(es)' }}
                     · {{ formatCosto(carrera.costo_carrera_completa) }}
                 </p>
                 <Link :href="route('director.carreras.index')"
@@ -312,16 +324,22 @@ function confirmarEliminarNivel() {
                 <div class="flex items-center justify-between">
                     <p class="text-sm font-medium" style="color: var(--text-secondary);">
                         <template v-if="carrera.tipo === 'curso_libre'">
-                            {{ (materiasLibres ?? []).length }} materia(s) en el curso
+                            <span :style="cursoLibreLleno ? 'color: #ef4444; font-weight:600;' : ''">
+                                {{ (materiasLibres ?? []).length }}{{ carrera.max_materias ? ' / ' + carrera.max_materias : '' }} materia(s) en el curso
+                            </span>
+                            <span v-if="cursoLibreLleno" class="ml-2 text-xs font-semibold" style="color: #ef4444;">— Límite alcanzado</span>
                         </template>
                         <template v-else>
                             {{ porNivel.length }} nivel(es) configurado(s)
                         </template>
                     </p>
                     <button v-if="canEdit && carrera.tipo === 'curso_libre'"
-                        @click="abrirModalMateria(nivelLibre)"
+                        @click="!cursoLibreLleno && abrirModalMateria(nivelLibre)"
                         class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition"
-                        style="background-color: var(--primary-color); color: var(--primary-text);">
+                        :style="cursoLibreLleno
+                            ? 'background-color: #6b7280; color: #fff; cursor: not-allowed; opacity: 0.6;'
+                            : 'background-color: var(--primary-color); color: var(--primary-text);'"
+                        :title="cursoLibreLleno ? `Límite de ${carrera.max_materias} materias alcanzado` : ''">
                         + Agregar Materia
                     </button>
                     <button v-else-if="canEdit"
@@ -347,8 +365,8 @@ function confirmarEliminarNivel() {
                         <span class="font-semibold" style="color: var(--text-color);">{{ formatCosto(carrera.costo_carrera_completa) }}</span>
                     </span>
                     <span v-if="costoPorMateria" style="color: var(--text-secondary);">
-                        Costo por materia (calculado):
-                        <span class="font-bold text-base" style="color: var(--primary-color);">{{ formatCostoEntero(costoPorMateria) }}</span>
+                        Costo por materia{{ costoExacto ? '' : ' (aprox.)' }}:
+                        <span class="font-bold text-base" style="color: var(--primary-color);">{{ costoExacto ? '' : '~' }}{{ formatCostoEntero(costoPorMateria) }}</span>
                     </span>
                     <span v-else class="text-xs" style="color: var(--text-secondary);">
                         (Define el costo total de la carrera para ver el costo por materia)
@@ -401,9 +419,12 @@ function confirmarEliminarNivel() {
                                 <p class="text-xs" style="color: var(--text-secondary);">{{ (materiasLibres ?? []).length }} materia(s)</p>
                             </div>
                         </div>
-                        <button v-if="canEdit" @click="abrirModalMateria(nivelLibre)"
+                        <button v-if="canEdit" @click="!cursoLibreLleno && abrirModalMateria(nivelLibre)"
                             class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition"
-                            style="background-color: var(--primary-color); color: var(--primary-text);">
+                            :style="cursoLibreLleno
+                                ? 'background-color: #6b7280; color: #fff; cursor: not-allowed; opacity: 0.6;'
+                                : 'background-color: var(--primary-color); color: var(--primary-text);'"
+                            :title="cursoLibreLleno ? `Límite de ${carrera.max_materias} materias alcanzado` : ''">
                             + Asignar Materia
                         </button>
                     </div>
@@ -414,7 +435,7 @@ function confirmarEliminarNivel() {
                                 <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Código</th>
                                 <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Materia</th>
                                 <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Prerequisito</th>
-                                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell whitespace-nowrap" style="color: var(--text-secondary);">Costo sugerido</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell whitespace-nowrap" style="color: var(--text-secondary);">Costo proporcional</th>
                                 <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Tipo</th>
                                 <th class="px-4 py-2 whitespace-nowrap"></th>
                             </tr>
@@ -441,7 +462,10 @@ function confirmarEliminarNivel() {
                                     <span v-else class="text-xs" style="color: var(--text-secondary);">—</span>
                                 </td>
                                 <td class="px-4 py-3 text-sm hidden md:table-cell whitespace-nowrap">
-                                    <span class="font-semibold" style="color: var(--primary-color);">{{ formatCosto(m.costo_mensual) }}</span>
+                                    <span v-if="costoPorMateria" class="font-semibold" style="color: var(--primary-color);">
+                                        {{ costoExacto ? '' : '~' }}{{ formatCostoEntero(costoPorMateria) }}
+                                    </span>
+                                    <span v-else class="text-xs" style="color: var(--text-secondary);">—</span>
                                 </td>
                                 <td class="px-4 py-3 whitespace-nowrap">
                                     <span :class="['badge', m.obligatoria ? 'badge-obligatoria' : 'badge-electiva']">
