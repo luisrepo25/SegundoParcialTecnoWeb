@@ -29,6 +29,7 @@ class PerfilController extends Controller
                 'telefono'     => $usuario?->telefono,
                 'direccion'    => $usuario?->direccion,
                 'especialidad' => $profesor?->especialidad ?? null,
+                'archivo_cv'  => $profesor?->archivo_cv  ?? null,
             ],
         ]);
     }

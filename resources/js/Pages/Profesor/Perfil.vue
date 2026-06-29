@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { Head, useForm, usePage, Link } from '@inertiajs/vue3';
+import { Head, useForm, usePage, Link, router } from '@inertiajs/vue3';
 import DocenteLayout from '@/Layouts/DocenteLayout.vue';
 
 const props = defineProps({
@@ -29,6 +29,37 @@ function updatePhoto() {
     formFoto.post(route('profile.photo.update'), {
         preserveScroll: true,
         onSuccess: () => { if (fileInput.value) fileInput.value.value = null; },
+    });
+}
+
+// ── CV ───────────────────────────────────────────────────────────────────────
+const cvInput    = ref(null);
+const cvLoading  = ref(false);
+const cvDeleting = ref(false);
+
+function selectCv() { cvInput.value?.click(); }
+
+function uploadCv() {
+    const file = cvInput.value?.files?.[0];
+    if (!file) return;
+    cvLoading.value = true;
+    const data = new FormData();
+    data.append('cv', file);
+    router.post(route('profile.cv.update'), data, {
+        preserveScroll: true,
+        onFinish: () => {
+            cvLoading.value = false;
+            if (cvInput.value) cvInput.value.value = null;
+        },
+    });
+}
+
+function eliminarCv() {
+    if (!confirm('¿Eliminar el CV cargado?')) return;
+    cvDeleting.value = true;
+    router.delete(route('profile.cv.delete'), {
+        preserveScroll: true,
+        onFinish: () => { cvDeleting.value = false; },
     });
 }
 
@@ -160,6 +191,74 @@ function cambiarPassword() {
                         <p style="color: var(--text-secondary);">Especialidad</p>
                         <p class="font-medium" style="color: var(--text-color);">{{ perfil.especialidad }}</p>
                     </div>
+                </div>
+            </div>
+
+            <!-- ── Currículum Vitae ── -->
+            <div class="rounded-xl p-5" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                <div class="flex items-center justify-between mb-3">
+                    <p class="text-xs font-semibold uppercase tracking-wide" style="color: var(--text-secondary);">Currículum Vitae</p>
+                    <div class="flex items-center gap-2">
+                        <button v-if="perfil.archivo_cv" @click="eliminarCv" :disabled="cvDeleting"
+                                class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-50"
+                                style="background-color: color-mix(in srgb, #ef4444 10%, transparent); color: #ef4444;">
+                            <svg v-if="!cvDeleting" class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                            </svg>
+                            <svg v-else class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                            </svg>
+                            Eliminar
+                        </button>
+                        <button @click="selectCv" :disabled="cvLoading"
+                                class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-50"
+                                style="background-color: color-mix(in srgb, var(--primary-color) 12%, transparent); color: var(--primary-color);">
+                            <svg v-if="!cvLoading" class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                            <svg v-else class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                            </svg>
+                            {{ perfil.archivo_cv ? 'Reemplazar' : 'Subir CV' }}
+                        </button>
+                        <input ref="cvInput" type="file" class="hidden" accept="application/pdf" @change="uploadCv" />
+                    </div>
+                </div>
+
+                <!-- CV existente -->
+                <div v-if="perfil.archivo_cv"
+                     class="flex items-center gap-3 p-3 rounded-lg"
+                     style="background-color: color-mix(in srgb, var(--text-color) 4%, transparent); border: 1px solid var(--border-color);">
+                    <div class="w-8 h-8 rounded-md flex items-center justify-center shrink-0"
+                         style="background-color: color-mix(in srgb, #ef4444 12%, transparent);">
+                        <svg class="w-4 h-4" style="color: #ef4444;" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium truncate" style="color: var(--text-color);">{{ perfil.archivo_cv }}</p>
+                        <p class="text-xs" style="color: var(--text-secondary);">PDF · Currículum Vitae</p>
+                    </div>
+                    <a :href="(assetUrl || '') + '/cvs/' + perfil.archivo_cv" target="_blank"
+                       class="flex items-center gap-1 text-xs font-medium shrink-0 px-2.5 py-1.5 rounded-md transition-all"
+                       style="color: var(--primary-color); background-color: color-mix(in srgb, var(--primary-color) 8%, transparent);">
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
+                            <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
+                        </svg>
+                        Ver
+                    </a>
+                </div>
+
+                <!-- Sin CV -->
+                <div v-else class="flex items-center gap-3 p-3 rounded-lg text-sm"
+                     style="background-color: color-mix(in srgb, var(--text-color) 4%, transparent); color: var(--text-secondary); border: 1px dashed var(--border-color);">
+                    <svg class="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/>
+                    </svg>
+                    No hay CV cargado · solo se aceptan archivos PDF
                 </div>
             </div>
 

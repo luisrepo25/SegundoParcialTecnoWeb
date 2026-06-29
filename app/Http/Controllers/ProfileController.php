@@ -150,7 +150,7 @@ class ProfileController extends Controller
         $profesor->archivo_cv = $filename;
         $profesor->save();
 
-        return Redirect::route('profile.edit')->with('status', 'cv-updated');
+        return back()->with('success', 'CV actualizado correctamente.');
     }
 
     /**
@@ -159,9 +159,9 @@ class ProfileController extends Controller
     public function deleteCv(Request $request): RedirectResponse
     {
         $user = $request->user();
-        
+
         if ($user->id_rol != 4 || !$user->profesor) {
-            return Redirect::route('profile.edit')->with('status', 'not-authorized');
+            return back()->with('error', 'No autorizado.');
         }
 
         $profesor = $user->profesor;
@@ -175,6 +175,6 @@ class ProfileController extends Controller
             $profesor->save();
         }
 
-        return Redirect::route('profile.edit')->with('status', 'cv-deleted');
+        return back()->with('success', 'CV eliminado correctamente.');
     }
 }
