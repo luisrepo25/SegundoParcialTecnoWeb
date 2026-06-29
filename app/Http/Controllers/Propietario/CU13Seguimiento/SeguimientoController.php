@@ -8,7 +8,6 @@ use App\Models\Estudiante;
 use App\Models\Usuario;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class SeguimientoController extends Controller
@@ -67,14 +66,14 @@ class SeguimientoController extends Controller
         if ($estudiante?->id_carrera_actual) {
             $c = Carrera::find($estudiante->id_carrera_actual);
             $carrera = $c ? [
-                'id'              => $c->id_carrera,
-                'nombre'          => $c->nombre,
-                'duracion_niveles'=> $c->duracion_niveles,
+                'id'               => $c->id_carrera,
+                'nombre'           => $c->nombre,
+                'duracion_niveles' => $c->duracion_niveles,
             ] : null;
         }
 
-        $historial  = [];
-        $resumen    = [
+        $historial = collect();
+        $resumen   = [
             'total_materias_cursadas' => 0,
             'materias_aprobadas'      => 0,
             'materias_reprobadas'     => 0,
@@ -83,78 +82,81 @@ class SeguimientoController extends Controller
             'progreso_carrera'        => null,
         ];
 
-        // ── Requiere CU6 (inscripciones) + CU9 (grupos) + CU12 (evaluaciones) ─
-        $tieneInscripciones = Schema::hasTable('inscripciones');
-        $tieneEvaluaciones  = Schema::hasTable('evaluaciones');
+        if ($estudiante) {
+            $historial = DB::table('inscripciones as i')
+                ->join('grupos as g',           'i.id_oferta',   '=', 'g.id_oferta')
+                ->join('materias as m',          'g.id_materia',  '=', 'm.id_materia')
+                ->join('periodos_dictado as p',  'g.id_periodo',  '=', 'p.id_periodo')
+                ->where('i.id_estudiante', $estudiante->id_estudiante)
+                ->select(
+                    'i.id_inscripcion', 'i.estado', 'i.fecha_inscripcion',
+                    'i.calificacion_final', 'i.aprobado', 'i.observaciones',
+                    'm.nombre as materia', 'm.codigo as materia_codigo', 'm.id_materia',
+                    'p.nombre as periodo', 'p.tipo_periodo', 'p.fecha_inicio', 'p.fecha_fin',
+                    'g.id_oferta', 'g.codigo_grupo'
+                )
+                ->orderByDesc('p.fecha_inicio')
+                ->get();
 
-        if ($tieneInscripciones && $estudiante) {
-            /*
-             * TODO: completar cuando CU6/CU9/CU12 estén listos.
-             *
-             * $historial = DB::table('inscripciones as i')
-             *     ->join('grupos as g',   'i.id_grupo',   '=', 'g.id_grupo')
-             *     ->join('materias as m', 'g.id_materia', '=', 'm.id_materia')
-             *     ->join('periodos as p', 'g.id_periodo', '=', 'p.id_periodo')
-             *     ->where('i.id_estudiante', $estudiante->id_estudiante)
-             *     ->select(
-             *         'i.id_inscripcion', 'i.estado', 'i.fecha_inscripcion',
-             *         'm.nombre as materia', 'm.id_materia',
-             *         'p.nombre as periodo', 'p.tipo as periodo_tipo',
-             *         'g.id_grupo',
-             *     )
-             *     ->orderByDesc('p.fecha_inicio')
-             *     ->get();
-             *
-             * if ($tieneEvaluaciones) {
-             *     foreach ($historial as &$ins) {
-             *         $ins->evaluaciones = DB::table('evaluaciones')
-             *             ->where('id_inscripcion', $ins->id_inscripcion)
-             *             ->orderBy('numero_evaluacion')
-             *             ->get();
-             *         $notas = $ins->evaluaciones->pluck('nota')->filter()->values();
-             *         $ins->promedio = $notas->count() ? round($notas->avg(), 2) : null;
-             *         $ins->aprobado = $ins->promedio !== null && $ins->promedio >= 51;
-             *     }
-             *
-             *     $cursadas  = $historial->count();
-             *     $aprobadas = $historial->where('aprobado', true)->count();
-             *     $promedios = $historial->pluck('promedio')->filter();
-             *     $resumen = [
-             *         'total_materias_cursadas' => $cursadas,
-             *         'materias_aprobadas'      => $aprobadas,
-             *         'materias_reprobadas'     => $cursadas - $aprobadas,
-             *         'promedio_general'        => $promedios->count() ? round($promedios->avg(), 2) : null,
-             *         'tasa_aprobacion'         => $cursadas > 0 ? round($aprobadas / $cursadas * 100, 1) : null,
-             *         'progreso_carrera'        => $carrera
-             *             ? round($aprobadas / max($carrera['duracion_niveles'] * 6, 1) * 100, 1)
-             *             : null,
-             *     ];
-             * }
-             */
+            // Cargar evaluaciones agrupadas por inscripción
+            $idInscripciones     = $historial->pluck('id_inscripcion');
+            $evalsPorInscripcion = DB::table('evaluaciones')
+                ->whereIn('id_inscripcion', $idInscripciones)
+                ->orderByRaw("CASE tipo WHEN 'parcial1' THEN 1 WHEN 'parcial2' THEN 2 WHEN 'final' THEN 3 ELSE 4 END")
+                ->get()
+                ->groupBy('id_inscripcion');
+
+            $historial = $historial->map(function ($ins) use ($evalsPorInscripcion) {
+                $arr = (array) $ins;
+                $arr['aprobado']      = (bool) ($ins->aprobado ?? false);
+                $arr['evaluaciones']  = array_values(
+                    $evalsPorInscripcion->get($ins->id_inscripcion)?->toArray() ?? []
+                );
+                return $arr;
+            });
+
+            // Calcular indicadores
+            $finalizadas = $historial->filter(fn($i) => $i['calificacion_final'] !== null);
+            $aprobadas   = $historial->filter(fn($i) => $i['aprobado'] === true)->count();
+            $reprobadas  = $finalizadas->filter(fn($i) => !$i['aprobado'])->count();
+            $notas       = $finalizadas->pluck('calificacion_final')->filter();
+
+            $totalMalla = $carrera
+                ? DB::table('malla_curricular')->where('id_carrera', $carrera['id'])->count()
+                : 0;
+
+            $resumen = [
+                'total_materias_cursadas' => $historial->count(),
+                'materias_aprobadas'      => $aprobadas,
+                'materias_reprobadas'     => $reprobadas,
+                'promedio_general'        => $notas->count() ? round($notas->avg(), 2) : null,
+                'tasa_aprobacion'         => $finalizadas->count() > 0
+                    ? round($aprobadas / $finalizadas->count() * 100, 1)
+                    : null,
+                'progreso_carrera'        => ($totalMalla > 0 && $aprobadas > 0)
+                    ? round($aprobadas / $totalMalla * 100, 1)
+                    : null,
+            ];
         }
 
         return Inertia::render('Propietario/CU13Seguimiento/Show', [
             'estudiante' => [
-                'id_usuario'    => $usuario->id_usuario,
-                'nombre'        => $usuario->nombre,
-                'apellido'      => $usuario->apellido,
-                'email'         => $usuario->email,
-                'dni'           => $usuario->dni,
-                'telefono'      => $usuario->telefono,
-                'activo'        => $usuario->activo,
-                'legajo'        => $estudiante?->legajo,
-                'tutor_nombre'  => $estudiante?->tutor_nombre,
-                'tutor_telefono'=> $estudiante?->tutor_telefono,
-                'observaciones' => $estudiante?->observaciones,
-                'fecha_inicio'  => $estudiante?->fecha_inscripcion_inicial,
+                'id_usuario'     => $usuario->id_usuario,
+                'nombre'         => $usuario->nombre,
+                'apellido'       => $usuario->apellido,
+                'email'          => $usuario->email,
+                'dni'            => $usuario->dni,
+                'telefono'       => $usuario->telefono,
+                'activo'         => $usuario->activo,
+                'legajo'         => $estudiante?->legajo,
+                'tutor_nombre'   => $estudiante?->tutor_nombre,
+                'tutor_telefono' => $estudiante?->tutor_telefono,
+                'observaciones'  => $estudiante?->observaciones,
+                'fecha_inicio'   => $estudiante?->fecha_inscripcion_inicial,
             ],
-            'carrera'    => $carrera,
-            'historial'  => $historial,
-            'resumen'    => $resumen,
-            'pendiente'  => [
-                'inscripciones' => !$tieneInscripciones,
-                'evaluaciones'  => !$tieneEvaluaciones,
-            ],
+            'carrera'  => $carrera,
+            'historial' => $historial->values()->toArray(),
+            'resumen'   => $resumen,
         ]);
     }
 
@@ -167,10 +169,6 @@ class SeguimientoController extends Controller
 
         $estudiante = Estudiante::where('id_usuario', $id)->firstOrFail();
 
-        /*
-         * TODO: cuando exista tabla 'abandonos', insertar registro formal.
-         * Por ahora se registra en observaciones como historial temporal.
-         */
         $nota = '[ABANDONO ' . now()->format('d/m/Y') . '] ' . $request->motivo;
         $prev = $estudiante->observaciones ? $estudiante->observaciones . "\n" : '';
         $estudiante->update(['observaciones' => $prev . $nota]);
@@ -181,14 +179,37 @@ class SeguimientoController extends Controller
     // ── CU13.4 — Validar si puede recursar una materia ───────────────────────
     public function validarRecurso(int $idUsuario, int $idMateria)
     {
-        /*
-         * TODO: completar cuando CU6/CU12 estén listos.
-         * Lógica: estudiante puede recursar si cursó la materia al menos una vez
-         * y obtuvo nota < 51 o tiene estado 'reprobado'.
-         */
+        $estudiante = Estudiante::where('id_usuario', $idUsuario)->first();
+
+        if (!$estudiante) {
+            return response()->json(['puede_recursar' => false, 'mensaje' => 'Estudiante no encontrado.']);
+        }
+
+        $intentos = DB::table('inscripciones as i')
+            ->join('grupos as g', 'i.id_oferta', '=', 'g.id_oferta')
+            ->where('i.id_estudiante', $estudiante->id_estudiante)
+            ->where('g.id_materia', $idMateria)
+            ->select('i.id_inscripcion', 'i.estado', 'i.aprobado', 'i.calificacion_final')
+            ->get();
+
+        if ($intentos->isEmpty()) {
+            return response()->json(['puede_recursar' => false, 'mensaje' => 'No cursó esta materia anteriormente.']);
+        }
+
+        $yaAprobada = $intentos->contains(fn($i) => (bool) $i->aprobado === true);
+        if ($yaAprobada) {
+            return response()->json(['puede_recursar' => false, 'mensaje' => 'La materia ya fue aprobada.']);
+        }
+
+        $cursandoAhora = $intentos->contains(fn($i) => $i->estado === 'activo');
+        if ($cursandoAhora) {
+            return response()->json(['puede_recursar' => false, 'mensaje' => 'Actualmente está cursando esta materia.']);
+        }
+
         return response()->json([
-            'puede_recursar' => null,
-            'mensaje'        => 'Validación disponible cuando CU6 y CU12 estén implementados.',
+            'puede_recursar' => true,
+            'intentos'       => $intentos->count(),
+            'mensaje'        => "Puede recursar. Intentos previos: {$intentos->count()}.",
         ]);
     }
 }
