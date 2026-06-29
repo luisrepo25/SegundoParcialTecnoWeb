@@ -71,17 +71,30 @@ function abrirAgregar(carreraId = '') {
 }
 
 function abrirEditar(p) {
-    editando.value                  = p;
-    form.id_carrera                 = '';
-    form.nombre                     = p.nombre;
-    form.tipo_periodo               = p.tipo_periodo;
-    form.fecha_inicio               = p.fecha_inicio ?? '';
-    form.fecha_fin                  = p.fecha_fin ?? '';
-    form.fecha_inicio_inscripcion   = p.fecha_inicio_inscripcion ?? '';
-    form.fecha_fin_inscripcion      = p.fecha_fin_inscripcion ?? '';
-    cronogramaModal.value           = null;
-    cronogramaInscripcionModal.value = null;
+    editando.value                = p;
+    form.id_carrera               = '';
+    form.nombre                   = p.nombre;
+    form.tipo_periodo             = p.tipo_periodo;
+    form.fecha_inicio             = p.fecha_inicio ?? '';
+    form.fecha_fin                = p.fecha_fin ?? '';
+    form.fecha_inicio_inscripcion = p.fecha_inicio_inscripcion ?? '';
+    form.fecha_fin_inscripcion    = p.fecha_fin_inscripcion ?? '';
     form.clearErrors();
+
+    // Pre-seleccionar cronograma de clases cuyas fechas coincidan con el período
+    const matchClases = p.fecha_inicio && p.fecha_fin
+        ? props.cronogramasClases.find(c =>
+            c.fecha_inicio === p.fecha_inicio && c.fecha_fin === p.fecha_fin)
+        : null;
+    cronogramaModal.value = matchClases ? matchClases.id_cronograma : null;
+
+    // Pre-seleccionar cronograma de inscripción cuyas fechas coincidan
+    const matchInsc = p.fecha_inicio_inscripcion && p.fecha_fin_inscripcion
+        ? props.cronogramasInscripcion.find(c =>
+            c.fecha_inicio === p.fecha_inicio_inscripcion && c.fecha_fin === p.fecha_fin_inscripcion)
+        : null;
+    cronogramaInscripcionModal.value = matchInsc ? matchInsc.id_cronograma : null;
+
     modalOpen.value = true;
 }
 
