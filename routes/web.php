@@ -230,6 +230,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('role:profesor')->prefix('profesor')->name('profesor.')->group(function () {
         Route::post('/evaluaciones',        [\App\Http\Controllers\Profesor\CU12Evaluaciones\EvaluacionController::class, 'store'])       ->name('evaluaciones.store');
         Route::post('/evaluaciones/masivo', [\App\Http\Controllers\Profesor\CU12Evaluaciones\EvaluacionController::class, 'storeMasivo']) ->name('evaluaciones.masivo');
+
+        // Perfil Docente
+        Route::get('/perfil',          [\App\Http\Controllers\Profesor\PerfilController::class, 'index'])           ->name('perfil');
+        Route::put('/perfil',          [\App\Http\Controllers\Profesor\PerfilController::class, 'update'])          ->name('perfil.update');
+        Route::put('/perfil/password', [\App\Http\Controllers\Profesor\PerfilController::class, 'cambiarPassword']) ->name('perfil.password');
     });
 
     // CU12 — Evaluaciones y Notas (admin: secretaria/director/propietario en nombre del docente)
