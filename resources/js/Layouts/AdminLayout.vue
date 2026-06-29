@@ -22,6 +22,14 @@ const dashboardUrl = computed(() => {
     return '/secretaria/panel';
 });
 
+const perfilRoute = computed(() => {
+    const role = user.value?.role;
+    if (role === 'propietario') return 'propietario.perfil';
+    if (role === 'director')    return 'director.perfil';
+    if (role === 'secretaria')  return 'secretaria.perfil';
+    return 'profile.edit';
+});
+
 const roleBadge = computed(() => {
     const role = user.value?.role;
     if (role === 'director')   return { emoji: '🎓', label: 'Director' };
@@ -34,36 +42,48 @@ const secciones = [
         key: 'academico',
         label: 'Académico',
         items: [
-            { name: 'Gestión de Carreras',   route: 'director.carreras.index',        activeUrls: ['/director/carreras'] },
-            { name: 'Gestión de Materias',   route: 'director.materias.index',        activeUrls: ['/director/materias'] },
-            { name: 'Períodos Académicos',   route: 'director.periodos.index',        activeUrls: ['/director/periodos'] },
-            { name: 'Grupos / Oferta',       route: 'director.grupos.index',          activeUrls: ['/director/grupos'] },
-            { name: 'Cronogramas',           route: 'secretaria.cronogramas.index',   activeUrls: ['/secretaria/cronogramas'] },
-            { name: 'Seguimiento Académico', route: 'propietario.seguimiento.index',  activeUrls: ['/propietario/seguimiento'] },
+            { name: 'CU3 · Materias',            route: 'director.materias.index',       activeUrls: ['/director/materias'] },
+            { name: 'CU4/5 · Carreras y Malla',  route: 'director.carreras.index',       activeUrls: ['/director/carreras'] },
+            { name: 'CU8 · Períodos Académicos', route: 'director.periodos.index',       activeUrls: ['/director/periodos'] },
+            { name: 'CU9/12 · Grupos y Notas',   route: 'director.grupos.index',         activeUrls: ['/director/grupos'] },
+            { name: 'CU10 · Cronogramas',        route: 'secretaria.cronogramas.index',  activeUrls: ['/secretaria/cronogramas'] },
+            { name: 'CU13 · Seguimiento',        route: 'propietario.seguimiento.index', activeUrls: ['/propietario/seguimiento'] },
         ],
     },
     {
         key: 'financiero',
         label: 'Financiero',
         items: [
-            { name: 'Inscripciones', route: 'secretaria.inscripciones.index', activeUrls: ['/secretaria/inscripciones'] },
-            { name: 'Caja y Pagos',  route: 'secretaria.pagos.index',         activeUrls: ['/secretaria/pagos'] },
+            { name: 'CU6 · Inscripciones', route: 'secretaria.inscripciones.index', activeUrls: ['/secretaria/inscripciones'] },
+            { name: 'CU7 · Caja y Pagos',  route: 'secretaria.pagos.index',         activeUrls: ['/secretaria/pagos'] },
         ],
     },
     {
         key: 'administrativo',
         label: 'Administrativo',
         items: [
-            { name: 'Gestión de Usuarios', route: 'propietario.usuarios.index', activeUrls: ['/propietario/usuarios'] },
-            { name: 'Gestión de Aulas',    route: 'propietario.aulas.index',    activeUrls: ['/propietario/aulas'] },
-            { name: 'Gestión de Horarios', route: 'propietario.horarios.index', activeUrls: ['/propietario/horarios'] },
+            { name: 'CU1 · Gestión de Usuarios', route: 'propietario.usuarios.index', activeUrls: ['/propietario/usuarios'] },
+            { name: 'CU2 · Gestión de Aulas',    route: 'propietario.aulas.index',    activeUrls: ['/propietario/aulas'] },
+            { name: 'CU11 · Gestión de Horarios',route: 'propietario.horarios.index', activeUrls: ['/propietario/horarios'] },
         ],
     },
 ];
 
 const reportesItem = { name: 'Reportes y Estadísticas', route: 'propietario.reportes.index', activeUrls: ['/propietario/reportes'] };
 
-const openSections = ref({ academico: true, financiero: false, administrativo: false });
+function detectActiveSection(url) {
+    if (url.startsWith('/director/') || url.startsWith('/secretaria/cronogramas') || url.startsWith('/propietario/seguimiento')) return 'academico';
+    if (url.startsWith('/secretaria/inscripciones') || url.startsWith('/secretaria/pagos')) return 'financiero';
+    if (url.startsWith('/propietario/usuarios') || url.startsWith('/propietario/aulas') || url.startsWith('/propietario/horarios')) return 'administrativo';
+    return null;
+}
+
+const activeSection = detectActiveSection(page.url);
+const openSections = ref({
+    academico:      activeSection === 'academico',
+    financiero:     activeSection === 'financiero',
+    administrativo: activeSection === 'administrativo',
+});
 const toggleSection = (key) => { openSections.value[key] = !openSections.value[key]; };
 
 const isActive = (urls) => urls.some(url => page.url.startsWith(url));
@@ -104,7 +124,7 @@ const showUserMenu   = ref(false);
             <div class="px-4 pt-3 pb-2">
                 <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
                       style="background-color: var(--primary-color); color: var(--primary-text);">
-                    {{ roleBadge.emoji }} {{ roleBadge.label }}
+                    {{ roleBadge.label }}
                 </span>
             </div>
 
@@ -121,7 +141,7 @@ const showUserMenu   = ref(false);
                         ? 'background-color: color-mix(in srgb, var(--primary-color) 15%, transparent); color: var(--primary-color);'
                         : 'color: var(--text-secondary);'"
                 >
-                    <span class="text-base leading-none">⊞</span> Dashboard
+                    Dashboard
                 </Link>
 
                 <!-- Reportes — propietario y director -->
@@ -133,7 +153,7 @@ const showUserMenu   = ref(false);
                         ? 'background-color: color-mix(in srgb, var(--primary-color) 15%, transparent); color: var(--primary-color);'
                         : 'color: var(--text-secondary);'"
                 >
-                    <span class="text-base leading-none">📊</span> Reportes
+                    Reportes
                 </Link>
 
                 <!-- Secciones colapsables -->
@@ -185,7 +205,7 @@ const showUserMenu   = ref(false);
                             <div class="px-4 py-2 border-b" style="border-color: var(--border-color);">
                                 <p class="text-xs truncate" style="color: var(--text-secondary);">{{ user?.email }}</p>
                             </div>
-                            <Link :href="route('profile.edit')"
+                            <Link :href="route(perfilRoute)"
                                 class="block px-4 py-2 text-sm transition-colors"
                                 style="color: var(--text-color);"
                                 onmouseover="this.style.backgroundColor='color-mix(in srgb, var(--text-color) 5%, transparent)'"

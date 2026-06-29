@@ -78,7 +78,7 @@ class ProfileController extends Controller
         $user = $request->user();
         
         $file = $request->file('foto');
-        $filename = 'perfil_US' . $user->id_usuario . '_' . $user->dni . '.' . $file->getClientOriginalExtension();
+        $filename = 'perfil_US' . $user->id_usuario . '_' . $user->dni . '_' . time() . '.' . $file->getClientOriginalExtension();
         
         // Delete old photo if it exists
         if ($user->foto_perfil) {
@@ -93,7 +93,7 @@ class ProfileController extends Controller
         $user->foto_perfil = $filename;
         $user->save();
 
-        return Redirect::route('profile.edit')->with('status', 'photo-updated');
+        return back()->with('status', 'photo-updated');
     }
 
     /**
@@ -112,7 +112,7 @@ class ProfileController extends Controller
             $user->save();
         }
 
-        return Redirect::route('profile.edit')->with('status', 'photo-deleted');
+        return back()->with('status', 'photo-deleted');
     }
     /**
      * Update the user's CV (only for profesores).

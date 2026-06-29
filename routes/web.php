@@ -33,7 +33,7 @@ Route::get('/dashboard', function () {
     $user = auth()->user();
 
     return match ($user?->role) {
-        'propietario' => Inertia::render('Dashboard/Propietario'),
+        'propietario' => redirect()->route('dashboard.propietario'),
         'director'    => Inertia::render('Dashboard/Director'),
         'secretaria'  => Inertia::render('Dashboard/Secretaria'),
         'profesor'    => Inertia::render('Dashboard/Docente'),
@@ -48,15 +48,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('Dashboard/Propietario', [
             'nombre' => auth()->user()->nombre ?? '',
             'stats'  => [
-                'total_usuarios'   => Usuario::count(),
-                'usuarios_activos' => Usuario::whereRaw('activo IS TRUE')->count(),
-                'total_aulas'      => Aula::count(),
-                'total_carreras'   => \App\Models\Carrera::count(),
-                'total_materias'   => \App\Models\Materia::count(),
-                'total_horarios'   => \App\Models\Horario::count(),
+                'total_usuarios'       => Usuario::count(),
+                'usuarios_activos'     => Usuario::whereRaw('activo IS TRUE')->count(),
+                'total_estudiantes'    => Usuario::where('id_rol', 5)->count(),
+                'total_profesores'     => Usuario::where('id_rol', 4)->count(),
+                'total_aulas'          => Aula::count(),
+                'total_carreras'       => \App\Models\Carrera::whereRaw('activo IS TRUE')->count(),
+                'total_materias'       => \App\Models\Materia::whereRaw('activo IS TRUE')->count(),
+                'total_horarios'       => \App\Models\Horario::count(),
+                'inscripciones_activas'=> \Illuminate\Support\Facades\DB::table('inscripciones')->where('estado', 'activo')->count(),
+                'grupos_activos'       => \Illuminate\Support\Facades\DB::table('grupos')->whereRaw('activo IS TRUE')->count(),
+                'periodos_activos'     => \Illuminate\Support\Facades\DB::table('periodos_dictado')->whereRaw('activo IS TRUE')->count(),
+                'cuotas_pendientes'    => \Illuminate\Support\Facades\DB::table('cuotas_carrera')->where('estado', 'pendiente')->count(),
             ],
         ]);
     })->middleware('role:propietario')->name('dashboard.propietario');
+
+    // Perfil Propietario
+    Route::middleware('role:propietario')->prefix('propietario')->name('propietario.')->group(function () {
+        Route::get('/perfil',          [\App\Http\Controllers\Propietario\PerfilController::class, 'index'])           ->name('perfil');
+        Route::put('/perfil',          [\App\Http\Controllers\Propietario\PerfilController::class, 'update'])          ->name('perfil.update');
+        Route::put('/perfil/password', [\App\Http\Controllers\Propietario\PerfilController::class, 'cambiarPassword']) ->name('perfil.password');
+    });
 
     // CU1 — Gestión de Usuarios (propietario, director, secretaria)
     Route::middleware('role:propietario,director,secretaria')->prefix('propietario')->name('propietario.')->group(function () {

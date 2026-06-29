@@ -52,7 +52,7 @@ function toggleEditing() {
 }
 
 function guardarDatos() {
-    formDatos.put(route('secretaria.perfil.update'), {
+    formDatos.put(route('propietario.perfil.update'), {
         preserveScroll: true,
         onSuccess: () => { isEditing.value = false; },
     });
@@ -66,7 +66,7 @@ const formPwd = useForm({
 });
 
 function cambiarPassword() {
-    formPwd.put(route('secretaria.perfil.password'), {
+    formPwd.put(route('propietario.perfil.password'), {
         preserveScroll: true,
         onSuccess: () => formPwd.reset(),
     });
@@ -78,7 +78,7 @@ function cambiarPassword() {
     <AdminLayout>
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('secretaria.dashboard')"
+                <Link :href="route('dashboard.propietario')"
                       class="flex items-center justify-center w-8 h-8 rounded-lg transition-colors"
                       style="color: var(--text-secondary); background-color: color-mix(in srgb, var(--text-color) 8%, transparent);"
                       title="Volver al panel">
@@ -110,7 +110,7 @@ function cambiarPassword() {
                              :src="assetUrl + '/imagenes/' + user.foto_perfil"
                              alt="Foto de perfil"
                              class="w-full h-full object-cover" />
-                        <span v-else>{{ (perfil.nombre ?? 'S')[0].toUpperCase() }}</span>
+                        <span v-else>{{ (perfil.nombre ?? 'P')[0].toUpperCase() }}</span>
                         <div v-if="formFoto.processing"
                              class="absolute inset-0 bg-black/50 flex items-center justify-center rounded-full">
                             <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -139,7 +139,7 @@ function cambiarPassword() {
                     <p class="text-sm" style="color: var(--text-secondary);">{{ perfil.email }}</p>
                     <span class="inline-block mt-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold"
                           style="background-color: color-mix(in srgb, var(--primary-color) 15%, transparent); color: var(--primary-color);">
-                        Secretaria
+                        Propietario
                     </span>
                 </div>
             </div>
@@ -154,7 +154,7 @@ function cambiarPassword() {
                     </div>
                     <div>
                         <p style="color: var(--text-secondary);">Rol</p>
-                        <p class="font-medium" style="color: var(--text-color);">Secretaria</p>
+                        <p class="font-medium" style="color: var(--text-color);">Propietario</p>
                     </div>
                 </div>
             </div>

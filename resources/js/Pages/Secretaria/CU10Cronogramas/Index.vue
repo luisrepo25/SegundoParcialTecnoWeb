@@ -1,5 +1,5 @@
 <script setup>
-import SecretariaLayout from '@/Layouts/SecretariaLayout.vue';
+import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, router } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
 
@@ -177,7 +177,7 @@ function eliminar(c) {
 
 <template>
     <Head title="Cronogramas Académicos" />
-    <SecretariaLayout>
+    <AdminLayout>
         <template #header>
             <span class="font-semibold text-base" style="color: var(--text-color);">Cronogramas Académicos</span>
         </template>
@@ -575,5 +575,5 @@ function eliminar(c) {
             </div>
         </Teleport>
 
-    </SecretariaLayout>
+    </AdminLayout>
 </template>
