@@ -95,6 +95,43 @@ const optsPeriodos = computed(() =>
         }))
 );
 
+// ── Filtro de carrera para modal Nuevo Grupo ──────────────────────────────────
+const filtroCarreraModal  = ref('');
+const soloVigentesModal   = ref(true);
+const optsPeriodosModalFiltrados = computed(() => {
+    let lista = props.periodos.filter(p => p.activo);
+    if (soloVigentesModal.value) lista = lista.filter(p => new Date(p.fecha_inicio).getFullYear() === anoActual);
+    if (filtroCarreraModal.value) lista = lista.filter(p => p.id_carrera === filtroCarreraModal.value);
+    return lista
+        .sort((a, b) => (b.fecha_inicio ?? '').localeCompare(a.fecha_inicio ?? ''))
+        .map(p => ({
+            value: p.id_periodo,
+            label: (filtroCarreraModal.value ? '' : (p.carrera_nombre ? p.carrera_nombre + ' · ' : ''))
+                 + (p.nivel_nombre ? p.nivel_nombre + ' — ' : '')
+                 + p.nombre,
+        }));
+});
+
+// ── Filtro de carrera para modal Clonar Oferta ────────────────────────────────
+const filtroCarreraClonar  = ref('');
+const soloVigentesClonar   = ref(true);
+const optsPeriodosOrigenFiltrados = computed(() => {
+    let lista = props.periodos;
+    if (soloVigentesClonar.value) lista = lista.filter(p => new Date(p.fecha_inicio).getFullYear() === anoActual);
+    if (filtroCarreraClonar.value) lista = lista.filter(p => p.id_carrera === filtroCarreraClonar.value);
+    return lista
+        .sort((a, b) => (b.fecha_inicio ?? '').localeCompare(a.fecha_inicio ?? ''))
+        .map(p => ({
+            value: p.id_periodo,
+            label: (filtroCarreraClonar.value ? '' : (p.carrera_nombre ? p.carrera_nombre + ' · ' : ''))
+                 + (p.nivel_nombre ? p.nivel_nombre + ' — ' : '')
+                 + p.nombre,
+        }));
+});
+const optsPeriodosDestinoClonarFiltrados = computed(() =>
+    optsPeriodosOrigenFiltrados.value.filter(p => p.value !== formClonar.id_periodo_origen)
+);
+
 const optsAulas = computed(() => props.aulas.map(a => ({
     value: a.id_aula,
     label: a.nombre + ' (cap. ' + a.capacidad + ')',
@@ -145,6 +182,8 @@ const optsMateriasFiltradas = computed(() => {
 
 // Al cambiar período, resetear materia (porque cambia el listado)
 watch(() => formNuevo.id_periodo, () => { formNuevo.id_materia = ''; });
+// Al cambiar carrera en el modal, resetear período y materia
+watch(filtroCarreraModal, () => { formNuevo.id_periodo = ''; formNuevo.id_materia = ''; });
 
 // ── Aula seleccionada → auto-fill vacantes y código ───────────────────────────
 const aulaSeleccionada = computed(() =>
@@ -189,6 +228,12 @@ const abrirModal = (id_periodo = '') => {
     formNuevo.reset();
     formNuevo.id_periodo  = id_periodo;
     formNuevo.vacantes_max = 30;
+    if (id_periodo) {
+        const p = props.periodos.find(x => x.id_periodo === id_periodo);
+        filtroCarreraModal.value = p?.id_carrera ?? '';
+    } else {
+        filtroCarreraModal.value = '';
+    }
     showModal.value = true;
 };
 
@@ -258,15 +303,29 @@ const optsPeriodosDestino = computed(() =>
 );
 
 watch(() => formClonar.id_periodo_origen, () => { formClonar.id_periodo_destino = ''; });
+// Al cambiar carrera en modal clonar, resetear ambos períodos
+watch(filtroCarreraClonar, () => { formClonar.id_periodo_origen = ''; formClonar.id_periodo_destino = ''; });
 
 const gruposOrigen = computed(() => {
     if (!formClonar.id_periodo_origen) return 0;
     return props.periodos.find(p => p.id_periodo === formClonar.id_periodo_origen)?.grupos?.length ?? 0;
 });
 
+const abrirClonar = () => {
+    filtroCarreraClonar.value  = '';
+    soloVigentesClonar.value   = true;
+    formClonar.reset();
+    showClonar.value = true;
+};
+
 const guardarClonar = () => {
     formClonar.post(route('director.grupos.clonar'), {
-        onSuccess: () => { showClonar.value = false; formClonar.reset(); },
+        onSuccess: () => {
+            showClonar.value          = false;
+            formClonar.reset();
+            filtroCarreraClonar.value = '';
+            soloVigentesClonar.value  = true;
+        },
     });
 };
 
@@ -344,7 +403,7 @@ const fmtFecha = (f) => {
                 <button @click="filtroCarrera = ''" class="underline" style="color: var(--primary-color);">Limpiar filtro</button>
             </p>
             <div class="ml-auto flex items-center gap-2 shrink-0">
-                <button @click="showClonar = true"
+                <button @click="abrirClonar()"
                     class="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border transition"
                     style="border-color: var(--primary-color); color: var(--primary-color); background: transparent;">
                     📋 Clonar Oferta
@@ -447,9 +506,20 @@ const fmtFecha = (f) => {
                                 {{ periodo.nombre }}
                             </p>
                             <p class="text-xs truncate" style="color: var(--text-secondary);">
-                                {{ fmtFecha(periodo.fecha_inicio) }} — {{ fmtFecha(periodo.fecha_fin) }}
+                                📚 {{ fmtFecha(periodo.fecha_inicio) }} — {{ fmtFecha(periodo.fecha_fin) }}
                                 <span v-if="periodo.carrera_nombre"> · {{ periodo.carrera_nombre }}</span>
                                 <span v-if="periodo.nivel_nombre"> · {{ periodo.nivel_nombre }}</span>
+                            </p>
+                            <p class="text-xs truncate"
+                               :style="periodo.fecha_inicio_inscripcion
+                                   ? 'color: #8b5cf6;'
+                                   : 'color: var(--text-secondary); opacity: 0.55;'">
+                                <template v-if="periodo.fecha_inicio_inscripcion">
+                                    📝 Inscripciones: {{ fmtFecha(periodo.fecha_inicio_inscripcion) }} → {{ fmtFecha(periodo.fecha_fin_inscripcion) }}
+                                </template>
+                                <template v-else>
+                                    📝 Sin ventana de inscripciones definida
+                                </template>
                             </p>
                         </div>
                         <span v-if="!periodo.activo"
@@ -547,6 +617,11 @@ const fmtFecha = (f) => {
 
                                     <td class="px-4 py-3">
                                         <div class="flex items-center justify-end gap-1">
+                                            <a :href="route('director.grupos.inscritos', grupo.id_oferta)"
+                                               class="p-1.5 rounded text-xs" title="Ver inscritos"
+                                               style="color: var(--text-secondary);"
+                                               onmouseover="this.style.color='#10b981'"
+                                               onmouseout="this.style.color='var(--text-secondary)'">👥</a>
                                             <button @click="abrirEditar(grupo)" class="p-1.5 rounded text-xs" title="Editar"
                                                 style="color: var(--text-secondary);"
                                                 onmouseover="this.style.color='var(--primary-color)'"
@@ -594,10 +669,33 @@ const fmtFecha = (f) => {
                             {{ formNuevo.errors.grupo }}
                         </div>
 
+                        <!-- Carrera + toggle vigentes (pre-filtro) -->
+                        <div class="flex gap-3 items-end">
+                            <div class="flex-1">
+                                <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">Carrera</label>
+                                <select v-model="filtroCarreraModal"
+                                    class="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                                    style="background-color: var(--card-bg); border-color: var(--border-color); color: var(--text-color);">
+                                    <option value="">— Todas las carreras —</option>
+                                    <option v-for="c in optsCarrerasFiltro" :key="c.value" :value="c.value">{{ c.label }}</option>
+                                </select>
+                            </div>
+                            <label class="flex items-center gap-1.5 cursor-pointer select-none pb-2 shrink-0">
+                                <span class="relative inline-block w-8 h-4">
+                                    <input type="checkbox" v-model="soloVigentesModal" class="sr-only peer" />
+                                    <span class="block w-full h-full rounded-full transition"
+                                          :style="soloVigentesModal ? 'background-color:var(--primary-color)' : 'background-color:var(--border-color)'"></span>
+                                    <span class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform"
+                                          :style="soloVigentesModal ? 'transform:translateX(16px)' : ''"></span>
+                                </span>
+                                <span class="text-xs" style="color: var(--text-secondary);">{{ anoActual }}</span>
+                            </label>
+                        </div>
+
                         <!-- Período -->
                         <div>
                             <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">Período *</label>
-                            <ComboSelect v-model="formNuevo.id_periodo" :options="optsPeriodos"
+                            <ComboSelect v-model="formNuevo.id_periodo" :options="optsPeriodosModalFiltrados"
                                 placeholder="— Seleccionar período —" emptyLabel="" />
                             <p v-if="formNuevo.errors.id_periodo" class="text-xs mt-1" style="color:#ef4444;">{{ formNuevo.errors.id_periodo }}</p>
                         </div>
@@ -691,24 +789,47 @@ const fmtFecha = (f) => {
             <div v-if="showClonar"
                 class="fixed inset-0 z-50 flex items-center justify-center p-4"
                 style="background-color: rgba(0,0,0,0.5);"
-                @click.self="showClonar = false">
-                <div class="w-full max-w-md rounded-2xl border shadow-xl"
-                    style="background-color: var(--card-bg); border-color: var(--border-color);">
-                    <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: var(--border-color);">
+                @click.self="showClonar = false; filtroCarreraClonar = ''">
+                <div class="w-full max-w-md rounded-2xl border shadow-xl flex flex-col"
+                    style="background-color: var(--card-bg); border-color: var(--border-color); max-height: 92vh;">
+                    <div class="flex items-center justify-between px-6 py-4 border-b shrink-0" style="border-color: var(--border-color);">
                         <div>
                             <h2 class="font-bold text-base" style="color: var(--text-color);">📋 Clonar Oferta Académica</h2>
                             <p class="text-xs mt-0.5" style="color: var(--text-secondary);">
                                 Copia todos los grupos de un período a otro. Solo modifica los que cambien.
                             </p>
                         </div>
-                        <button @click="showClonar = false" class="text-lg leading-none" style="color: var(--text-secondary);">✕</button>
+                        <button @click="showClonar = false; filtroCarreraClonar = ''" class="text-lg leading-none" style="color: var(--text-secondary);">✕</button>
                     </div>
 
-                    <div class="px-6 py-5 space-y-4">
+                    <div class="overflow-y-auto flex-1 px-6 py-5 space-y-4">
                         <div v-if="formClonar.errors.grupo"
                             class="rounded-lg px-3 py-2 text-xs font-medium"
                             style="background-color: color-mix(in srgb,#ef4444 12%,transparent); color:#ef4444; border:1px solid color-mix(in srgb,#ef4444 30%,transparent);">
                             {{ formClonar.errors.grupo }}
+                        </div>
+
+                        <!-- Carrera + toggle vigentes (pre-filtro) -->
+                        <div class="flex gap-3 items-end">
+                            <div class="flex-1">
+                                <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">Carrera</label>
+                                <select v-model="filtroCarreraClonar"
+                                    class="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                                    style="background-color: var(--card-bg); border-color: var(--border-color); color: var(--text-color);">
+                                    <option value="">— Todas las carreras —</option>
+                                    <option v-for="c in optsCarrerasFiltro" :key="c.value" :value="c.value">{{ c.label }}</option>
+                                </select>
+                            </div>
+                            <label class="flex items-center gap-1.5 cursor-pointer select-none pb-2 shrink-0">
+                                <span class="relative inline-block w-8 h-4">
+                                    <input type="checkbox" v-model="soloVigentesClonar" class="sr-only peer" />
+                                    <span class="block w-full h-full rounded-full transition"
+                                          :style="soloVigentesClonar ? 'background-color:var(--primary-color)' : 'background-color:var(--border-color)'"></span>
+                                    <span class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform"
+                                          :style="soloVigentesClonar ? 'transform:translateX(16px)' : ''"></span>
+                                </span>
+                                <span class="text-xs" style="color: var(--text-secondary);">{{ anoActual }}</span>
+                            </label>
                         </div>
 
                         <!-- Período origen -->
@@ -716,7 +837,7 @@ const fmtFecha = (f) => {
                             <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">
                                 Período plantilla (origen) *
                             </label>
-                            <ComboSelect v-model="formClonar.id_periodo_origen" :options="optsPeriodos"
+                            <ComboSelect v-model="formClonar.id_periodo_origen" :options="optsPeriodosOrigenFiltrados"
                                 placeholder="— Seleccionar período origen —" emptyLabel="" />
                             <p v-if="gruposOrigen > 0" class="text-[11px] mt-1" style="color: var(--primary-color);">
                                 {{ gruposOrigen }} grupo(s) disponibles para clonar
@@ -731,7 +852,7 @@ const fmtFecha = (f) => {
                             <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">
                                 Período destino *
                             </label>
-                            <ComboSelect v-model="formClonar.id_periodo_destino" :options="optsPeriodosDestino"
+                            <ComboSelect v-model="formClonar.id_periodo_destino" :options="optsPeriodosDestinoClonarFiltrados"
                                 placeholder="— Seleccionar período destino —" emptyLabel="" />
                         </div>
 
@@ -746,8 +867,8 @@ const fmtFecha = (f) => {
                         </div>
                     </div>
 
-                    <div class="flex justify-end gap-3 px-6 py-4 border-t" style="border-color: var(--border-color);">
-                        <button @click="showClonar = false"
+                    <div class="flex justify-end gap-3 px-6 py-4 border-t shrink-0" style="border-color: var(--border-color);">
+                        <button @click="showClonar = false; filtroCarreraClonar = ''"
                             class="px-4 py-2 rounded-lg text-sm font-medium border"
                             style="border-color: var(--border-color); color: var(--text-secondary);">
                             Cancelar
@@ -770,17 +891,17 @@ const fmtFecha = (f) => {
                 class="fixed inset-0 z-50 flex items-center justify-center p-4"
                 style="background-color: rgba(0,0,0,0.5);"
                 @click.self="showEdit = false">
-                <div class="w-full max-w-lg rounded-2xl border shadow-xl"
-                    style="background-color: var(--card-bg); border-color: var(--border-color);">
-                    <div class="flex items-center justify-between px-6 py-4 border-b" style="border-color: var(--border-color);">
+                <div class="w-full max-w-lg rounded-2xl border shadow-xl flex flex-col"
+                    style="background-color: var(--card-bg); border-color: var(--border-color); max-height: 92vh;">
+                    <div class="flex items-center justify-between px-6 py-4 border-b shrink-0" style="border-color: var(--border-color);">
                         <h2 class="font-bold text-base" style="color: var(--text-color);">Editar Grupo</h2>
                         <button @click="showEdit = false" class="text-lg leading-none" style="color: var(--text-secondary);">✕</button>
                     </div>
-                    <div class="px-6 pt-4 pb-2">
+                    <div class="px-6 pt-4 pb-2 shrink-0">
                         <p class="text-sm font-medium" style="color: var(--text-color);">{{ grupoEdit?.materia_nombre }}</p>
                         <p class="text-xs" style="color: var(--text-secondary);">{{ grupoEdit?.materia_codigo }}</p>
                     </div>
-                    <div class="px-6 py-4 space-y-4">
+                    <div class="overflow-y-auto flex-1 px-6 py-4 space-y-4">
                         <div v-if="formEdit.errors.grupo"
                             class="rounded-lg px-3 py-2 text-xs font-medium"
                             style="background-color: color-mix(in srgb,#ef4444 12%,transparent); color:#ef4444; border:1px solid color-mix(in srgb,#ef4444 30%,transparent);">
@@ -839,7 +960,7 @@ const fmtFecha = (f) => {
                                 style="background-color: var(--card-bg); border-color: var(--border-color); color: var(--text-color);" />
                         </div>
                     </div>
-                    <div class="flex justify-end gap-3 px-6 py-4 border-t" style="border-color: var(--border-color);">
+                    <div class="flex justify-end gap-3 px-6 py-4 border-t shrink-0" style="border-color: var(--border-color);">
                         <button @click="showEdit = false"
                             class="px-4 py-2 rounded-lg text-sm font-medium border"
                             style="border-color: var(--border-color); color: var(--text-secondary);">

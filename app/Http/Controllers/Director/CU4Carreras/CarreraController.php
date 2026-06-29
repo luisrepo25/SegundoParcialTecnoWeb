@@ -45,6 +45,8 @@ class CarreraController extends Controller
             'nombre'                 => 'required|string|max:150',
             'descripcion'            => 'nullable|string',
             'tipo'                   => 'required|string|in:tecnico,tecnico_superior,curso_libre',
+            'modalidad'              => 'nullable|string|in:anual,semestral,mensual',
+            'max_materias'           => 'required|integer|min:1|max:30',
             'duracion_niveles'       => 'required|integer|min:1',
             'costo_carrera_completa' => 'nullable|numeric|min:0',
         ]);
@@ -54,6 +56,8 @@ class CarreraController extends Controller
             'nombre'                 => $request->nombre,
             'descripcion'            => $request->descripcion,
             'tipo'                   => $request->tipo,
+            'modalidad'              => $request->modalidad ?: null,
+            'max_materias'           => $request->max_materias,
             'duracion_niveles'       => $request->duracion_niveles,
             'costo_carrera_completa' => $request->costo_carrera_completa,
             'activo'                 => true,
@@ -71,6 +75,8 @@ class CarreraController extends Controller
             'nombre'                 => 'required|string|max:150',
             'descripcion'            => 'nullable|string',
             'tipo'                   => 'required|string|in:tecnico,tecnico_superior,curso_libre',
+            'modalidad'              => 'nullable|string|in:anual,semestral,mensual',
+            'max_materias'           => 'required|integer|min:1|max:30',
             'duracion_niveles'       => 'required|integer|min:1',
             'costo_carrera_completa' => 'nullable|numeric|min:0',
         ]);
@@ -80,6 +86,8 @@ class CarreraController extends Controller
             'nombre'                 => $request->nombre,
             'descripcion'            => $request->descripcion,
             'tipo'                   => $request->tipo,
+            'modalidad'              => $request->modalidad ?: null,
+            'max_materias'           => $request->max_materias,
             'duracion_niveles'       => $request->duracion_niveles,
             'costo_carrera_completa' => $request->costo_carrera_completa,
         ]);

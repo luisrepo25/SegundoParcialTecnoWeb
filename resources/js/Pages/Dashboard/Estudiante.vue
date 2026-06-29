@@ -4,12 +4,14 @@ import { Head, useForm, usePage } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
 const props = defineProps({
-    estudiante:        { type: Object, default: null },
-    afiliacion:        { type: Object, default: null },
-    pagoCarrera:       { type: Object, default: null },
-    planOpciones:      { type: Object, default: () => ({}) },
-    inscripciones:     { type: Array,  default: () => [] },
-    gruposDisponibles: { type: Array,  default: () => [] },
+    estudiante:             { type: Object, default: null },
+    afiliacion:             { type: Object, default: null },
+    pagoCarrera:            { type: Object, default: null },
+    planOpciones:           { type: Object, default: () => ({}) },
+    inscripciones:          { type: Array,  default: () => [] },
+    gruposDisponibles:      { type: Array,  default: () => [] },
+    proximaMateria:         { type: Object, default: null },
+    cronogramaInscripcion:  { type: Object, default: null },
 });
 
 const page  = usePage();
@@ -327,6 +329,35 @@ function elegirPlan(tipo) {
                 <!-- ══ TAB: GRUPOS DISPONIBLES ══ -->
                 <div v-if="tabActiva === 'disponibles'">
 
+                    <!-- Banner cronograma: inscripciones abiertas o cerradas -->
+                    <div v-if="cronogramaInscripcion" class="rounded-xl px-4 py-3 mb-3 flex items-center gap-2 text-sm"
+                         style="background-color: color-mix(in srgb,#10b981 10%,transparent); border: 1px solid color-mix(in srgb,#10b981 30%,transparent); color:#15803d;">
+                        <span>✅</span>
+                        <span>
+                            Inscripciones abiertas hasta
+                            <strong>{{ new Date(cronogramaInscripcion.fecha_fin + 'T12:00:00').toLocaleDateString('es-BO', { day:'2-digit', month:'short', year:'numeric' }) }}</strong>
+                            — {{ cronogramaInscripcion.nombre }}
+                        </span>
+                    </div>
+                    <div v-else class="rounded-xl px-4 py-3 mb-3 flex items-center gap-2 text-sm"
+                         style="background-color: color-mix(in srgb,#ef4444 10%,transparent); border: 1px solid color-mix(in srgb,#ef4444 30%,transparent); color:#b91c1c;">
+                        <span>🔒</span>
+                        <span>Período de inscripciones cerrado. Consulta el cronograma académico.</span>
+                    </div>
+
+                    <!-- Banner materia que le corresponde -->
+                    <div v-if="cronogramaInscripcion && proximaMateria"
+                         class="rounded-xl px-4 py-3 mb-3 flex items-center gap-2 text-sm"
+                         style="background-color: color-mix(in srgb,#6366f1 10%,transparent); border: 1px solid color-mix(in srgb,#6366f1 30%,transparent); color:#4338ca;">
+                        <span>📚</span>
+                        <span>
+                            Tu próxima materia:
+                            <strong>{{ proximaMateria.nombre }}</strong>
+                            <span class="ml-1 opacity-70">({{ proximaMateria.codigo }})</span>
+                            — se muestran solo los grupos disponibles para esta materia.
+                        </span>
+                    </div>
+
                     <!-- Sin afiliación → bloquear con aviso -->
                     <div v-if="!afiliacion" class="rounded-xl p-6"
                          style="background-color: #fffbeb; border: 1px solid #fcd34d;">
@@ -344,8 +375,16 @@ function elegirPlan(tipo) {
                     <div v-else-if="gruposPorPeriodo.length === 0" class="rounded-xl p-8 text-center"
                          style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
                         <p class="text-4xl mb-3">📅</p>
-                        <p class="font-medium" style="color: var(--text-color);">No hay grupos disponibles en este momento.</p>
-                        <p class="text-sm mt-1" style="color: var(--text-secondary);">Los períodos activos con vacantes aparecerán aquí.</p>
+                        <p class="font-medium" style="color: var(--text-color);">
+                            <template v-if="!cronogramaInscripcion">Las inscripciones están cerradas.</template>
+                            <template v-else-if="!proximaMateria">Ya completaste todas las materias de la malla.</template>
+                            <template v-else>No hay grupos disponibles para <strong>{{ proximaMateria.nombre }}</strong> en este período.</template>
+                        </p>
+                        <p class="text-sm mt-1" style="color: var(--text-secondary);">
+                            <template v-if="!cronogramaInscripcion">Consulta el cronograma académico para las próximas fechas.</template>
+                            <template v-else-if="!proximaMateria">Consulta con la dirección para tu siguiente paso.</template>
+                            <template v-else>El director aún no ha publicado grupos para esta materia.</template>
+                        </p>
                     </div>
 
                     <!-- Grupos por período -->

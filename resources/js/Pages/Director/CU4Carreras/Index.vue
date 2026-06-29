@@ -1,7 +1,7 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 
 const props = defineProps({
     carreras: Object,
@@ -36,9 +36,25 @@ const showModal   = ref(false);
 const modoEdicion = ref(false);
 const editandoId  = ref(null);
 
+const MODALIDADES = [
+    { value: 'semestral', label: 'Semestral (2 períodos/año)' },
+    { value: 'anual',     label: 'Anual (1 período/año)' },
+    { value: 'mensual',   label: 'Mensual' },
+];
+
+const MODALIDAD_LABELS = { semestral: 'Semestral', anual: 'Anual', mensual: 'Mensual' };
+
+const MAX_SUGERIDO = { semestral: 5, anual: 10, mensual: 1 };
+
 const form = useForm({
     codigo: '', nombre: '', descripcion: '',
-    tipo: 'tecnico_superior', duracion_niveles: '', costo_carrera_completa: '',
+    tipo: 'tecnico_superior', modalidad: 'semestral',
+    max_materias: 5, duracion_niveles: '', costo_carrera_completa: '',
+});
+
+// Cuando cambia modalidad, sugerir max_materias automáticamente
+watch(() => form.modalidad, (val) => {
+    if (val && MAX_SUGERIDO[val]) form.max_materias = MAX_SUGERIDO[val];
 });
 
 function abrirCrear() {
@@ -55,6 +71,8 @@ function abrirEditar(c) {
     form.nombre                 = c.nombre;
     form.descripcion            = c.descripcion ?? '';
     form.tipo                   = c.tipo;
+    form.modalidad              = c.modalidad ?? 'semestral';
+    form.max_materias           = c.max_materias ?? 5;
     form.duracion_niveles       = c.duracion_niveles;
     form.costo_carrera_completa = c.costo_carrera_completa ?? '';
     modoEdicion.value = true;
@@ -150,6 +168,7 @@ function formatCosto(val) {
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Código</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="color: var(--text-secondary);">Carrera</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Tipo</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap hidden md:table-cell" style="color: var(--text-secondary);">Modalidad</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap hidden md:table-cell" style="color: var(--text-secondary);">Duración</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap hidden lg:table-cell" style="color: var(--text-secondary);">Costo Total</th>
                                 <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap" style="color: var(--text-secondary);">Estado</th>
@@ -174,6 +193,17 @@ function formatCosto(val) {
                                     <span :class="['badge', tipoBadge(c.tipo).color]">{{ tipoBadge(c.tipo).label }}</span>
                                 </td>
                                 <td class="px-4 py-3 text-sm hidden md:table-cell" style="color: var(--text-color);">
+                                    <span v-if="c.modalidad" class="text-xs font-semibold px-2 py-0.5 rounded"
+                                          :style="c.modalidad === 'anual'
+                                              ? 'background-color:color-mix(in srgb,#10b981 15%,transparent);color:#10b981;'
+                                              : c.modalidad === 'mensual'
+                                              ? 'background-color:color-mix(in srgb,#3b82f6 15%,transparent);color:#3b82f6;'
+                                              : 'background-color:color-mix(in srgb,#8b5cf6 15%,transparent);color:#8b5cf6;'">
+                                        {{ MODALIDAD_LABELS[c.modalidad] }}
+                                    </span>
+                                    <span v-else class="text-xs" style="color: var(--text-muted);">—</span>
+                                </td>
+                                <td class="px-4 py-3 text-sm hidden md:table-cell" style="color: var(--text-color);">
                                     {{ c.duracion_niveles }} <span class="text-xs" style="color: var(--text-secondary);">nivel(es)</span>
                                 </td>
                                 <td class="px-4 py-3 text-sm hidden lg:table-cell" style="color: var(--text-color);">
@@ -195,7 +225,7 @@ function formatCosto(val) {
                                 </td>
                             </tr>
                             <tr v-if="carreras.data.length === 0">
-                                <td colspan="7" class="px-4 py-8 text-center text-sm" style="color: var(--text-secondary);">
+                                <td colspan="8" class="px-4 py-8 text-center text-sm" style="color: var(--text-secondary);">
                                     No se encontraron carreras.
                                 </td>
                             </tr>
@@ -252,6 +282,29 @@ function formatCosto(val) {
                         </div>
 
                         <div>
+                            <label class="field-label">Modalidad de períodos *</label>
+                            <div class="grid grid-cols-3 gap-2 mt-1">
+                                <button v-for="m in MODALIDADES" :key="m.value"
+                                    type="button"
+                                    @click="form.modalidad = m.value"
+                                    class="px-2 py-2 rounded-lg text-xs font-semibold border transition text-center"
+                                    :style="form.modalidad === m.value
+                                        ? (m.value === 'anual'
+                                            ? 'background-color:color-mix(in srgb,#10b981 20%,transparent);color:#10b981;border-color:#10b981;'
+                                            : m.value === 'mensual'
+                                            ? 'background-color:color-mix(in srgb,#3b82f6 20%,transparent);color:#3b82f6;border-color:#3b82f6;'
+                                            : 'background-color:color-mix(in srgb,#8b5cf6 20%,transparent);color:#8b5cf6;border-color:#8b5cf6;')
+                                        : 'background:transparent;color:var(--text-secondary);border-color:var(--border-color);'">
+                                    {{ m.label }}
+                                </button>
+                            </div>
+                            <p class="text-[11px] mt-1" style="color: var(--text-secondary);">
+                                Define cuántos períodos se crean por año para esta carrera.
+                            </p>
+                            <p v-if="form.errors.modalidad" class="field-error">{{ form.errors.modalidad }}</p>
+                        </div>
+
+                        <div>
                             <label class="field-label">Nombre *</label>
                             <input v-model="form.nombre" type="text" class="field-input" placeholder="Ej: Ingeniería de Sistemas" />
                             <p v-if="form.errors.nombre" class="field-error">{{ form.errors.nombre }}</p>
@@ -262,11 +315,20 @@ function formatCosto(val) {
                             <textarea v-model="form.descripcion" rows="3" class="field-input" placeholder="Descripción de la carrera..."></textarea>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-3">
+                        <div class="grid grid-cols-3 gap-3">
                             <div>
-                                <label class="field-label">Duración (niveles) *</label>
-                                <input v-model="form.duracion_niveles" type="number" min="1" class="field-input" placeholder="Ej: 6" />
+                                <label class="field-label">Duración (años) *</label>
+                                <input v-model="form.duracion_niveles" type="number" min="1" class="field-input" placeholder="Ej: 4" />
                                 <p v-if="form.errors.duracion_niveles" class="field-error">{{ form.errors.duracion_niveles }}</p>
+                            </div>
+                            <div>
+                                <label class="field-label">Materias por período *</label>
+                                <input v-model.number="form.max_materias" type="number" min="1" max="30" class="field-input" />
+                                <p class="text-[11px] mt-0.5" style="color: var(--text-secondary);">
+                                    {{ form.modalidad === 'semestral' ? '× 2 sem/año' : form.modalidad === 'mensual' ? '× 12 mes/año' : '× 1 año' }}
+                                    = {{ form.max_materias * (form.modalidad === 'semestral' ? 2 : form.modalidad === 'mensual' ? 12 : 1) }} mat/año por nivel
+                                </p>
+                                <p v-if="form.errors.max_materias" class="field-error">{{ form.errors.max_materias }}</p>
                             </div>
                             <div>
                                 <label class="field-label">Costo Total (Bs)</label>

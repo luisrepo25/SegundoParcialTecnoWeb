@@ -74,6 +74,8 @@ class CronogramaController extends Controller
             'activo'       => true,
         ]);
 
+        $this->sincronizarPeriodos($request->tipo_periodo, $request->fecha_inicio, $request->fecha_fin, $request->modalidad);
+
         return redirect()->back()->with('success', 'Cronograma creado correctamente.');
     }
 
@@ -105,6 +107,8 @@ class CronogramaController extends Controller
                 'modalidad'    => $request->modalidad ?: null,
             ]);
 
+        $this->sincronizarPeriodos($request->tipo_periodo, $request->fecha_inicio, $request->fecha_fin, $request->modalidad);
+
         return redirect()->back()->with('success', 'Cronograma actualizado correctamente.');
     }
 
@@ -120,6 +124,76 @@ class CronogramaController extends Controller
 
         $estado = $cronograma->activo ? 'desactivado' : 'activado';
         return redirect()->back()->with('success', "Cronograma $estado correctamente.");
+    }
+
+    /**
+     * Al crear/actualizar un cronograma de clases o inscripción,
+     * auto-rellena los periodos_dictado del mismo año que aún tienen NULL en esos campos.
+     * Solo afecta períodos cuya carrera tenga la misma modalidad (o si el cronograma es global).
+     */
+    /**
+     * Al crear/actualizar un cronograma de clases o inscripción,
+     * sincroniza automáticamente los periodos_dictado del mismo año y modalidad.
+     *
+     * Clases: actualiza períodos cuya fecha_inicio actual cae dentro del rango del cronograma
+     *   (±14 días en el inicio para tolerar diferencias de clone vs fechas reales).
+     *   Identifica correctamente Sem 1 vs Sem 2 porque los clones tienen fechas aproximadas.
+     *
+     * Inscripción: solo actualiza períodos que aún tienen NULL en fecha_inicio_inscripcion,
+     *   cuyo año coincide. Se identifica el semestre porque Sem 1 empieza en la 1ra mitad
+     *   del año y Sem 2 en la 2da; se usa el rango del cronograma para filtrar.
+     */
+    private function sincronizarPeriodos(string $tipo, string $fechaInicio, string $fechaFin, ?string $modalidad): void
+    {
+        $carrerasQuery = DB::table('carreras')->whereNotNull('id_carrera');
+        if ($modalidad) {
+            $carrerasQuery->where('modalidad', $modalidad);
+        }
+        $idCarreras = $carrerasQuery->pluck('id_carrera');
+
+        if ($idCarreras->isEmpty()) return;
+
+        if ($tipo === 'clases') {
+            // Actualiza períodos cuya fecha_inicio (clonada o previa) cae dentro del rango
+            // del cronograma (con tolerancia de 14 días al inicio para manejar desfases de clone).
+            // Esto identifica Sem 1 vs Sem 2 sin ambigüedad.
+            DB::table('periodos_dictado')
+                ->whereNotNull('id_carrera')
+                ->whereNull('id_nivel')
+                ->whereIn('id_carrera', $idCarreras)
+                ->whereNotNull('fecha_inicio')
+                ->whereRaw(
+                    "fecha_inicio BETWEEN (? ::date - INTERVAL '14 days') AND ? ::date",
+                    [$fechaInicio, $fechaFin]
+                )
+                ->update([
+                    'fecha_inicio' => $fechaInicio,
+                    'fecha_fin'    => $fechaFin,
+                ]);
+
+        } elseif ($tipo === 'inscripcion') {
+            $anio = (int) date('Y', strtotime($fechaInicio));
+
+            // Actualiza períodos del año que aún no tienen fecha de inscripción.
+            // Para distinguir Sem 1 vs Sem 2, filtra por períodos cuya fecha_inicio
+            // caiga en el mismo rango del cronograma (con tolerancia de 60 días post-fin
+            // para cubrir ventanas de inscripción que terminan antes que inicien clases).
+            DB::table('periodos_dictado')
+                ->whereNotNull('id_carrera')
+                ->whereNull('id_nivel')
+                ->whereIn('id_carrera', $idCarreras)
+                ->whereNull('fecha_inicio_inscripcion')
+                ->whereNotNull('fecha_inicio')
+                ->whereRaw(
+                    "EXTRACT(YEAR FROM fecha_inicio) = ?
+                     AND fecha_inicio BETWEEN (? ::date - INTERVAL '14 days') AND (? ::date + INTERVAL '60 days')",
+                    [$anio, $fechaInicio, $fechaFin]
+                )
+                ->update([
+                    'fecha_inicio_inscripcion' => $fechaInicio,
+                    'fecha_fin_inscripcion'    => $fechaFin,
+                ]);
+        }
     }
 
     public function destroy(int $id)

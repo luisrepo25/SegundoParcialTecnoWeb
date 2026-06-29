@@ -139,6 +139,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/grupos', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'index'])->name('grupos.index');
         Route::post('/grupos', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'store'])->name('grupos.store');
         Route::post('/grupos/clonar', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'clonar'])->name('grupos.clonar');
+        Route::get('/grupos/{id}/inscritos', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'inscritos'])->name('grupos.inscritos');
         Route::put('/grupos/{id}', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'update'])->name('grupos.update');
         Route::patch('/grupos/{id}/toggle', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'toggleActivo'])->name('grupos.toggle');
         Route::delete('/grupos/{id}', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'destroy'])->name('grupos.destroy');

@@ -33,16 +33,13 @@ class GrupoController extends Controller
 
         // ── Todos los períodos (para agrupar y para el select del modal) ─────
         $periodosRaw = DB::table('periodos_dictado as pd')
-            ->leftJoin('niveles_carrera as n', 'pd.id_nivel', '=', 'n.id_nivel')
-            ->leftJoin('carreras as cn', 'n.id_carrera', '=', 'cn.id_carrera')
-            ->leftJoin('carreras as cl', 'pd.id_carrera', '=', 'cl.id_carrera')
+            ->leftJoin('carreras as c', 'pd.id_carrera', '=', 'c.id_carrera')
             ->orderBy('pd.fecha_inicio', 'desc')
             ->select(
                 'pd.id_periodo', 'pd.nombre', 'pd.tipo_periodo',
                 'pd.fecha_inicio', 'pd.fecha_fin', 'pd.activo',
-                DB::raw("COALESCE(cn.id_carrera, cl.id_carrera) as id_carrera"),
-                DB::raw("COALESCE(cn.nombre, cl.nombre) as carrera_nombre"),
-                'n.numero_nivel', 'n.nombre as nivel_nombre'
+                'pd.fecha_inicio_inscripcion', 'pd.fecha_fin_inscripcion',
+                'c.id_carrera', 'c.nombre as carrera_nombre'
             )
             ->get();
 
@@ -71,16 +68,18 @@ class GrupoController extends Controller
         }
 
         $periodos = $periodosRaw->map(fn($p) => [
-            'id_periodo'     => $p->id_periodo,
-            'nombre'         => $p->nombre,
-            'tipo_periodo'   => $p->tipo_periodo,
-            'fecha_inicio'   => $p->fecha_inicio,
-            'fecha_fin'      => $p->fecha_fin,
-            'activo'         => $p->activo,
-            'id_carrera'     => $p->id_carrera,
-            'carrera_nombre' => $p->carrera_nombre,
-            'nivel_nombre'   => $p->nivel_nombre ? ($p->nivel_nombre . ' (Año ' . $p->numero_nivel . ')') : null,
-            'grupos'         => $gruposPorPeriodo[$p->id_periodo] ?? [],
+            'id_periodo'               => $p->id_periodo,
+            'nombre'                   => $p->nombre,
+            'tipo_periodo'             => $p->tipo_periodo,
+            'fecha_inicio'             => $p->fecha_inicio,
+            'fecha_fin'                => $p->fecha_fin,
+            'fecha_inicio_inscripcion' => $p->fecha_inicio_inscripcion ?? null,
+            'fecha_fin_inscripcion'    => $p->fecha_fin_inscripcion ?? null,
+            'activo'                   => $p->activo,
+            'id_carrera'               => $p->id_carrera,
+            'carrera_nombre'           => $p->carrera_nombre,
+            'nivel_nombre'             => null,
+            'grupos'                   => $gruposPorPeriodo[$p->id_periodo] ?? [],
         ]);
 
         // ── Datos para selects del modal ─────────────────────────────────────
@@ -390,5 +389,53 @@ class GrupoController extends Controller
         if ($omitidos > 0) $msg .= " {$omitidos} omitido(s) por conflicto de horario.";
 
         return redirect()->route('director.grupos.index')->with('success', $msg);
+    }
+
+    // ── CU6: Ver inscritos en un grupo específico ──────────────────────────────
+    public function inscritos(int $idOferta)
+    {
+        $grupo = DB::table('grupos as g')
+            ->join('materias as m',          'g.id_materia',  '=', 'm.id_materia')
+            ->join('periodos_dictado as pd', 'g.id_periodo',  '=', 'pd.id_periodo')
+            ->join('aulas as a',             'g.id_aula',     '=', 'a.id_aula')
+            ->join('profesores as pr',       'g.id_profesor', '=', 'pr.id_profesor')
+            ->join('usuarios as up',         'pr.id_usuario', '=', 'up.id_usuario')
+            ->join('horarios as h',          'g.id_horario',  '=', 'h.id_horario')
+            ->where('g.id_oferta', $idOferta)
+            ->select(
+                'g.id_oferta', 'g.codigo_grupo', 'g.vacantes_max', 'g.vacantes_ocupadas', 'g.activo',
+                'm.nombre as materia_nombre', 'm.codigo as materia_codigo',
+                'pd.nombre as periodo_nombre', 'pd.fecha_inicio', 'pd.fecha_fin',
+                'a.nombre as aula_nombre',
+                DB::raw("up.nombre || ' ' || up.apellido as profesor_nombre"),
+                'h.dia_semana', 'h.hora_inicio', 'h.hora_fin'
+            )
+            ->first();
+
+        if (!$grupo) abort(404);
+
+        $inscritos = DB::table('inscripciones as i')
+            ->join('estudiantes as e',  'i.id_estudiante', '=', 'e.id_estudiante')
+            ->join('usuarios as u',     'e.id_usuario',    '=', 'u.id_usuario')
+            ->leftJoin('carreras as c', 'e.id_carrera_actual', '=', 'c.id_carrera')
+            ->where('i.id_oferta', $idOferta)
+            ->whereIn('i.estado', ['activo', 'aprobado', 'pendiente_matricula', 'pendiente_pago'])
+            ->select(
+                'i.id_inscripcion', 'i.estado', 'i.calificacion_final', 'i.aprobado', 'i.fecha_inscripcion',
+                'e.id_estudiante', 'e.legajo',
+                DB::raw("u.nombre || ' ' || u.apellido as estudiante_nombre"),
+                'u.email', 'u.dni',
+                'c.nombre as carrera_nombre'
+            )
+            ->orderBy('u.apellido')
+            ->orderBy('u.nombre')
+            ->get()
+            ->map(fn($r) => (array) $r)
+            ->toArray();
+
+        return Inertia::render('Director/CU9Grupos/Inscritos', [
+            'grupo'     => (array) $grupo,
+            'inscritos' => $inscritos,
+        ]);
     }
 }

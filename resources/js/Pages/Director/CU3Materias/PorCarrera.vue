@@ -23,6 +23,17 @@ const totalMaterias = computed(() =>
         : props.porNivel.reduce((sum, n) => sum + n.materias.length, 0)
 );
 
+const periodosPorAnio = computed(() => {
+    const m = props.carrera.modalidad;
+    if (m === 'anual') return 1;
+    if (m === 'mensual') return 12;
+    return 2; // semestral por defecto
+});
+
+const maxMateriasNivel = computed(() =>
+    (props.carrera.max_materias ?? 5) * periodosPorAnio.value
+);
+
 const costoPorMateria = computed(() => {
     const total = props.carrera.costo_carrera_completa;
     if (!total || totalMaterias.value === 0) return null;
@@ -148,7 +159,14 @@ const ultimaMateriaDelNivel = computed(() => {
     return sorted[sorted.length - 1];
 });
 
+const nivelLleno = computed(() =>
+    nivelActivo.value
+        ? nivelActivo.value.materias.length >= maxMateriasNivel.value
+        : false
+);
+
 function abrirModalMateria(nivel) {
+    if (nivel.id_nivel && nivel.materias.length >= maxMateriasNivel.value) return;
     nivelActivo.value = nivel;
     tabMateria.value  = 'existente';
     formAsignar.reset();
@@ -174,6 +192,7 @@ function abrirModalMateria(nivel) {
 }
 
 function guardarAsignar() {
+    if (nivelLleno.value) return;
     const esLibre = props.carrera.tipo === 'curso_libre';
     formAsignar.transform(data => ({
         ...data,
@@ -187,6 +206,7 @@ function guardarAsignar() {
 }
 
 function guardarNueva() {
+    if (nivelLleno.value) return;
     const esLibre = props.carrera.tipo === 'curso_libre';
     const payload = {
         ...formNueva.data(),
@@ -314,6 +334,11 @@ function confirmarEliminarNivel() {
                 <div v-if="totalMaterias > 0" class="rounded-lg px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm border" style="background-color: color-mix(in srgb, var(--primary-color) 6%, transparent); border-color: color-mix(in srgb, var(--primary-color) 20%, transparent);">
                     <span style="color: var(--text-secondary);">
                         <span class="font-semibold" style="color: var(--text-color);">{{ totalMaterias }}</span> materia(s) en la malla
+                    </span>
+                    <span v-if="carrera.tipo !== 'curso_libre' && carrera.max_materias" style="color: var(--text-secondary);">
+                        Límite por nivel:
+                        <span class="font-semibold" style="color: var(--text-color);">{{ maxMateriasNivel }}</span>
+                        <span class="text-xs opacity-70"> ({{ carrera.max_materias }} mat/período × {{ periodosPorAnio }} período/año)</span>
                     </span>
                     <span style="color: var(--text-secondary);">
                         Costo total carrera:
@@ -449,13 +474,32 @@ function confirmarEliminarNivel() {
                             </div>
                             <div>
                                 <p class="font-semibold text-sm" style="color: var(--text-color);">{{ nivel.nombre_nivel }}</p>
-                                <p class="text-xs" style="color: var(--text-secondary);">{{ nivel.materias.length }} materia(s)</p>
+                                <p class="text-xs flex items-center gap-1.5">
+                                    <span :style="nivel.materias.length >= maxMateriasNivel
+                                        ? 'color: #ef4444; font-weight: 600;'
+                                        : nivel.materias.length >= maxMateriasNivel * 0.8
+                                        ? 'color: #f59e0b; font-weight: 600;'
+                                        : 'color: var(--text-secondary);'">
+                                        {{ nivel.materias.length }} / {{ maxMateriasNivel }} materias
+                                    </span>
+                                    <span v-if="nivel.materias.length >= maxMateriasNivel"
+                                          class="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                                          style="background-color:color-mix(in srgb,#ef4444 15%,transparent); color:#ef4444;">
+                                        LLENO
+                                    </span>
+                                </p>
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
                             <button @click="abrirModalMateria(nivel)"
+                                :disabled="nivel.materias.length >= maxMateriasNivel"
                                 class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition"
-                                style="background-color: var(--primary-color); color: var(--primary-text);">
+                                :style="nivel.materias.length >= maxMateriasNivel
+                                    ? 'background-color: var(--border-color); color: var(--text-muted); cursor: not-allowed;'
+                                    : 'background-color: var(--primary-color); color: var(--primary-text);'"
+                                :title="nivel.materias.length >= maxMateriasNivel
+                                    ? `Límite alcanzado: ${maxMateriasNivel} materias máx por nivel (${carrera.max_materias} × ${periodosPorAnio} período${periodosPorAnio > 1 ? 's' : ''}/año)`
+                                    : ''">
                                 + Asignar Materia
                             </button>
                             <button v-if="nivel.materias.length === 0"
@@ -604,6 +648,14 @@ function confirmarEliminarNivel() {
                     <button @click="modalMateria = false" class="text-lg leading-none" style="color: var(--text-secondary);">✕</button>
                 </div>
 
+                <!-- Banner nivel lleno -->
+                <div v-if="nivelLleno" class="mx-6 mb-3 rounded-lg px-3 py-2.5 text-xs font-semibold"
+                     style="background-color:color-mix(in srgb,#ef4444 12%,transparent); color:#ef4444; border:1px solid color-mix(in srgb,#ef4444 30%,transparent);">
+                    🚫 Nivel lleno: {{ nivelActivo.materias.length }} / {{ maxMateriasNivel }} materias
+                    ({{ carrera.max_materias }} mat/período × {{ periodosPorAnio }} período/año).
+                    Ajusta el límite en la configuración de la carrera para agregar más.
+                </div>
+
                 <!-- Tabs -->
                 <div class="flex border-b mx-6" style="border-color: var(--border-color);">
                     <button @click="tabMateria = 'existente'"
@@ -659,7 +711,7 @@ function confirmarEliminarNivel() {
                         <div class="flex justify-end gap-3 pt-2">
                             <button @click="modalMateria = false" class="btn-secondary">Cancelar</button>
                             <button @click="guardarAsignar"
-                                :disabled="!formAsignar.id_materia || formAsignar.processing"
+                                :disabled="!formAsignar.id_materia || formAsignar.processing || nivelLleno"
                                 class="btn-primary">
                                 {{ formAsignar.processing ? 'Asignando...' : 'Asignar a Nivel' }}
                             </button>
@@ -758,7 +810,7 @@ function confirmarEliminarNivel() {
 
                         <div class="flex justify-end gap-3 pt-2">
                             <button @click="modalMateria = false" class="btn-secondary">Cancelar</button>
-                            <button @click="guardarNueva" :disabled="formNueva.processing" class="btn-primary">
+                            <button @click="guardarNueva" :disabled="formNueva.processing || nivelLleno" class="btn-primary">
                                 {{ formNueva.processing ? 'Creando...' : 'Crear y Asignar' }}
                             </button>
                         </div>

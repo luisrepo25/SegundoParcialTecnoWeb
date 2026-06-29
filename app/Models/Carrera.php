@@ -12,7 +12,7 @@ class Carrera extends Model
 
     protected $fillable = [
         'codigo', 'nombre', 'descripcion',
-        'tipo', 'duracion_niveles',
+        'tipo', 'modalidad', 'max_materias', 'duracion_niveles',
         'costo_carrera_completa', 'activo',
     ];
 
@@ -22,6 +22,7 @@ class Carrera extends Model
             'activo'                 => 'boolean',
             'costo_carrera_completa' => 'decimal:2',
             'duracion_niveles'       => 'integer',
+            'max_materias'           => 'integer',
         ];
     }
 }
