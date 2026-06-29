@@ -206,6 +206,19 @@ class GrupoController extends Controller
             ]);
         }
 
+        // Verificar duplicado de código en el mismo período
+        if ($request->codigo_grupo) {
+            $codigoUsado = DB::table('grupos')
+                ->where('codigo_grupo', $request->codigo_grupo)
+                ->where('id_periodo',   $request->id_periodo)
+                ->exists();
+            if ($codigoUsado) {
+                return redirect()->back()->withErrors([
+                    'grupo' => "El código '{$request->codigo_grupo}' ya está en uso en este período. Usa otro código o déjalo vacío para generar uno automático.",
+                ]);
+            }
+        }
+
         $id = DB::table('grupos')->insertGetId([
             'id_materia'        => $request->id_materia,
             'id_aula'           => $request->id_aula,

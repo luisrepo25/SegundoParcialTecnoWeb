@@ -231,10 +231,28 @@ function duracionDias(inicio, fin) {
 // ── Cronograma → auto-rellena fechas ─────────────────────────────────────────
 const MODALIDAD_LABELS = { mensual: 'Mensual', semestral: 'Semestral', anual: 'Anual', intensivo: 'Intensivo' };
 
+// Año del período siendo editado/creado — guía el filtro de cronogramas mostrados
+const anioFormulario = computed(() => {
+    if (form.fecha_inicio) return new Date(form.fecha_inicio + 'T12:00:00').getFullYear();
+    return new Date().getFullYear();
+});
+
+// Cronogramas de clases del mismo año del período, filtrados por modalidad
 function cronogramasFiltrados(modalidadFiltro = null) {
-    return props.cronogramasClases
-        .filter(c => !modalidadFiltro || c.modalidad === null || c.modalidad === modalidadFiltro);
+    return props.cronogramasClases.filter(c => {
+        const anio = new Date(c.fecha_inicio + 'T12:00:00').getFullYear();
+        if (anio !== anioFormulario.value) return false;
+        return !modalidadFiltro || c.modalidad === null || c.modalidad === modalidadFiltro;
+    });
 }
+
+// Cronogramas de inscripción del mismo año del período
+const cronogramasInscripcionFiltrados = computed(() =>
+    props.cronogramasInscripcion.filter(c => {
+        const anio = new Date(c.fecha_inicio + 'T12:00:00').getFullYear();
+        return anio === anioFormulario.value;
+    })
+);
 
 function labelCronograma(c) {
     const mod = c.modalidad ? MODALIDAD_LABELS[c.modalidad] ?? c.modalidad : 'Global';
@@ -517,7 +535,7 @@ const carrerasFiltradas = computed(() => {
                         <p class="text-[11px] font-semibold mb-2 flex items-center gap-1.5" style="color: #8b5cf6;">
                             📚 Fechas de clases
                         </p>
-                        <div v-if="cronogramasClases.length > 0" class="mb-3">
+                        <div v-if="cronogramasFiltrados(form.tipo_periodo).length > 0" class="mb-3">
                             <select v-model="cronogramaModal" class="input-field text-xs w-full"
                                     @change="aplicarCronograma(cronogramaModal, form)">
                                 <option value="">— Tomar fechas del cronograma de clases —</option>
@@ -550,11 +568,11 @@ const carrerasFiltradas = computed(() => {
                         <p class="text-[11px] font-semibold mb-2 flex items-center gap-1.5" style="color: #10b981;">
                             📝 Período de inscripciones
                         </p>
-                        <div v-if="cronogramasInscripcion.length > 0" class="mb-3">
+                        <div v-if="cronogramasInscripcionFiltrados.length > 0" class="mb-3">
                             <select v-model="cronogramaInscripcionModal" class="input-field text-xs w-full"
                                     @change="aplicarCronogramaInscripcion(cronogramaInscripcionModal, form)">
                                 <option value="">— Tomar fechas del cronograma de inscripciones —</option>
-                                <option v-for="c in cronogramasInscripcion"
+                                <option v-for="c in cronogramasInscripcionFiltrados"
                                         :key="c.id_cronograma" :value="c.id_cronograma">
                                     {{ labelCronograma(c) }}
                                 </option>
