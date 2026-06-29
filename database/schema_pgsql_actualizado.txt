@@ -3156,11 +3156,11 @@ ALTER TABLE ONLY public.evaluaciones
 
 
 --
--- Name: grupos grupos_codigo_grupo_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: grupos grupos_codigo_grupo_periodo_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.grupos
-    ADD CONSTRAINT grupos_codigo_grupo_key UNIQUE (codigo_grupo);
+    ADD CONSTRAINT grupos_codigo_grupo_periodo_key UNIQUE (codigo_grupo, id_periodo);
 
 
 --

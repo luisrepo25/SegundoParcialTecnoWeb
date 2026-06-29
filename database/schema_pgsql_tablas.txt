@@ -110,7 +110,8 @@ CREATE TABLE grupos (
     vacantes_max              integer              NOT NULL   ,
     vacantes_ocupadas         integer              NULL       ,
     activo                    boolean              NULL       DEFAULT true,
-    codigo_grupo              character varying(20) NULL       
+    codigo_grupo              character varying(20) NULL       ,
+    CONSTRAINT grupos_codigo_grupo_periodo_key UNIQUE (codigo_grupo, id_periodo)
 );
 
 CREATE TABLE horarios (

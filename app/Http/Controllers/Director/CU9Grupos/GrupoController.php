@@ -284,9 +284,23 @@ class GrupoController extends Controller
             ]);
         }
 
+        $nuevoCodigo = $request->codigo_grupo ?: $grupo->codigo_grupo;
+
+        $codigoUsado = DB::table('grupos')
+            ->where('codigo_grupo', $nuevoCodigo)
+            ->where('id_periodo',   $grupo->id_periodo)
+            ->where('id_oferta',    '!=', $id)
+            ->exists();
+
+        if ($codigoUsado) {
+            return redirect()->back()->withErrors([
+                'grupo' => "El código '{$nuevoCodigo}' ya está en uso en este período.",
+            ]);
+        }
+
         DB::table('grupos')->where('id_oferta', $id)->update([
             'vacantes_max' => $request->vacantes_max,
-            'codigo_grupo' => $request->codigo_grupo ?: $grupo->codigo_grupo,
+            'codigo_grupo' => $nuevoCodigo,
             'id_aula'      => $request->id_aula,
             'id_profesor'  => $request->id_profesor,
             'id_horario'   => $request->id_horario,
