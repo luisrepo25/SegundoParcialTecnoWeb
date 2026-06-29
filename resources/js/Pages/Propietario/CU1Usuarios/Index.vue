@@ -3,8 +3,9 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
 
-const page    = usePage();
-const canEdit = computed(() => page.props.auth?.user?.role === 'propietario');
+const page      = usePage();
+const canEdit   = computed(() => ['propietario', 'director', 'secretaria'].includes(page.props.auth?.user?.role));
+const canToggle = computed(() => ['propietario', 'director'].includes(page.props.auth?.user?.role));
 
 const props = defineProps({
     usuarios: Object,
@@ -220,13 +221,11 @@ function toggleActivo(u) {
                                 <td class="px-4 py-3 text-right">
                                     <div class="flex justify-end gap-1">
                                         <button @click="abrirVer(u)" class="btn-accion" style="color: var(--primary-color);">Ver</button>
-                                        <template v-if="canEdit">
-                                            <button @click="abrirEditar(u)" class="btn-accion" style="color: #d97706;">Editar</button>
-                                            <button @click="toggleActivo(u)" class="btn-accion"
-                                                :style="u.activo ? 'color: #dc2626;' : 'color: #059669;'">
-                                                {{ u.activo ? 'Desactivar' : 'Activar' }}
-                                            </button>
-                                        </template>
+                                        <button v-if="canEdit" @click="abrirEditar(u)" class="btn-accion" style="color: #d97706;">Editar</button>
+                                        <button v-if="canToggle" @click="toggleActivo(u)" class="btn-accion"
+                                            :style="u.activo ? 'color: #dc2626;' : 'color: #059669;'">
+                                            {{ u.activo ? 'Desactivar' : 'Activar' }}
+                                        </button>
                                     </div>
                                 </td>
                             </tr>

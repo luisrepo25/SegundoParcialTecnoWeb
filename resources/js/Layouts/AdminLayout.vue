@@ -47,7 +47,7 @@ const todasSecciones = [
             { name: 'CU8 · Períodos Académicos', route: 'director.periodos.index',       activeUrls: ['/director/periodos'],          roles: null },
             { name: 'CU9/12 · Grupos y Notas',   route: 'director.grupos.index',         activeUrls: ['/director/grupos'],            roles: null },
             { name: 'CU10 · Cronogramas',        route: 'secretaria.cronogramas.index',  activeUrls: ['/secretaria/cronogramas'],     roles: null },
-            { name: 'CU13 · Seguimiento',        route: 'propietario.seguimiento.index', activeUrls: ['/propietario/seguimiento'],    roles: ['propietario', 'director'] },
+            { name: 'CU13 · Seguimiento',        route: 'propietario.seguimiento.index', activeUrls: ['/propietario/seguimiento'],    roles: null },
         ],
     },
     {
@@ -63,8 +63,8 @@ const todasSecciones = [
         label: 'Administrativo',
         items: [
             { name: 'CU1 · Gestión de Usuarios', route: 'propietario.usuarios.index', activeUrls: ['/propietario/usuarios'], roles: null },
-            { name: 'CU2 · Gestión de Aulas',    route: 'propietario.aulas.index',    activeUrls: ['/propietario/aulas'],    roles: ['propietario'] },
-            { name: 'CU11 · Gestión de Horarios',route: 'propietario.horarios.index', activeUrls: ['/propietario/horarios'], roles: ['propietario'] },
+            { name: 'CU2 · Gestión de Aulas',    route: 'propietario.aulas.index',    activeUrls: ['/propietario/aulas'],    roles: null },
+            { name: 'CU11 · Gestión de Horarios',route: 'propietario.horarios.index', activeUrls: ['/propietario/horarios'], roles: null },
         ],
     },
 ];

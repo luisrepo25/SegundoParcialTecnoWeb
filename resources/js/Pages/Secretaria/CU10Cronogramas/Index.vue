@@ -1,7 +1,9 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { Head, router } from '@inertiajs/vue3';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
+
+const canEdit = computed(() => ['propietario', 'director'].includes(usePage().props.auth?.user?.role));
 
 const props = defineProps({
     cronogramas: Array,
@@ -202,7 +204,7 @@ function eliminar(c) {
                     <span class="opacity-40">·</span>
                     <span><strong style="color:#22c55e;">{{ totalAbierta }}</strong> abiertos</span>
                 </div>
-                <button @click="abrirCrear"
+                <button v-if="canEdit" @click="abrirCrear"
                         class="shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-all"
                         style="background-color: var(--primary-color); color: var(--primary-text);">
                     + Nuevo Cronograma
@@ -322,7 +324,7 @@ function eliminar(c) {
 
                                 <!-- Acciones -->
                                 <td class="px-5 py-4">
-                                    <div class="flex items-center justify-end gap-2">
+                                    <div v-if="canEdit" class="flex items-center justify-end gap-2">
                                         <button @click="toggleActivo(c.id_cronograma)"
                                                 class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-all"
                                                 :style="c.activo

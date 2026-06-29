@@ -9,6 +9,7 @@ const props = defineProps({
 
 const page = usePage();
 const credenciales = computed(() => page.props.flash?.credenciales);
+const canEdit = computed(() => ['propietario', 'director', 'secretaria'].includes(page.props.auth?.user?.role));
 
 const form = useForm({
     nombre: '',
@@ -40,7 +41,12 @@ function submitForm() {
         </template>
 
         <div class="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-            
+
+            <div v-if="!canEdit" class="text-center py-16" style="color:var(--text-secondary);">
+                <p class="text-sm">Solo la secretaría puede registrar nuevas inscripciones.</p>
+            </div>
+
+            <template v-else>
             <div class="mb-8">
                 <h3 class="text-3xl font-light text-[var(--text-color)] tracking-tight">Nueva Inscripción Presencial</h3>
                 <p class="text-[var(--text-muted)] mt-1 font-light">Registra a un estudiante y cóbrale en efectivo instantáneamente.</p>
@@ -139,6 +145,7 @@ function submitForm() {
 
                 </form>
             </div>
+            </template>
         </div>
 
     </AdminLayout>

@@ -3,7 +3,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
 
-const canEdit = computed(() => usePage().props.auth?.user?.role === 'propietario');
+const canEdit = computed(() => ['propietario', 'director'].includes(usePage().props.auth?.user?.role));
 
 const props = defineProps({
     horarios: Object,

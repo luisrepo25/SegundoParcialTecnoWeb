@@ -624,7 +624,7 @@ const fmtFecha = (f) => {
                                                style="color: var(--text-secondary);"
                                                onmouseover="this.style.color='#10b981'"
                                                onmouseout="this.style.color='var(--text-secondary)'">👥</a>
-                                            <a v-if="usePage().props.auth?.user?.role === 'director'"
+                                            <a v-if="['propietario', 'director', 'secretaria'].includes(usePage().props.auth?.user?.role)"
                                                :href="route('director.grupos.notas', grupo.id_oferta)"
                                                class="p-1.5 rounded text-xs" title="Administrar notas"
                                                style="color: var(--text-secondary);"

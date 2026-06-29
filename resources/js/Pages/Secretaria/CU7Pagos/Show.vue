@@ -1,7 +1,9 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
+
+const canEdit = computed(() => ['propietario', 'director', 'secretaria'].includes(usePage().props.auth?.user?.role));
 
 const props = defineProps({
     estudiante:           Object,
@@ -141,7 +143,7 @@ const cuotasPendientes = computed(() => props.cuotas.filter(c => c.estado === 'p
                         <p class="text-[11px] font-semibold uppercase tracking-widest" style="color:var(--text-secondary);">Matrícula</p>
                         <p class="text-xs mt-0.5" style="color:var(--text-secondary);">Costo fijo: Bs. 500</p>
                     </div>
-                    <button v-if="!pendiente.matricula && !matricula"
+                    <button v-if="canEdit && !pendiente.matricula && !matricula"
                         @click="showMatricula = true"
                         class="px-4 py-2 rounded-lg text-sm font-medium transition-opacity hover:opacity-80"
                         style="background-color:var(--primary-color);color:var(--primary-text);">
@@ -191,7 +193,7 @@ const cuotasPendientes = computed(() => props.cuotas.filter(c => c.estado === 'p
                         <p class="text-[11px] font-semibold uppercase tracking-widest" style="color:var(--text-secondary);">Plan de Carrera</p>
                         <p class="text-xs mt-0.5" style="color:var(--text-secondary);">Mín. 30% · 20% descuento pagando al contado</p>
                     </div>
-                    <button v-if="!pendiente.carrera && !planCarrera"
+                    <button v-if="canEdit && !pendiente.carrera && !planCarrera"
                         @click="showCarrera = true"
                         class="px-4 py-2 rounded-lg text-sm font-medium transition-opacity hover:opacity-80"
                         style="background-color:var(--primary-color);color:var(--primary-text);">
@@ -283,7 +285,7 @@ const cuotasPendientes = computed(() => props.cuotas.filter(c => c.estado === 'p
                                                 </span>
                                             </td>
                                             <td class="px-4 py-3 text-right">
-                                                <button v-if="c.estado === 'pendiente'"
+                                                <button v-if="canEdit && c.estado === 'pendiente'"
                                                     @click="confirmarCuota(c)"
                                                     class="text-xs font-medium transition-opacity hover:opacity-70"
                                                     style="color:var(--primary-color);">

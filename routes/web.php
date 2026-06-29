@@ -76,16 +76,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
     });
 
-    // CU1 — Gestión de Usuarios — escritura solo propietario
-    Route::middleware('role:propietario')->prefix('propietario')->name('propietario.')->group(function () {
+    // CU1 — store, update, password: propietario + director + secretaria
+    Route::middleware('role:propietario,director,secretaria')->prefix('propietario')->name('propietario.')->group(function () {
         Route::post('/usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
         Route::put('/usuarios/{id}', [UsuarioController::class, 'update'])->name('usuarios.update');
-        Route::patch('/usuarios/{id}/toggle-activo', [UsuarioController::class, 'toggleActivo'])->name('usuarios.toggle-activo');
         Route::patch('/usuarios/{id}/password', [UsuarioController::class, 'cambiarPassword'])->name('usuarios.password');
     });
-
-    // CU13 — Seguimiento Académico (propietario + director)
+    // CU1 — toggle-activo: propietario + director (secretaria no puede desactivar/reactivar)
     Route::middleware('role:propietario,director')->prefix('propietario')->name('propietario.')->group(function () {
+        Route::patch('/usuarios/{id}/toggle-activo', [UsuarioController::class, 'toggleActivo'])->name('usuarios.toggle-activo');
+    });
+
+    // CU13 — Seguimiento Académico (propietario + director + secretaria)
+    Route::middleware('role:propietario,director,secretaria')->prefix('propietario')->name('propietario.')->group(function () {
         Route::get('/seguimiento',                                    [\App\Http\Controllers\Propietario\CU13Seguimiento\SeguimientoController::class, 'index'])          ->name('seguimiento.index');
         Route::get('/seguimiento/{id}',                               [\App\Http\Controllers\Propietario\CU13Seguimiento\SeguimientoController::class, 'show'])           ->name('seguimiento.show');
         Route::post('/seguimiento/{id}/abandono',                     [\App\Http\Controllers\Propietario\CU13Seguimiento\SeguimientoController::class, 'registrarAbandono'])->name('seguimiento.abandono');
@@ -103,8 +106,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/horarios', [HorarioController::class, 'index'])->name('horarios.index');
     });
 
-    // CU2 y CU11 — escritura solo propietario
-    Route::middleware('role:propietario')->prefix('propietario')->name('propietario.')->group(function () {
+    // CU2 y CU11 — escritura propietario + director
+    Route::middleware('role:propietario,director')->prefix('propietario')->name('propietario.')->group(function () {
         Route::post('/aulas', [AulaController::class, 'store'])->name('aulas.store');
         Route::put('/aulas/{id}', [AulaController::class, 'update'])->name('aulas.update');
         Route::patch('/aulas/{id}/toggle-activo', [AulaController::class, 'toggleActivo'])->name('aulas.toggle-activo');
@@ -169,8 +172,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     });
 
-    // CU12 — Notas de un grupo (solo director)
-    Route::middleware('role:director')->prefix('director')->name('director.')->group(function () {
+    // CU12 — Notas de un grupo (propietario + director + secretaria)
+    Route::middleware('role:propietario,director,secretaria')->prefix('director')->name('director.')->group(function () {
         Route::get('/grupos/{id}/notas', [\App\Http\Controllers\Director\GrupoDetalleController::class, 'show'])->name('grupos.notas');
     });
 
@@ -187,13 +190,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             return Inertia::render('Dashboard/Secretaria');
         })->name('dashboard');
 
-        // Cronogramas (CU10)
-        Route::get('/cronogramas',                      [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'index'])       ->name('cronogramas.index');
-        Route::post('/cronogramas',                     [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'store'])        ->name('cronogramas.store');
-        Route::put('/cronogramas/{id}',                 [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'update'])       ->name('cronogramas.update');
-        Route::patch('/cronogramas/{id}/toggle-activo', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'toggleActivo']) ->name('cronogramas.toggle-activo');
-        Route::delete('/cronogramas/{id}',              [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'destroy'])      ->name('cronogramas.destroy');
-
+        // Cronogramas (CU10) — solo lectura para secretaria
+        Route::get('/cronogramas', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'index'])->name('cronogramas.index');
 
         Route::get('/inscripciones', [\App\Http\Controllers\Secretaria\CU6Inscripciones\InscripcionController::class, 'index'])->name('inscripciones.index');
         Route::post('/inscripciones/manual', [\App\Http\Controllers\Secretaria\CU6Inscripciones\InscripcionController::class, 'storeManual'])->name('inscripciones.manual');
@@ -204,6 +202,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/pagos/{id}/matricula',                      [\App\Http\Controllers\Secretaria\CU7Pagos\PagoController::class, 'registrarMatricula'])->name('pagos.matricula');
         Route::post('/pagos/{id}/carrera',                        [\App\Http\Controllers\Secretaria\CU7Pagos\PagoController::class, 'registrarCarrera'])  ->name('pagos.carrera');
         Route::post('/pagos/cuota/{idPago}/{numCuota}',           [\App\Http\Controllers\Secretaria\CU7Pagos\PagoController::class, 'pagarCuota'])        ->name('pagos.cuota');
+    });
+
+    // CU10 — Cronogramas escritura: propietario + director (secretaria solo puede ver)
+    Route::middleware('role:propietario,director')->prefix('secretaria')->name('secretaria.')->group(function () {
+        Route::post('/cronogramas',                     [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'store'])        ->name('cronogramas.store');
+        Route::put('/cronogramas/{id}',                 [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'update'])       ->name('cronogramas.update');
+        Route::patch('/cronogramas/{id}/toggle-activo', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'toggleActivo']) ->name('cronogramas.toggle-activo');
+        Route::delete('/cronogramas/{id}',              [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'destroy'])      ->name('cronogramas.destroy');
     });
 
     // Perfil Secretaria — solo secretaria
