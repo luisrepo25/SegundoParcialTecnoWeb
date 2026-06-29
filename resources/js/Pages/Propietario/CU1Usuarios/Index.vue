@@ -3,7 +3,8 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
 
-const page = usePage();
+const page    = usePage();
+const canEdit = computed(() => page.props.auth?.user?.role === 'propietario');
 
 const props = defineProps({
     usuarios: Object,
@@ -170,7 +171,7 @@ function toggleActivo(u) {
                             <option v-for="r in roles" :key="r.id_rol" :value="r.id_rol">{{ r.nombre_rol }}</option>
                         </select>
                     </div>
-                    <button v-if="rolesCreables.length > 0" @click="abrirCrear"
+                    <button v-if="canEdit && rolesCreables.length > 0" @click="abrirCrear"
                         class="rounded-lg px-4 py-2 text-sm font-medium transition"
                         style="background-color: var(--primary-color); color: var(--primary-text);">
                         + Nuevo Usuario
@@ -219,11 +220,13 @@ function toggleActivo(u) {
                                 <td class="px-4 py-3 text-right">
                                     <div class="flex justify-end gap-1">
                                         <button @click="abrirVer(u)" class="btn-accion" style="color: var(--primary-color);">Ver</button>
-                                        <button @click="abrirEditar(u)" class="btn-accion" style="color: #d97706;">Editar</button>
-                                        <button @click="toggleActivo(u)" class="btn-accion"
-                                            :style="u.activo ? 'color: #dc2626;' : 'color: #059669;'">
-                                            {{ u.activo ? 'Desactivar' : 'Activar' }}
-                                        </button>
+                                        <template v-if="canEdit">
+                                            <button @click="abrirEditar(u)" class="btn-accion" style="color: #d97706;">Editar</button>
+                                            <button @click="toggleActivo(u)" class="btn-accion"
+                                                :style="u.activo ? 'color: #dc2626;' : 'color: #059669;'">
+                                                {{ u.activo ? 'Desactivar' : 'Activar' }}
+                                            </button>
+                                        </template>
                                     </div>
                                 </td>
                             </tr>

@@ -13,8 +13,9 @@ const props = defineProps({
 });
 
 const page = usePage();
-const flash  = computed(() => page.props.flash  ?? {});
-const errors = computed(() => page.props.errors ?? {});
+const flash    = computed(() => page.props.flash  ?? {});
+const errors   = computed(() => page.props.errors ?? {});
+const canEdit  = computed(() => ['propietario', 'director'].includes(page.props.auth?.user?.role));
 
 const TIPO_LABELS = {
     mensual:   'Mensual',
@@ -351,7 +352,7 @@ const carrerasFiltradas = computed(() => {
             {{ errors.periodo }}
         </div>
 
-        <div class="flex justify-end gap-2 mb-4">
+        <div v-if="canEdit" class="flex justify-end gap-2 mb-4">
             <button @click="confirmClonar = true"
                 class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition border"
                 style="border-color: #8b5cf6; color: #8b5cf6; background: transparent;">
@@ -421,7 +422,7 @@ const carrerasFiltradas = computed(() => {
                               :style="(carrera.periodos?.length ?? 0) > 0 ? 'color:#10b981;font-weight:600;' : 'color:var(--text-muted);'">
                             {{ carrera.periodos?.length ?? 0 }} período(s)
                         </span>
-                        <button @click.stop="abrirAgregar(carrera.id_carrera)"
+                        <button v-if="canEdit" @click.stop="abrirAgregar(carrera.id_carrera)"
                             class="text-xs font-semibold px-2.5 py-1 rounded-md transition"
                             style="background-color: color-mix(in srgb, var(--primary-color) 12%, transparent); color: var(--primary-color);">
                             + Período
@@ -464,7 +465,7 @@ const carrerasFiltradas = computed(() => {
                                     📝 Sin ventana de inscripción definida
                                 </p>
                             </div>
-                            <div class="flex items-center gap-2 shrink-0">
+                            <div v-if="canEdit" class="flex items-center gap-2 shrink-0">
                                 <button @click="toggleActivo(p)" class="text-[11px] font-medium"
                                         :style="p.activo ? 'color:#f59e0b;' : 'color:#10b981;'">
                                     {{ p.activo ? 'Desactivar' : 'Activar' }}

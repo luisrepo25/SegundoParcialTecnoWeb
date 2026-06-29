@@ -1,7 +1,9 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { ref, watch, computed } from 'vue';
+
+const canEdit = computed(() => usePage().props.auth?.user?.role === 'propietario');
 
 const props = defineProps({
     aulas:   Object,
@@ -133,7 +135,7 @@ function tipoBadge(tipo) { return TIPO_BADGE[tipo] ?? { label: tipo, color: 'bad
                             <option value="0">Inactivas</option>
                         </select>
                     </div>
-                    <button @click="abrirCrear"
+                    <button v-if="canEdit" @click="abrirCrear"
                         class="rounded-lg px-4 py-2 text-sm font-medium transition"
                         style="background-color: var(--primary-color); color: var(--primary-text);">
                         + Nueva Aula
@@ -176,11 +178,13 @@ function tipoBadge(tipo) { return TIPO_BADGE[tipo] ?? { label: tipo, color: 'bad
                                 </td>
                                 <td class="px-4 py-3 text-right">
                                     <div class="flex justify-end gap-1">
-                                        <button @click="abrirEditar(a)" class="btn-accion" style="color: #d97706;">Editar</button>
-                                        <button @click="toggleActivo(a)" class="btn-accion"
-                                            :style="a.activo ? 'color: #dc2626;' : 'color: #059669;'">
-                                            {{ a.activo ? 'Desactivar' : 'Activar' }}
-                                        </button>
+                                        <template v-if="canEdit">
+                                            <button @click="abrirEditar(a)" class="btn-accion" style="color: #d97706;">Editar</button>
+                                            <button @click="toggleActivo(a)" class="btn-accion"
+                                                :style="a.activo ? 'color: #dc2626;' : 'color: #059669;'">
+                                                {{ a.activo ? 'Desactivar' : 'Activar' }}
+                                            </button>
+                                        </template>
                                     </div>
                                 </td>
                             </tr>

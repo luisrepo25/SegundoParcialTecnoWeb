@@ -37,37 +37,45 @@ const roleBadge = computed(() => {
     return { emoji: '🏛️', label: 'Propietario' };
 });
 
-const secciones = [
+const todasSecciones = [
     {
         key: 'academico',
         label: 'Académico',
         items: [
-            { name: 'CU3 · Materias',            route: 'director.materias.index',       activeUrls: ['/director/materias'] },
-            { name: 'CU4/5 · Carreras y Malla',  route: 'director.carreras.index',       activeUrls: ['/director/carreras'] },
-            { name: 'CU8 · Períodos Académicos', route: 'director.periodos.index',       activeUrls: ['/director/periodos'] },
-            { name: 'CU9/12 · Grupos y Notas',   route: 'director.grupos.index',         activeUrls: ['/director/grupos'] },
-            { name: 'CU10 · Cronogramas',        route: 'secretaria.cronogramas.index',  activeUrls: ['/secretaria/cronogramas'] },
-            { name: 'CU13 · Seguimiento',        route: 'propietario.seguimiento.index', activeUrls: ['/propietario/seguimiento'] },
+            { name: 'CU3 · Materias',            route: 'director.materias.index',       activeUrls: ['/director/materias'],          roles: null },
+            { name: 'CU4/5 · Carreras y Malla',  route: 'director.carreras.index',       activeUrls: ['/director/carreras'],          roles: null },
+            { name: 'CU8 · Períodos Académicos', route: 'director.periodos.index',       activeUrls: ['/director/periodos'],          roles: null },
+            { name: 'CU9/12 · Grupos y Notas',   route: 'director.grupos.index',         activeUrls: ['/director/grupos'],            roles: null },
+            { name: 'CU10 · Cronogramas',        route: 'secretaria.cronogramas.index',  activeUrls: ['/secretaria/cronogramas'],     roles: null },
+            { name: 'CU13 · Seguimiento',        route: 'propietario.seguimiento.index', activeUrls: ['/propietario/seguimiento'],    roles: ['propietario', 'director'] },
         ],
     },
     {
         key: 'financiero',
         label: 'Financiero',
         items: [
-            { name: 'CU6 · Inscripciones', route: 'secretaria.inscripciones.index', activeUrls: ['/secretaria/inscripciones'] },
-            { name: 'CU7 · Caja y Pagos',  route: 'secretaria.pagos.index',         activeUrls: ['/secretaria/pagos'] },
+            { name: 'CU6 · Inscripciones', route: 'secretaria.inscripciones.index', activeUrls: ['/secretaria/inscripciones'], roles: null },
+            { name: 'CU7 · Caja y Pagos',  route: 'secretaria.pagos.index',         activeUrls: ['/secretaria/pagos'],         roles: null },
         ],
     },
     {
         key: 'administrativo',
         label: 'Administrativo',
         items: [
-            { name: 'CU1 · Gestión de Usuarios', route: 'propietario.usuarios.index', activeUrls: ['/propietario/usuarios'] },
-            { name: 'CU2 · Gestión de Aulas',    route: 'propietario.aulas.index',    activeUrls: ['/propietario/aulas'] },
-            { name: 'CU11 · Gestión de Horarios',route: 'propietario.horarios.index', activeUrls: ['/propietario/horarios'] },
+            { name: 'CU1 · Gestión de Usuarios', route: 'propietario.usuarios.index', activeUrls: ['/propietario/usuarios'], roles: null },
+            { name: 'CU2 · Gestión de Aulas',    route: 'propietario.aulas.index',    activeUrls: ['/propietario/aulas'],    roles: ['propietario'] },
+            { name: 'CU11 · Gestión de Horarios',route: 'propietario.horarios.index', activeUrls: ['/propietario/horarios'], roles: ['propietario'] },
         ],
     },
 ];
+
+const secciones = computed(() => {
+    const role = user.value?.role;
+    return todasSecciones.map(sec => ({
+        ...sec,
+        items: sec.items.filter(item => !item.roles || item.roles.includes(role)),
+    })).filter(sec => sec.items.length > 0);
+});
 
 const reportesItem = { name: 'Reportes y Estadísticas', route: 'propietario.reportes.index', activeUrls: ['/propietario/reportes'] };
 

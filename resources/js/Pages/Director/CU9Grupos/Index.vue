@@ -1,8 +1,10 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
-import { useForm, router } from '@inertiajs/vue3';
+import { useForm, router, usePage } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import ComboSelect from '@/Components/ComboSelect.vue';
+
+const canEdit = computed(() => ['propietario', 'director'].includes(usePage().props.auth?.user?.role));
 
 const props = defineProps({
     periodos:        { type: Array,  default: () => [] },
@@ -402,7 +404,7 @@ const fmtFecha = (f) => {
             <p v-if="filtroCarrera" class="text-xs shrink-0" style="color: var(--text-secondary);">
                 <button @click="filtroCarrera = ''" class="underline" style="color: var(--primary-color);">Limpiar filtro</button>
             </p>
-            <div class="ml-auto flex items-center gap-2 shrink-0">
+            <div v-if="canEdit" class="ml-auto flex items-center gap-2 shrink-0">
                 <button @click="abrirClonar()"
                     class="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold border transition"
                     style="border-color: var(--primary-color); color: var(--primary-color); background: transparent;">
@@ -533,7 +535,7 @@ const fmtFecha = (f) => {
                             style="background-color: color-mix(in srgb,var(--primary-color) 12%,transparent); color: var(--primary-color);">
                             {{ periodo.grupos.length }} grupo{{ periodo.grupos.length !== 1 ? 's' : '' }}
                         </span>
-                        <button @click.stop="abrirModal(periodo.id_periodo)"
+                        <button v-if="canEdit" @click.stop="abrirModal(periodo.id_periodo)"
                             class="text-xs px-2.5 py-1 rounded-md font-medium transition-opacity hover:opacity-80"
                             style="background-color: var(--primary-color); color: var(--primary-text);">
                             + Grupo
@@ -622,21 +624,29 @@ const fmtFecha = (f) => {
                                                style="color: var(--text-secondary);"
                                                onmouseover="this.style.color='#10b981'"
                                                onmouseout="this.style.color='var(--text-secondary)'">👥</a>
-                                            <button @click="abrirEditar(grupo)" class="p-1.5 rounded text-xs" title="Editar"
-                                                style="color: var(--text-secondary);"
-                                                onmouseover="this.style.color='var(--primary-color)'"
-                                                onmouseout="this.style.color='var(--text-secondary)'">✏️</button>
-                                            <button @click="toggleGrupo(grupo)" class="p-1.5 rounded text-xs"
-                                                :title="grupo.activo ? 'Desactivar' : 'Activar'"
-                                                style="color: var(--text-secondary);"
-                                                onmouseover="this.style.color='#f59e0b'"
-                                                onmouseout="this.style.color='var(--text-secondary)'">
-                                                {{ grupo.activo ? '🔒' : '🔓' }}
-                                            </button>
-                                            <button @click="confirmarEliminar = grupo" class="p-1.5 rounded text-xs" title="Eliminar"
-                                                style="color: var(--text-secondary);"
-                                                onmouseover="this.style.color='#ef4444'"
-                                                onmouseout="this.style.color='var(--text-secondary)'">🗑️</button>
+                                            <a v-if="usePage().props.auth?.user?.role === 'director'"
+                                               :href="route('director.grupos.notas', grupo.id_oferta)"
+                                               class="p-1.5 rounded text-xs" title="Administrar notas"
+                                               style="color: var(--text-secondary);"
+                                               onmouseover="this.style.color='#6366f1'"
+                                               onmouseout="this.style.color='var(--text-secondary)'">📊</a>
+                                            <template v-if="canEdit">
+                                                <button @click="abrirEditar(grupo)" class="p-1.5 rounded text-xs" title="Editar"
+                                                    style="color: var(--text-secondary);"
+                                                    onmouseover="this.style.color='var(--primary-color)'"
+                                                    onmouseout="this.style.color='var(--text-secondary)'">✏️</button>
+                                                <button @click="toggleGrupo(grupo)" class="p-1.5 rounded text-xs"
+                                                    :title="grupo.activo ? 'Desactivar' : 'Activar'"
+                                                    style="color: var(--text-secondary);"
+                                                    onmouseover="this.style.color='#f59e0b'"
+                                                    onmouseout="this.style.color='var(--text-secondary)'">
+                                                    {{ grupo.activo ? '🔒' : '🔓' }}
+                                                </button>
+                                                <button @click="confirmarEliminar = grupo" class="p-1.5 rounded text-xs" title="Eliminar"
+                                                    style="color: var(--text-secondary);"
+                                                    onmouseover="this.style.color='#ef4444'"
+                                                    onmouseout="this.style.color='var(--text-secondary)'">🗑️</button>
+                                            </template>
                                         </div>
                                     </td>
                                 </tr>

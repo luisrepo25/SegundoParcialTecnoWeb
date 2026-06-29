@@ -1,7 +1,9 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
+
+const canEdit = computed(() => ['propietario', 'director'].includes(usePage().props.auth?.user?.role));
 
 const props = defineProps({
     carreras: Object,
@@ -153,7 +155,7 @@ function formatCosto(val) {
                             <option value="0">Inactivas</option>
                         </select>
                     </div>
-                    <button @click="abrirCrear"
+                    <button v-if="canEdit" @click="abrirCrear"
                         class="rounded-lg px-4 py-2 text-sm font-medium transition"
                         style="background-color: var(--primary-color); color: var(--primary-text);">
                         + Nueva Carrera
@@ -216,11 +218,13 @@ function formatCosto(val) {
                                 </td>
                                 <td class="px-4 py-3 text-right">
                                     <div class="flex justify-end gap-1">
-                                        <button @click="abrirEditar(c)" class="btn-accion" style="color: #d97706;">Editar</button>
-                                        <button @click="toggleActivo(c)" class="btn-accion"
-                                            :style="c.activo ? 'color: #dc2626;' : 'color: #059669;'">
-                                            {{ c.activo ? 'Desactivar' : 'Activar' }}
-                                        </button>
+                                        <template v-if="canEdit">
+                                            <button @click="abrirEditar(c)" class="btn-accion" style="color: #d97706;">Editar</button>
+                                            <button @click="toggleActivo(c)" class="btn-accion"
+                                                :style="c.activo ? 'color: #dc2626;' : 'color: #059669;'">
+                                                {{ c.activo ? 'Desactivar' : 'Activar' }}
+                                            </button>
+                                        </template>
                                     </div>
                                 </td>
                             </tr>

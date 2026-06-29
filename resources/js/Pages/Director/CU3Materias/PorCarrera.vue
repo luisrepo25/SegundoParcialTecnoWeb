@@ -1,8 +1,10 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import ComboSelect from '@/Components/ComboSelect.vue';
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
+
+const canEdit = computed(() => ['propietario', 'director'].includes(usePage().props.auth?.user?.role));
 
 const props = defineProps({
     carrera:             Object,
@@ -316,13 +318,13 @@ function confirmarEliminarNivel() {
                             {{ porNivel.length }} nivel(es) configurado(s)
                         </template>
                     </p>
-                    <button v-if="carrera.tipo === 'curso_libre'"
+                    <button v-if="canEdit && carrera.tipo === 'curso_libre'"
                         @click="abrirModalMateria(nivelLibre)"
                         class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition"
                         style="background-color: var(--primary-color); color: var(--primary-text);">
                         + Agregar Materia
                     </button>
-                    <button v-else
+                    <button v-else-if="canEdit"
                         @click="abrirModalNivel"
                         class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition"
                         style="background-color: var(--primary-color); color: var(--primary-text);">
@@ -362,7 +364,7 @@ function confirmarEliminarNivel() {
                     <p class="text-sm mt-1" style="color: var(--text-secondary);">
                         Agrega las materias del curso libre directamente.
                     </p>
-                    <button @click="abrirModalMateria(nivelLibre)"
+                    <button v-if="canEdit" @click="abrirModalMateria(nivelLibre)"
                         class="inline-block mt-5 rounded-lg px-5 py-2.5 text-sm font-semibold"
                         style="background-color: var(--primary-color); color: var(--primary-text);">
                         + Agregar Primera Materia
@@ -378,7 +380,7 @@ function confirmarEliminarNivel() {
                     <p class="text-sm mt-1" style="color: var(--text-secondary);">
                         Agrega el primer nivel para comenzar a construir la malla curricular.
                     </p>
-                    <button @click="abrirModalNivel"
+                    <button v-if="canEdit" @click="abrirModalNivel"
                         class="inline-block mt-5 rounded-lg px-5 py-2.5 text-sm font-semibold"
                         style="background-color: var(--primary-color); color: var(--primary-text);">
                         + Agregar Primer Nivel
@@ -399,7 +401,7 @@ function confirmarEliminarNivel() {
                                 <p class="text-xs" style="color: var(--text-secondary);">{{ (materiasLibres ?? []).length }} materia(s)</p>
                             </div>
                         </div>
-                        <button @click="abrirModalMateria(nivelLibre)"
+                        <button v-if="canEdit" @click="abrirModalMateria(nivelLibre)"
                             class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition"
                             style="background-color: var(--primary-color); color: var(--primary-text);">
                             + Asignar Materia
@@ -490,7 +492,7 @@ function confirmarEliminarNivel() {
                                 </p>
                             </div>
                         </div>
-                        <div class="flex items-center gap-2">
+                        <div v-if="canEdit" class="flex items-center gap-2">
                             <button @click="abrirModalMateria(nivel)"
                                 :disabled="nivel.materias.length >= maxMateriasNivel"
                                 class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition"

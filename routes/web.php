@@ -71,9 +71,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/perfil/password', [\App\Http\Controllers\Propietario\PerfilController::class, 'cambiarPassword']) ->name('perfil.password');
     });
 
-    // CU1 — Gestión de Usuarios (propietario, director, secretaria)
+    // CU1 — Gestión de Usuarios — lectura para todos los roles admin
     Route::middleware('role:propietario,director,secretaria')->prefix('propietario')->name('propietario.')->group(function () {
         Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
+    });
+
+    // CU1 — Gestión de Usuarios — escritura solo propietario
+    Route::middleware('role:propietario')->prefix('propietario')->name('propietario.')->group(function () {
         Route::post('/usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
         Route::put('/usuarios/{id}', [UsuarioController::class, 'update'])->name('usuarios.update');
         Route::patch('/usuarios/{id}/toggle-activo', [UsuarioController::class, 'toggleActivo'])->name('usuarios.toggle-activo');
@@ -93,16 +97,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('role:propietario,director')
         ->name('propietario.reportes.index');
 
-    // CU2 y CU11 — todos los roles admin
+    // CU2 y CU11 — lectura para todos los roles admin
     Route::middleware('role:propietario,director,secretaria')->prefix('propietario')->name('propietario.')->group(function () {
-        // CU2 — Gestión de Aulas
-        Route::get('/aulas', [AulaController::class, 'index'])->name('aulas.index');
+        Route::get('/aulas',    [AulaController::class,    'index'])->name('aulas.index');
+        Route::get('/horarios', [HorarioController::class, 'index'])->name('horarios.index');
+    });
+
+    // CU2 y CU11 — escritura solo propietario
+    Route::middleware('role:propietario')->prefix('propietario')->name('propietario.')->group(function () {
         Route::post('/aulas', [AulaController::class, 'store'])->name('aulas.store');
         Route::put('/aulas/{id}', [AulaController::class, 'update'])->name('aulas.update');
         Route::patch('/aulas/{id}/toggle-activo', [AulaController::class, 'toggleActivo'])->name('aulas.toggle-activo');
 
-        // CU11 — Gestión de Horarios
-        Route::get('/horarios', [HorarioController::class, 'index'])->name('horarios.index');
         Route::post('/horarios', [HorarioController::class, 'store'])->name('horarios.store');
         Route::put('/horarios/{id}', [HorarioController::class, 'update'])->name('horarios.update');
         Route::patch('/horarios/{id}/toggle-activo', [HorarioController::class, 'toggleActivo'])->name('horarios.toggle-activo');
@@ -117,30 +123,36 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->middleware('role:director')->name('dashboard.director');
 
-    // CU4 — Gestión de Carreras + CU5 Materias + CU6 Malla — todos los roles admin
+    // CU3/4/5/8/9 — Lectura: propietario, director, secretaria
     Route::middleware('role:propietario,director,secretaria')->prefix('director')->name('director.')->group(function () {
-        // CU4 Carreras
         Route::get('/carreras', [\App\Http\Controllers\Director\CU4Carreras\CarreraController::class, 'index'])->name('carreras.index');
+        Route::get('/carreras/{id}/materias', [\App\Http\Controllers\Director\CU3Materias\MateriaController::class, 'porCarrera'])->name('carreras.materias');
+        Route::get('/materias', [\App\Http\Controllers\Director\CU3Materias\MateriaController::class, 'index'])->name('materias.index');
+        Route::get('/periodos', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'index'])->name('periodos.index');
+        Route::get('/grupos', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'index'])->name('grupos.index');
+        Route::get('/grupos/{id}/inscritos', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'inscritos'])->name('grupos.inscritos');
+    });
+
+    // CU3/4/5/8/9 — Escritura: solo propietario y director
+    Route::middleware('role:propietario,director')->prefix('director')->name('director.')->group(function () {
+        // CU4 Carreras
         Route::post('/carreras', [\App\Http\Controllers\Director\CU4Carreras\CarreraController::class, 'store'])->name('carreras.store');
         Route::put('/carreras/{id}', [\App\Http\Controllers\Director\CU4Carreras\CarreraController::class, 'update'])->name('carreras.update');
         Route::patch('/carreras/{id}/toggle-activo', [\App\Http\Controllers\Director\CU4Carreras\CarreraController::class, 'toggleActivo'])->name('carreras.toggle-activo');
-        Route::get('/carreras/{id}/materias', [\App\Http\Controllers\Director\CU3Materias\MateriaController::class, 'porCarrera'])->name('carreras.materias');
 
-        // CU5 Materias
-        Route::get('/materias', [\App\Http\Controllers\Director\CU3Materias\MateriaController::class, 'index'])->name('materias.index');
+        // CU3 Materias
         Route::post('/materias', [\App\Http\Controllers\Director\CU3Materias\MateriaController::class, 'store'])->name('materias.store');
         Route::put('/materias/{id}', [\App\Http\Controllers\Director\CU3Materias\MateriaController::class, 'update'])->name('materias.update');
         Route::patch('/materias/{id}/toggle-activo', [\App\Http\Controllers\Director\CU3Materias\MateriaController::class, 'toggleActivo'])->name('materias.toggle-activo');
 
-        // CU6 Malla Curricular
+        // CU5 Malla Curricular
         Route::post('/carreras/{id}/niveles', [\App\Http\Controllers\Director\CU5Malla\MallaController::class, 'storeNivel'])->name('malla.nivel.store');
         Route::delete('/niveles/{id}', [\App\Http\Controllers\Director\CU5Malla\MallaController::class, 'destroyNivel'])->name('malla.nivel.destroy');
         Route::post('/malla', [\App\Http\Controllers\Director\CU5Malla\MallaController::class, 'storeMalla'])->name('malla.store');
         Route::delete('/malla/{id}', [\App\Http\Controllers\Director\CU5Malla\MallaController::class, 'destroyMalla'])->name('malla.destroy');
         Route::post('/carreras/{id}/nueva-materia', [\App\Http\Controllers\Director\CU5Malla\MallaController::class, 'storeMateriaNueva'])->name('malla.materia.store');
 
-        // CU8 — Períodos Académicos
-        Route::get('/periodos', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'index'])->name('periodos.index');
+        // CU8 Períodos
         Route::post('/periodos', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'store'])->name('periodos.store');
         Route::post('/periodos/lote', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'storeLote'])->name('periodos.lote');
         Route::post('/periodos/siguiente-anio', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'clonarSiguienteAnio'])->name('periodos.siguiente-anio');
@@ -148,16 +160,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/periodos/{id}/toggle', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'toggleActivo'])->name('periodos.toggle');
         Route::delete('/periodos/{id}', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'destroy'])->name('periodos.destroy');
 
-        // CU9 — Gestión de Grupos / Oferta Académica
-        Route::get('/grupos', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'index'])->name('grupos.index');
+        // CU9 Grupos
         Route::post('/grupos', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'store'])->name('grupos.store');
         Route::post('/grupos/clonar', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'clonar'])->name('grupos.clonar');
-        Route::get('/grupos/{id}/inscritos', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'inscritos'])->name('grupos.inscritos');
         Route::put('/grupos/{id}', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'update'])->name('grupos.update');
         Route::patch('/grupos/{id}/toggle', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'toggleActivo'])->name('grupos.toggle');
         Route::delete('/grupos/{id}', [\App\Http\Controllers\Director\CU9Grupos\GrupoController::class, 'destroy'])->name('grupos.destroy');
 
-        // Perfil Director
+    });
+
+    // CU12 — Notas de un grupo (solo director)
+    Route::middleware('role:director')->prefix('director')->name('director.')->group(function () {
+        Route::get('/grupos/{id}/notas', [\App\Http\Controllers\Director\GrupoDetalleController::class, 'show'])->name('grupos.notas');
+    });
+
+    // Perfil Director — solo director
+    Route::middleware('role:director')->prefix('director')->name('director.')->group(function () {
         Route::get('/perfil',          [\App\Http\Controllers\Director\PerfilController::class, 'index'])           ->name('perfil');
         Route::put('/perfil',          [\App\Http\Controllers\Director\PerfilController::class, 'update'])          ->name('perfil.update');
         Route::put('/perfil/password', [\App\Http\Controllers\Director\PerfilController::class, 'cambiarPassword']) ->name('perfil.password');
@@ -176,9 +194,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/cronogramas/{id}/toggle-activo', [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'toggleActivo']) ->name('cronogramas.toggle-activo');
         Route::delete('/cronogramas/{id}',              [\App\Http\Controllers\Secretaria\CU10Cronogramas\CronogramaController::class, 'destroy'])      ->name('cronogramas.destroy');
 
-        Route::get('/perfil',           [\App\Http\Controllers\Secretaria\PerfilController::class, 'index'])           ->name('perfil');
-        Route::put('/perfil',           [\App\Http\Controllers\Secretaria\PerfilController::class, 'update'])          ->name('perfil.update');
-        Route::put('/perfil/password',  [\App\Http\Controllers\Secretaria\PerfilController::class, 'cambiarPassword']) ->name('perfil.password');
 
         Route::get('/inscripciones', [\App\Http\Controllers\Secretaria\CU6Inscripciones\InscripcionController::class, 'index'])->name('inscripciones.index');
         Route::post('/inscripciones/manual', [\App\Http\Controllers\Secretaria\CU6Inscripciones\InscripcionController::class, 'storeManual'])->name('inscripciones.manual');
@@ -189,6 +204,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/pagos/{id}/matricula',                      [\App\Http\Controllers\Secretaria\CU7Pagos\PagoController::class, 'registrarMatricula'])->name('pagos.matricula');
         Route::post('/pagos/{id}/carrera',                        [\App\Http\Controllers\Secretaria\CU7Pagos\PagoController::class, 'registrarCarrera'])  ->name('pagos.carrera');
         Route::post('/pagos/cuota/{idPago}/{numCuota}',           [\App\Http\Controllers\Secretaria\CU7Pagos\PagoController::class, 'pagarCuota'])        ->name('pagos.cuota');
+    });
+
+    // Perfil Secretaria — solo secretaria
+    Route::middleware('role:secretaria')->prefix('secretaria')->name('secretaria.')->group(function () {
+        Route::get('/perfil',          [\App\Http\Controllers\Secretaria\PerfilController::class, 'index'])           ->name('perfil');
+        Route::put('/perfil',          [\App\Http\Controllers\Secretaria\PerfilController::class, 'update'])          ->name('perfil.update');
+        Route::put('/perfil/password', [\App\Http\Controllers\Secretaria\PerfilController::class, 'cambiarPassword']) ->name('perfil.password');
     });
 
     // ──────────────── Panel Docente ──────────────────────────────────────────────────────────────────────────
