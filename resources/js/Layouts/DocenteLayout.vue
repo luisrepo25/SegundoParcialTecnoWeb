@@ -8,10 +8,9 @@ const page = usePage();
 const user = computed(() => page.props.auth.user);
 
 const dashboardRoute = computed(() => 'dashboard.profesor');
-const dashboardUrl = computed(() => '/profesor/panel');
 
 const modulos = [
-    { name: 'Mis Materias', route: 'dashboard.profesor', activeUrls: ['/profesor/panel'] },
+    { name: 'Mis Materias', route: 'dashboard.profesor', activeUrls: ['/profesor/panel', '/profesor/grupos'] },
 ];
 
 const isRouteActive = (urls) => urls.some(url => page.url.startsWith(url));

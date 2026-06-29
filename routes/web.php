@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use App\Http\Controllers\Propietario\CU1Usuarios\UsuarioController;
 use App\Http\Controllers\Propietario\CU2Aulas\AulaController;
@@ -181,6 +181,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('role:profesor')->prefix('profesor')->name('dashboard.')->group(function () {
         Route::get('/panel', [\App\Http\Controllers\Profesor\PanelController::class, 'index'])->name('profesor');
         Route::get('/grupos/{id_oferta}', [\App\Http\Controllers\Profesor\PanelController::class, 'grupoDetalle'])->name('profesor.grupo');
+    });
+
+    // CU12 — Evaluaciones y Notas (docente)
+    Route::middleware('role:profesor')->prefix('profesor')->name('profesor.')->group(function () {
+        Route::post('/evaluaciones',        [\App\Http\Controllers\Profesor\CU12Evaluaciones\EvaluacionController::class, 'store'])       ->name('evaluaciones.store');
+        Route::post('/evaluaciones/masivo', [\App\Http\Controllers\Profesor\CU12Evaluaciones\EvaluacionController::class, 'storeMasivo']) ->name('evaluaciones.masivo');
     });
 
     // ── Panel Estudiante ───────────────────────────────────────────────────────

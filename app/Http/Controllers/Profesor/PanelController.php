@@ -89,9 +89,35 @@ class PanelController extends Controller
             ->orderBy('usuarios.apellido')
             ->get();
 
+        // Cargar evaluaciones por inscripcion
+        $idInscripciones = $estudiantes->pluck('id_inscripcion');
+        $evalsPorInscripcion = DB::table('evaluaciones')
+            ->whereIn('id_inscripcion', $idInscripciones)
+            ->orderBy('tipo')
+            ->get()
+            ->groupBy('id_inscripcion');
+
+        $estudiantes = $estudiantes->map(function ($est) use ($evalsPorInscripcion) {
+            $est->evaluaciones = array_values(
+                $evalsPorInscripcion->get($est->id_inscripcion)?->toArray() ?? []
+            );
+            return $est;
+        });
+
+        // Cronograma de clases del período (controla si el acta está abierta o cerrada)
+        $cronograma = DB::table('cronogramas')
+            ->where('id_periodo', $grupo->id_periodo)
+            ->where('tipo_periodo', 'clases')
+            ->first();
+
+        $actaCerrada = $cronograma && $cronograma->fecha_fin < now()->toDateString();
+
         return Inertia::render('Profesor/GrupoDetalle', [
-            'grupo' => $grupo,
-            'estudiantes' => $estudiantes
+            'grupo'       => $grupo,
+            'estudiantes' => $estudiantes,
+            'cronograma'  => $cronograma,
+            'actaCerrada' => $actaCerrada,
+            'hoy'         => now()->toDateString(),
         ]);
     }
 }
