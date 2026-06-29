@@ -86,22 +86,18 @@ class PeriodoController extends Controller
             $plantillasMap[$key]['id_carreras'][] = $r->id_carrera;
         }
 
-        $anioActual = (int) date('Y');
-
-        // ── Cronogramas de clases del año actual para auto-rellenar fechas ───
+        // Envía todos los cronogramas activos (sin filtro de año);
+        // la Vue filtra por el año del período que se está editando/creando.
         $cronogramasClases = DB::table('cronogramas')
             ->where('tipo_periodo', 'clases')
             ->where('activo', true)
-            ->whereRaw("EXTRACT(YEAR FROM fecha_inicio) = ?", [$anioActual])
             ->orderBy('fecha_inicio', 'desc')
             ->select('id_cronograma', 'nombre', 'modalidad', 'fecha_inicio', 'fecha_fin')
             ->get();
 
-        // ── Cronogramas de inscripción del año actual para auto-rellenar ─────
         $cronogramasInscripcion = DB::table('cronogramas')
             ->where('tipo_periodo', 'inscripcion')
             ->where('activo', true)
-            ->whereRaw("EXTRACT(YEAR FROM fecha_inicio) = ?", [$anioActual])
             ->orderBy('fecha_inicio', 'desc')
             ->select('id_cronograma', 'nombre', 'modalidad', 'fecha_inicio', 'fecha_fin')
             ->get();
