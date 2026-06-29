@@ -190,6 +190,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/evaluaciones/masivo', [\App\Http\Controllers\Profesor\CU12Evaluaciones\EvaluacionController::class, 'storeMasivo']) ->name('evaluaciones.masivo');
     });
 
+    // CU12 — Evaluaciones y Notas (admin: secretaria/director/propietario en nombre del docente)
+    Route::middleware('role:propietario,director,secretaria')->prefix('admin')->name('admin.')->group(function () {
+        Route::post('/evaluaciones',        [\App\Http\Controllers\Profesor\CU12Evaluaciones\EvaluacionController::class, 'store'])       ->name('evaluaciones.store');
+        Route::post('/evaluaciones/masivo', [\App\Http\Controllers\Profesor\CU12Evaluaciones\EvaluacionController::class, 'storeMasivo']) ->name('evaluaciones.masivo');
+    });
+
     // ── Panel Estudiante ───────────────────────────────────────────────────────
     Route::middleware('role:estudiante')->prefix('estudiante')->name('estudiante.')->group(function () {
         Route::get('/panel',                          [\App\Http\Controllers\Estudiante\PanelController::class, 'index'])             ->name('panel');

@@ -391,19 +391,19 @@ class GrupoController extends Controller
         return redirect()->route('director.grupos.index')->with('success', $msg);
     }
 
-    // ── CU6: Ver inscritos en un grupo específico ──────────────────────────────
+    // ── CU9: Ver inscritos en un grupo específico ──────────────────────────────
     public function inscritos(int $idOferta)
     {
         $grupo = DB::table('grupos as g')
-            ->join('materias as m',          'g.id_materia',  '=', 'm.id_materia')
+            ->join('materias as m',         'g.id_materia',  '=', 'm.id_materia')
             ->join('periodos_dictado as pd', 'g.id_periodo',  '=', 'pd.id_periodo')
-            ->join('aulas as a',             'g.id_aula',     '=', 'a.id_aula')
-            ->join('profesores as pr',       'g.id_profesor', '=', 'pr.id_profesor')
-            ->join('usuarios as up',         'pr.id_usuario', '=', 'up.id_usuario')
-            ->join('horarios as h',          'g.id_horario',  '=', 'h.id_horario')
+            ->join('aulas as a',            'g.id_aula',     '=', 'a.id_aula')
+            ->join('profesores as pr',      'g.id_profesor', '=', 'pr.id_profesor')
+            ->join('usuarios as up',        'pr.id_usuario', '=', 'up.id_usuario')
+            ->join('horarios as h',         'g.id_horario',  '=', 'h.id_horario')
             ->where('g.id_oferta', $idOferta)
             ->select(
-                'g.id_oferta', 'g.codigo_grupo', 'g.vacantes_max', 'g.vacantes_ocupadas', 'g.activo',
+                'g.id_oferta', 'g.id_periodo', 'g.codigo_grupo', 'g.vacantes_max', 'g.vacantes_ocupadas', 'g.activo',
                 'm.nombre as materia_nombre', 'm.codigo as materia_codigo',
                 'pd.nombre as periodo_nombre', 'pd.fecha_inicio', 'pd.fecha_fin',
                 'a.nombre as aula_nombre',
@@ -423,19 +423,42 @@ class GrupoController extends Controller
             ->select(
                 'i.id_inscripcion', 'i.estado', 'i.calificacion_final', 'i.aprobado', 'i.fecha_inscripcion',
                 'e.id_estudiante', 'e.legajo',
+                'u.nombre', 'u.apellido', 'u.email', 'u.dni',
                 DB::raw("u.nombre || ' ' || u.apellido as estudiante_nombre"),
-                'u.email', 'u.dni',
                 'c.nombre as carrera_nombre'
             )
             ->orderBy('u.apellido')
             ->orderBy('u.nombre')
+            ->get();
+
+        $idInscripciones = $inscritos->pluck('id_inscripcion');
+        $evalsPorInscripcion = DB::table('evaluaciones')
+            ->whereIn('id_inscripcion', $idInscripciones)
+            ->orderBy('tipo')
             ->get()
-            ->map(fn($r) => (array) $r)
-            ->toArray();
+            ->groupBy('id_inscripcion');
+
+        $inscritos = $inscritos->map(function ($ins) use ($evalsPorInscripcion) {
+            $arr = (array) $ins;
+            $arr['evaluaciones'] = array_values(
+                $evalsPorInscripcion->get($ins->id_inscripcion)?->toArray() ?? []
+            );
+            return $arr;
+        })->toArray();
+
+        $cronograma = DB::table('cronogramas')
+            ->where('id_periodo', $grupo->id_periodo)
+            ->where('tipo_periodo', 'clases')
+            ->first();
+
+        $actaCerrada = $cronograma && $cronograma->fecha_fin < now()->toDateString();
 
         return Inertia::render('Director/CU9Grupos/Inscritos', [
-            'grupo'     => (array) $grupo,
-            'inscritos' => $inscritos,
+            'grupo'       => (array) $grupo,
+            'inscritos'   => $inscritos,
+            'cronograma'  => $cronograma,
+            'actaCerrada' => $actaCerrada,
+            'hoy'         => now()->toDateString(),
         ]);
     }
 }

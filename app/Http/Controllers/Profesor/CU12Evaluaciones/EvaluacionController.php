@@ -28,8 +28,7 @@ class EvaluacionController extends Controller
             'evaluaciones.*.fecha'        => 'nullable|date',
         ]);
 
-        $profesor = $this->getProfesor();
-        $this->autorizarInscripcion($request->id_inscripcion, $profesor->id_profesor);
+        $profesor = $this->resolverProfesor(inscripcionId: $request->id_inscripcion);
         $this->verificarActaAbierta($request->id_inscripcion);
 
         foreach ($request->evaluaciones as $eval) {
@@ -84,19 +83,10 @@ class EvaluacionController extends Controller
             'notas.*.evaluaciones.*.fecha'            => 'nullable|date',
         ]);
 
-        $profesor = $this->getProfesor();
-
-        $grupo = DB::table('grupos')
-            ->where('id_oferta', $request->id_oferta)
-            ->where('id_profesor', $profesor->id_profesor)
-            ->first();
-
-        if (!$grupo) {
-            abort(403, 'No tenés permiso sobre este grupo.');
-        }
+        $profesor = $this->resolverProfesor(ofertaId: $request->id_oferta);
 
         $cronograma = DB::table('cronogramas')
-            ->where('id_periodo', $grupo->id_periodo)
+            ->where('id_periodo', $profesor->id_periodo_grupo)
             ->where('tipo_periodo', 'clases')
             ->first();
 
@@ -106,9 +96,17 @@ class EvaluacionController extends Controller
 
         $descripcionExtra = $request->descripcion_extra ?? 'Nota Extra';
 
-        foreach ($request->notas as $nota) {
-            $this->autorizarInscripcion($nota['id_inscripcion'], $profesor->id_profesor);
+        // Validar que todas las inscripciones pertenecen a esta oferta
+        $idsInscripcion = array_column($request->notas, 'id_inscripcion');
+        $pertenecen = DB::table('inscripciones')
+            ->whereIn('id_inscripcion', $idsInscripcion)
+            ->where('id_oferta', $request->id_oferta)
+            ->count();
+        if ($pertenecen !== count($idsInscripcion)) {
+            abort(403, 'Una o más inscripciones no pertenecen a este grupo.');
+        }
 
+        foreach ($request->notas as $nota) {
             foreach ($nota['evaluaciones'] as $eval) {
                 if ($eval['calificacion'] === null || $eval['calificacion'] === '') continue;
 
@@ -150,17 +148,57 @@ class EvaluacionController extends Controller
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private function getProfesor()
+    /**
+     * Si el usuario autenticado es profesor, devuelve su registro.
+     * Si es secretaria, deriva el profesor del grupo asociado a la inscripción u oferta.
+     */
+    private function resolverProfesor(?int $inscripcionId = null, ?int $ofertaId = null): object
     {
         $profesor = DB::table('profesores')
             ->where('id_usuario', Auth::user()->id_usuario)
             ->first();
 
-        if (!$profesor) {
-            abort(403, 'No sos profesor.');
+        if ($profesor) {
+            // Profesor autenticado: verificar que el grupo le pertenece
+            if ($inscripcionId) {
+                $this->autorizarInscripcion($inscripcionId, $profesor->id_profesor);
+            }
+            if ($ofertaId) {
+                $grupo = DB::table('grupos')
+                    ->where('id_oferta', $ofertaId)
+                    ->where('id_profesor', $profesor->id_profesor)
+                    ->first();
+                if (!$grupo) abort(403, 'No tenés permiso sobre este grupo.');
+                $profesor->id_periodo_grupo = $grupo->id_periodo;
+            }
+            return $profesor;
         }
 
-        return $profesor;
+        // Secretaria: derivar profesor del grupo
+        if ($inscripcionId) {
+            $fila = DB::table('inscripciones')
+                ->join('grupos', 'inscripciones.id_oferta', '=', 'grupos.id_oferta')
+                ->where('inscripciones.id_inscripcion', $inscripcionId)
+                ->select('grupos.id_profesor', 'grupos.id_periodo')
+                ->first();
+            if (!$fila) abort(404);
+            $ofertaId = $ofertaId ?? null;
+            $profesor = DB::table('profesores')->where('id_profesor', $fila->id_profesor)->first();
+            if (!$profesor) abort(403, 'El grupo no tiene profesor asignado.');
+            $profesor->id_periodo_grupo = $fila->id_periodo;
+            return $profesor;
+        }
+
+        if ($ofertaId) {
+            $grupo = DB::table('grupos')->where('id_oferta', $ofertaId)->first();
+            if (!$grupo) abort(404);
+            $profesor = DB::table('profesores')->where('id_profesor', $grupo->id_profesor)->first();
+            if (!$profesor) abort(403, 'El grupo no tiene profesor asignado.');
+            $profesor->id_periodo_grupo = $grupo->id_periodo;
+            return $profesor;
+        }
+
+        abort(403, 'No se pudo determinar el profesor.');
     }
 
     private function autorizarInscripcion(int $idInscripcion, int $idProfesor): void
