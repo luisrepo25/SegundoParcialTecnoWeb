@@ -212,53 +212,66 @@ Leyenda: `✓` acceso total · `~` parcial/solo lo propio · `✗` sin acceso ·
 
 | Acción | Propietario | Director | Secretaria | Profesor | Estudiante |
 |---|:---:|:---:|:---:|:---:|:---:|
-| Ver historial (de cualquier estudiante) | ✓ | ✓ | ✓ | ✓ | ✗ |
+| Ver historial (de cualquier estudiante) | ✓ | ✓ | ✓ | ~ ¹ | ✗ |
 | Ver historial propio | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Ver resumen con indicadores (de cualquiera) | ✓ | ✓ | ✓ | ✓ | ✗ |
+| Ver resumen con indicadores (de cualquiera) | ✓ | ✓ | ✓ | ~ ¹ | ✗ |
 | Ver resumen propio | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Ver detalles de evaluaciones | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Validar si puede recursar | ✓ | ✓ | ✓ | ✓ | ✗ |
-| Registrar abandono de carrera | ✓ | ✓ | ✓ | ✓ | ✗ |
+| Ver detalles de evaluaciones | ✓ | ✓ | ✓ | ~ ¹ | ✓ |
+| Validar si puede recursar | ✓ | ✓ | ✓ | ~ ¹ | ✗ |
+| Registrar abandono de carrera | ✓ | ✓ | ✓ | ~ ¹ | ✗ |
 | Eliminar registros de seguimiento | ✓ | ✗ | ✗ | ✗ | ✗ |
 
+> ¹ Profesor solo puede acceder a estudiantes que estén **inscritos en al menos uno de sus grupos activos**. Intentar ver un estudiante fuera de su ámbito devuelve 403. El listado del index también se filtra automáticamente para mostrar solo sus estudiantes.
 > El acceso admin (historial de otro estudiante) queda registrado automáticamente en auditoría.
 
 ---
 
 ## CU14 — Reportes y Estadísticas
 
+> **Criterio de visibilidad por rol:**
+> - Propietario y Director: ven TODOS los reportes.
+> - Secretaria: solo ve los reportes operativos relevantes a su trabajo (marcados con ◆). No ve análisis estratégicos ni auditoría.
+> - Profesor y Estudiante: sin acceso a esta sección.
+
 ### Reportes Académicos
 
 | Reporte | Propietario | Director | Secretaria | Profesor | Estudiante |
 |---|:---:|:---:|:---:|:---:|:---:|
-| Desempeño individual de un estudiante | ✓ | ✓ | ✓ | ✓ ¹ | ✗ ² |
-| Tasa de aprobación por materia y periodo | ✓ | ✓ | ✓ | ✓ | ✗ |
-| Estudiantes en riesgo por carrera | ✓ | ✓ | ✓ | ✗ | ✗ |
-| Progreso de carrera de un estudiante | ✓ | ✓ | ✓ | ✓ | ✗ ³ |
-| Ocupación de grupos por periodo | ✓ | ✓ | ✓ | ✓ | ✗ |
+| Tasa de aprobación por materia | ✓ | ✓ | ✗ | ✗ | ✗ |
+| Estudiantes en riesgo por carrera | ✓ | ✓ | ◆ ¹ | ✗ | ✗ |
+| Ocupación de grupos por periodo | ✓ | ✓ | ◆ ¹ | ✗ | ✗ |
+| Carreras / Materias activas | ✓ | ✓ | ✗ | ✗ | ✗ |
+| Horarios por día | ✓ | ✓ | ✗ | ✗ | ✗ |
 
 ### Reportes Financieros
 
 | Reporte | Propietario | Director | Secretaria | Profesor | Estudiante |
 |---|:---:|:---:|:---:|:---:|:---:|
-| Ingresos por matrículas (rango fechas) | ✓ | ✓ | ✓ | ✗ | ✗ |
-| Ingresos por pagos de materia (rango fechas) | ✓ | ✓ | ✓ | ✗ | ✗ |
-| Deudas y cuotas pendientes | ✓ | ✓ | ✓ | ✗ | ✗ |
-| Proyección de ingresos (mes, año) | ✓ | ✓ | ✓ | ✗ | ✗ |
+| Ingresos por matrículas | ✓ | ✓ | ◆ ¹ | ✗ | ✗ |
+| Ingresos por materias sueltas | ✓ | ✓ | ✗ | ✗ | ✗ |
+| Deudas y cuotas pendientes | ✓ | ✓ | ◆ ¹ | ✗ | ✗ |
+| Proyección de ingresos | ✓ | ✓ | ✗ | ✗ | ✗ |
 
 ### Reportes Administrativos
 
 | Reporte | Propietario | Director | Secretaria | Profesor | Estudiante |
 |---|:---:|:---:|:---:|:---:|:---:|
-| Inscripciones por carrera | ✓ | ✓ | ✓ | ✗ | ✗ |
-| Carga horaria de profesores | ✓ | ✓ | ✓ | ✗ | ✗ |
-| Disponibilidad de aulas | ✓ | ✓ | ✓ | ✗ | ✗ |
+| Usuarios por rol | ✓ | ✓ | ✗ | ✗ | ✗ |
+| Aulas por tipo | ✓ | ✓ | ✗ | ✗ | ✗ |
+| Inscripciones por carrera | ✓ | ✓ | ◆ ¹ | ✗ | ✗ |
+| Disponibilidad de aulas | ✓ | ✓ | ◆ ¹ | ✗ | ✗ |
+| Carga horaria de profesores | ✓ | ✓ | ✗ | ✗ | ✗ |
 | **Auditoría del sistema** | ✓ ★ | ✗ | ✗ | ✗ | ✗ |
 
-> ¹ Profesor ve solo estudiantes de sus materias (validado en business layer).
-> ² Estudiante bloqueado explícitamente — se le indica usar su propio ID si desea verse.
-> ³ Estudiante bloqueado — se le indica usar su propio ID si desea verse.
-> ★ Auditoría: exclusivo del propietario, verificación doble en HandleReporte.
+> ◆ Reportes que ve Secretaria — los operativos directamente relacionados con CU6 (inscripciones) y CU7 (pagos):
+> - Estudiantes en riesgo (para orientar al estudiante en ventanilla)
+> - Ocupación de grupos (para saber si hay cupo al inscribir)
+> - Ingresos por matrículas (registra matrículas directamente)
+> - Deudas y cuotas pendientes (gestiona cobros)
+> - Inscripciones por carrera (visión general de su trabajo diario)
+> - Disponibilidad de aulas (orientación logística)
+>
+> ★ Auditoría: exclusivo del propietario, verificación doble en controller + frontend.
 
 ---
 
@@ -271,8 +284,9 @@ Leyenda: `✓` acceso total · `~` parcial/solo lo propio · `✗` sin acceso ·
 | Eliminar registros de seguimiento | Propietario |
 | Anular pagos | Propietario y Director |
 | Desactivar / reactivar usuarios | Propietario y Director |
-| Reportes financieros completos | Propietario, Director, Secretaria |
-| Reportes administrativos | Propietario, Director, Secretaria |
-| Ver reporte de estudiantes en riesgo | Propietario, Director, Secretaria |
+| Reportes financieros completos | Propietario, Director |
+| Reportes administrativos completos | Propietario, Director |
+| Reportes operativos (◆) | Propietario, Director, Secretaria |
+| Ver seguimiento de cualquier estudiante | Propietario, Director, Secretaria, Profesor (solo sus alumnos) |
 | Pagar vía QR PagoFácil | Solo Estudiante |
 | Auto-registro sin autenticación | Solo "desconocido" (registrar_estudiante) |
