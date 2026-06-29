@@ -46,13 +46,14 @@ class DocentePruebaSeeder extends Seeder
         $idProfesor = $profesor->id_profesor;
 
         // 2. Crear datos base (Materia, Aula, Horario, Periodo) si no existen
-        $materia = DB::table('materias')->where('codigo', 'FIS-102')->first();
+        $materia = DB::table('materias')->where('codigo', 'SEED-DOC1')->first();
         $idMateria = $materia ? $materia->id_materia : DB::table('materias')->insertGetId([
-            'nombre' => 'Física Cuántica Avanzada',
-            'codigo' => 'FIS-102',
+            'nombre' => 'Materia de Prueba Docente',
+            'codigo' => 'SEED-DOC1',
             'duracion_meses' => 6,
             'costo_mensual' => 250.00,
             'creditos' => 4,
+            'id_materia_requisito' => null,
             'activo' => true
         ], 'id_materia');
 
@@ -64,13 +65,6 @@ class DocentePruebaSeeder extends Seeder
             'activo' => true
         ], 'id_aula');
 
-        $horario = DB::table('horarios')->where('dia_semana', 'martes')->where('hora_inicio', '10:00:00')->first();
-        $idHorario = $horario ? $horario->id_horario : DB::table('horarios')->insertGetId([
-            'dia_semana' => 'martes',
-            'hora_inicio' => '10:00:00',
-            'hora_fin' => '12:00:00'
-        ], 'id_horario');
-        
         $periodo = DB::table('periodos_dictado')->where('nombre', 'Semestre 2 - 2026')->first();
         $idPeriodo = $periodo ? $periodo->id_periodo : DB::table('periodos_dictado')->insertGetId([
             'nombre' => 'Semestre 2 - 2026',
@@ -79,8 +73,30 @@ class DocentePruebaSeeder extends Seeder
             'activo' => true
         ], 'id_periodo');
 
+        // Buscar horario libre para el profesor en este período
+        $horariosOcupados = DB::table('grupos')
+            ->where('id_profesor', $idProfesor)
+            ->where('id_periodo', $idPeriodo)
+            ->pluck('id_horario');
+
+        $horario = DB::table('horarios')
+            ->whereNotIn('id_horario', $horariosOcupados)
+            ->where('activo', true)
+            ->first();
+
+        if (!$horario) {
+            $idHorario = DB::table('horarios')->insertGetId([
+                'dia_semana' => 'sabado',
+                'hora_inicio' => '14:00:00',
+                'hora_fin'   => '16:00:00',
+                'activo'     => true,
+            ], 'id_horario');
+        } else {
+            $idHorario = $horario->id_horario;
+        }
+
         // 3. Crear el Grupo asignado al profesor
-        $grupo = DB::table('grupos')->where('codigo_grupo', 'G-FIS2')->first();
+        $grupo = DB::table('grupos')->where('codigo_grupo', 'SEED-G1')->where('id_periodo', $idPeriodo)->first();
         $idGrupo = $grupo ? $grupo->id_oferta : DB::table('grupos')->insertGetId([
             'id_materia' => $idMateria,
             'id_aula' => $idAula,
@@ -90,7 +106,7 @@ class DocentePruebaSeeder extends Seeder
             'vacantes_max' => 30,
             'vacantes_ocupadas' => 0,
             'activo' => true,
-            'codigo_grupo' => 'G-FIS2'
+            'codigo_grupo' => 'SEED-G1'
         ], 'id_oferta');
 
         // 4. Crear 3 Estudiantes de Prueba e inscribirlos al grupo
@@ -129,6 +145,17 @@ class DocentePruebaSeeder extends Seeder
                 $idEstudianteDB = $estudianteDB->id_estudiante;
             }
 
+            // Pagar matrícula única (requerida por trigger antes de inscribir)
+            $matricula = DB::table('matricula_unica')->where('id_estudiante', $idEstudianteDB)->first();
+            if (!$matricula) {
+                DB::table('matricula_unica')->insert([
+                    'id_estudiante' => $idEstudianteDB,
+                    'fecha_pago'    => '2026-01-01',
+                    'monto_pagado'  => 500.00,
+                    'estado'        => 'pagado',
+                ]);
+            }
+
             // Inscribirlos
             $inscripcion = DB::table('inscripciones')
                 ->where('id_estudiante', $idEstudianteDB)
@@ -139,7 +166,7 @@ class DocentePruebaSeeder extends Seeder
                 DB::table('inscripciones')->insert([
                     'id_estudiante' => $idEstudianteDB,
                     'id_oferta' => $idGrupo,
-                    'estado' => 'cursando',
+                    'estado' => 'activo',
                     'calificacion_final' => rand(50, 100),
                     'aprobado' => null
                 ]);

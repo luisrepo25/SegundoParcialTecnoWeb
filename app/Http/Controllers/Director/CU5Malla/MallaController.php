@@ -1,6 +1,6 @@
-<?php
+﻿<?php
 
-namespace App\Http\Controllers\Director\CU6Malla;
+namespace App\Http\Controllers\Director\CU5Malla;
 
 use App\Http\Controllers\Controller;
 use App\Models\Carrera;
@@ -22,7 +22,7 @@ class MallaController extends Controller
 
         $carrera = DB::table('carreras')->where('id_carrera', $idCarrera)->first();
         if ($carrera && $carrera->tipo === 'curso_libre') {
-            return redirect()->back()->withErrors(['nivel' => 'Los cursos libres no tienen niveles. Usa la oferta académica directamente.']);
+            return redirect()->back()->withErrors(['nivel' => 'Los cursos libres no tienen niveles. Usa la oferta acadÃ©mica directamente.']);
         }
 
         $maxNivel = DB::table('niveles_carrera')
@@ -64,7 +64,7 @@ class MallaController extends Controller
             ->with('success', 'Nivel eliminado.');
     }
 
-    // POST /director/malla  — asigna materia existente a un nivel (o a un curso libre)
+    // POST /director/malla  â€” asigna materia existente a un nivel (o a un curso libre)
     public function storeMalla(Request $request)
     {
         $esCursoLibre = $request->boolean('es_curso_libre');
@@ -86,10 +86,10 @@ class MallaController extends Controller
             ->exists();
 
         if ($existe) {
-            return redirect()->back()->withErrors(['materia' => 'Esta materia ya está en la malla de esta carrera.']);
+            return redirect()->back()->withErrors(['materia' => 'Esta materia ya estÃ¡ en la malla de esta carrera.']);
         }
 
-        // Validar que el prerequisito ya esté en la malla antes de agregar esta materia
+        // Validar que el prerequisito ya estÃ© en la malla antes de agregar esta materia
         $materia = DB::table('materias')->where('id_materia', $request->id_materia)->first();
 
         // Si es materia base (sin prereq), verificar que no queden cadenas pendientes en la carrera
@@ -113,7 +113,7 @@ class MallaController extends Controller
 
             if ($cadenaPendiente) {
                 return redirect()->route('director.carreras.materias', $request->id_carrera)->withErrors([
-                    'materia' => 'Aún hay materias que continúan cadenas existentes sin agregar. Completa las cadenas antes de iniciar una nueva rama.',
+                    'materia' => 'AÃºn hay materias que continÃºan cadenas existentes sin agregar. Completa las cadenas antes de iniciar una nueva rama.',
                 ]);
             }
         }
@@ -127,12 +127,12 @@ class MallaController extends Controller
             if (!$prereqEnMalla) {
                 $prereq = DB::table('materias')->where('id_materia', $materia->id_materia_requisito)->first();
                 return redirect()->back()->withErrors([
-                    'materia' => "No se puede agregar \"{$materia->nombre}\": su prerequisito \"{$prereq->nombre}\" aún no está en la malla. Agrégalo primero.",
+                    'materia' => "No se puede agregar \"{$materia->nombre}\": su prerequisito \"{$prereq->nombre}\" aÃºn no estÃ¡ en la malla. AgrÃ©galo primero.",
                 ]);
             }
         }
 
-        // ── Verificar límite max_materias del período ────────────────────────────
+        // â”€â”€ Verificar lÃ­mite max_materias del perÃ­odo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if ($esCursoLibre) {
             $periodo = DB::table('periodos_dictado')
                 ->where('id_carrera', $request->id_carrera)
@@ -145,7 +145,7 @@ class MallaController extends Controller
                     ->count();
                 if ($count >= $periodo->max_materias) {
                     return redirect()->back()->withErrors([
-                        'materia' => "Límite alcanzado: el curso solo permite {$periodo->max_materias} materia(s) según el período definido.",
+                        'materia' => "LÃ­mite alcanzado: el curso solo permite {$periodo->max_materias} materia(s) segÃºn el perÃ­odo definido.",
                     ]);
                 }
             }
@@ -159,7 +159,7 @@ class MallaController extends Controller
                     ->count();
                 if ($count >= $maxTotal) {
                     return redirect()->back()->withErrors([
-                        'materia' => "Límite alcanzado: este nivel admite {$maxTotal} materia(s) en total según sus períodos definidos.",
+                        'materia' => "LÃ­mite alcanzado: este nivel admite {$maxTotal} materia(s) en total segÃºn sus perÃ­odos definidos.",
                     ]);
                 }
             }
@@ -213,7 +213,7 @@ class MallaController extends Controller
             ->with('success', 'Materia removida de la malla.');
     }
 
-    // POST /director/carreras/{id}/nueva-materia — crea materia Y la asigna al nivel (o curso libre)
+    // POST /director/carreras/{id}/nueva-materia â€” crea materia Y la asigna al nivel (o curso libre)
     public function storeMateriaNueva(Request $request, int $idCarrera)
     {
         $carrera = Carrera::findOrFail($idCarrera);
@@ -233,7 +233,7 @@ class MallaController extends Controller
         }
         $request->validate($rules);
 
-        // ── Verificar límite max_materias antes de crear la materia ─────────────
+        // â”€â”€ Verificar lÃ­mite max_materias antes de crear la materia â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if ($esCursoLibre) {
             $periodo = DB::table('periodos_dictado')
                 ->where('id_carrera', $idCarrera)
@@ -246,7 +246,7 @@ class MallaController extends Controller
                     ->count();
                 if ($count >= $periodo->max_materias) {
                     return redirect()->back()->withErrors([
-                        'materia' => "Límite alcanzado: el curso solo permite {$periodo->max_materias} materia(s) según el período definido.",
+                        'materia' => "LÃ­mite alcanzado: el curso solo permite {$periodo->max_materias} materia(s) segÃºn el perÃ­odo definido.",
                     ]);
                 }
             }
@@ -260,7 +260,7 @@ class MallaController extends Controller
                     ->count();
                 if ($count >= $maxTotal) {
                     return redirect()->back()->withErrors([
-                        'materia' => "Límite alcanzado: este nivel admite {$maxTotal} materia(s) en total según sus períodos definidos.",
+                        'materia' => "LÃ­mite alcanzado: este nivel admite {$maxTotal} materia(s) en total segÃºn sus perÃ­odos definidos.",
                     ]);
                 }
             }

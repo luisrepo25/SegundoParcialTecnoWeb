@@ -1,6 +1,6 @@
-<?php
+﻿<?php
 
-namespace App\Http\Controllers\Secretaria\CU3Pagos;
+namespace App\Http\Controllers\Secretaria\CU7Pagos;
 
 use App\Http\Controllers\Controller;
 use App\Models\Carrera;
@@ -13,7 +13,7 @@ use Inertia\Inertia;
 
 class PagoController extends Controller
 {
-    // ── CU7.index — Estudiantes con resumen de estado de pagos ──────────────
+    // â”€â”€ CU7.index â€” Estudiantes con resumen de estado de pagos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     public function index(Request $request)
     {
         $buscar = $request->get('buscar', '');
@@ -37,7 +37,7 @@ class PagoController extends Controller
 
         $usuarios = $query->get();
 
-        // Cargar matrículas y planes en batch para evitar N+1
+        // Cargar matrÃ­culas y planes en batch para evitar N+1
         $matriculas  = collect();
         $planesCarrera = collect();
 
@@ -78,13 +78,13 @@ class PagoController extends Controller
             ];
         });
 
-        return Inertia::render('Secretaria/CU3Pagos/Index', [
+        return Inertia::render('Secretaria/CU7Pagos/Index', [
             'estudiantes' => $estudiantes,
             'filtros'     => ['buscar' => $buscar],
         ]);
     }
 
-    // ── CU7.show — Detalle completo de pagos de un estudiante ───────────────
+    // â”€â”€ CU7.show â€” Detalle completo de pagos de un estudiante â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     public function show(int $id)
     {
         $usuario    = Usuario::where('id_usuario', $id)->where('id_rol', 5)->firstOrFail();
@@ -105,7 +105,7 @@ class PagoController extends Controller
             }
         }
 
-        // Matrícula
+        // MatrÃ­cula
         $matricula = null;
         if ($idEst && Schema::hasTable('matricula_unica')) {
             $m = DB::table('matricula_unica')->where('id_estudiante', $idEst)->first();
@@ -142,7 +142,7 @@ class PagoController extends Controller
             }
         }
 
-        // Materias sueltas (disponible cuando CU6 esté implementado)
+        // Materias sueltas (disponible cuando CU6 estÃ© implementado)
         $materiasSueltas = [];
 
         // Carreras activas para el select del modal
@@ -158,7 +158,7 @@ class PagoController extends Controller
                 'precio_contado'         => round((float) $c->costo_carrera_completa * 0.80, 2),
             ]);
 
-        return Inertia::render('Secretaria/CU3Pagos/Show', [
+        return Inertia::render('Secretaria/CU7Pagos/Show', [
             'estudiante' => [
                 'id_usuario'    => $usuario->id_usuario,
                 'id_estudiante' => $idEst,
@@ -183,7 +183,7 @@ class PagoController extends Controller
         ]);
     }
 
-    // ── CU7.registrarMatricula — Registro admin directo (sin QR) ────────────
+    // â”€â”€ CU7.registrarMatricula â€” Registro admin directo (sin QR) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     public function registrarMatricula(Request $request, int $id)
     {
         $request->validate([
@@ -194,7 +194,7 @@ class PagoController extends Controller
         $estudiante = Estudiante::where('id_usuario', $id)->firstOrFail();
 
         if (DB::table('matricula_unica')->where('id_estudiante', $estudiante->id_estudiante)->exists()) {
-            return back()->withErrors(['monto' => 'El estudiante ya tiene matrícula registrada.']);
+            return back()->withErrors(['monto' => 'El estudiante ya tiene matrÃ­cula registrada.']);
         }
 
         $comprobante = $request->comprobante
@@ -207,10 +207,10 @@ class PagoController extends Controller
             'estado'        => 'pagado',
         ]);
 
-        return back()->with('success', 'Matrícula registrada correctamente.');
+        return back()->with('success', 'MatrÃ­cula registrada correctamente.');
     }
 
-    // ── CU7.registrarCarrera — Registro admin directo (sin QR) ─────────────
+    // â”€â”€ CU7.registrarCarrera â€” Registro admin directo (sin QR) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     public function registrarCarrera(Request $request, int $id)
     {
         $request->validate([
@@ -226,7 +226,7 @@ class PagoController extends Controller
         $minimo30 = round($costo * 0.30, 2);
         if ($monto < $minimo30) {
             return back()->withErrors([
-                'monto' => "El monto mínimo es el 30% del costo: Bs. {$minimo30}.",
+                'monto' => "El monto mÃ­nimo es el 30% del costo: Bs. {$minimo30}.",
             ]);
         }
 
@@ -241,7 +241,7 @@ class PagoController extends Controller
         $formaPago     = $monto >= $precioContado ? 'contado' : 'credito';
         $estado        = $formaPago === 'contado'  ? 'pagado'  : 'parcial';
 
-        // El trigger 'crear_cuotas_credito' genera las cuotas automáticamente al insertar
+        // El trigger 'crear_cuotas_credito' genera las cuotas automÃ¡ticamente al insertar
         DB::table('pago_carrera_completa')->insert([
             'id_estudiante'  => $estudiante->id_estudiante,
             'id_carrera'     => $carrera->id_carrera,
@@ -254,11 +254,11 @@ class PagoController extends Controller
 
         $estudiante->update(['id_carrera_actual' => $carrera->id_carrera]);
 
-        $label = $formaPago === 'contado' ? 'contado (con descuento del 20%)' : 'crédito';
+        $label = $formaPago === 'contado' ? 'contado (con descuento del 20%)' : 'crÃ©dito';
         return back()->with('success', "Plan de carrera registrado a {$label}.");
     }
 
-    // ── CU7.pagarCuota — Admin directo ──────────────────────────────────────
+    // â”€â”€ CU7.pagarCuota â€” Admin directo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     public function pagarCuota(int $idPago, int $numCuota)
     {
         $afectadas = DB::table('cuotas_carrera')
@@ -287,3 +287,4 @@ class PagoController extends Controller
         return back()->with('success', "Cuota #{$numCuota} registrada como pagada.");
     }
 }
+

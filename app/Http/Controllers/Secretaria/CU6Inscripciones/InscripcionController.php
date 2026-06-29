@@ -1,6 +1,6 @@
-<?php
+﻿<?php
 
-namespace App\Http\Controllers\Secretaria\CU2Inscripciones;
+namespace App\Http\Controllers\Secretaria\CU6Inscripciones;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -17,7 +17,7 @@ class InscripcionController extends Controller
     public function index()
     {
         $carreras = Carrera::whereRaw('activo IS TRUE')->get();
-        return Inertia::render('Secretaria/CU2Inscripciones/Index', [
+        return Inertia::render('Secretaria/CU6Inscripciones/Index', [
             'carreras' => $carreras
         ]);
     }
@@ -32,19 +32,19 @@ class InscripcionController extends Controller
             'telefono'   => 'nullable|string|max:20',
             'id_carrera' => 'required|exists:carreras,id_carrera',
         ], [
-            'dni.unique'   => 'Ya existe un usuario registrado con este número de carnet (CI/DNI).',
-            'email.unique' => 'Ya existe una cuenta con este correo electrónico.',
+            'dni.unique'   => 'Ya existe un usuario registrado con este nÃºmero de carnet (CI/DNI).',
+            'email.unique' => 'Ya existe una cuenta con este correo electrÃ³nico.',
         ]);
 
         $carrera = Carrera::findOrFail($request->id_carrera);
 
-        // Usamos el DNI como contraseña por defecto
+        // Usamos el DNI como contraseÃ±a por defecto
         $password = $request->dni;
         $usuario = null;
         $estudiante = null;
 
         // PgBouncer (Supabase port 6543) recicla conexiones que pueden quedar en estado
-        // abortado de requests anteriores. Forzamos reconexión limpia antes de la transacción.
+        // abortado de requests anteriores. Forzamos reconexiÃ³n limpia antes de la transacciÃ³n.
         DB::reconnect();
         DB::beginTransaction();
         try {
@@ -69,7 +69,7 @@ class InscripcionController extends Controller
                 'id_carrera_actual'         => $request->id_carrera,
             ]);
 
-            // 3. Crear Afiliación a Carrera
+            // 3. Crear AfiliaciÃ³n a Carrera
             DB::table('afiliaciones_estudiante')->insert([
                 'id_estudiante' => $estudiante->id_estudiante,
                 'id_carrera'    => $request->id_carrera,
@@ -78,11 +78,11 @@ class InscripcionController extends Controller
                 'estado'        => 'activo'
             ]);
 
-            // 4. Pago de Matrícula en Efectivo (Directo)
+            // 4. Pago de MatrÃ­cula en Efectivo (Directo)
             DB::table('matricula_unica')->insert([
                 'id_estudiante' => $estudiante->id_estudiante,
                 'fecha_pago'    => now()->toDateString(),
-                'monto_pagado'  => 500, // Costo de matrícula (fijo 500)
+                'monto_pagado'  => 500, // Costo de matrÃ­cula (fijo 500)
                 'comprobante'   => 'Pago en Efectivo - Caja',
                 'estado'        => 'pagado'
             ]);
@@ -101,3 +101,4 @@ class InscripcionController extends Controller
         ]);
     }
 }
+

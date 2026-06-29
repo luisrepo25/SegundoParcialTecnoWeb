@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use App\Http\Controllers\Propietario\CU1Usuarios\UsuarioController;
 use App\Http\Controllers\Propietario\CU2Aulas\AulaController;
@@ -111,20 +111,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/carreras', [\App\Http\Controllers\Director\CU4Carreras\CarreraController::class, 'store'])->name('carreras.store');
         Route::put('/carreras/{id}', [\App\Http\Controllers\Director\CU4Carreras\CarreraController::class, 'update'])->name('carreras.update');
         Route::patch('/carreras/{id}/toggle-activo', [\App\Http\Controllers\Director\CU4Carreras\CarreraController::class, 'toggleActivo'])->name('carreras.toggle-activo');
-        Route::get('/carreras/{id}/materias', [\App\Http\Controllers\Director\CU5Materias\MateriaController::class, 'porCarrera'])->name('carreras.materias');
+        Route::get('/carreras/{id}/materias', [\App\Http\Controllers\Director\CU3Materias\MateriaController::class, 'porCarrera'])->name('carreras.materias');
 
         // CU5 Materias
-        Route::get('/materias', [\App\Http\Controllers\Director\CU5Materias\MateriaController::class, 'index'])->name('materias.index');
-        Route::post('/materias', [\App\Http\Controllers\Director\CU5Materias\MateriaController::class, 'store'])->name('materias.store');
-        Route::put('/materias/{id}', [\App\Http\Controllers\Director\CU5Materias\MateriaController::class, 'update'])->name('materias.update');
-        Route::patch('/materias/{id}/toggle-activo', [\App\Http\Controllers\Director\CU5Materias\MateriaController::class, 'toggleActivo'])->name('materias.toggle-activo');
+        Route::get('/materias', [\App\Http\Controllers\Director\CU3Materias\MateriaController::class, 'index'])->name('materias.index');
+        Route::post('/materias', [\App\Http\Controllers\Director\CU3Materias\MateriaController::class, 'store'])->name('materias.store');
+        Route::put('/materias/{id}', [\App\Http\Controllers\Director\CU3Materias\MateriaController::class, 'update'])->name('materias.update');
+        Route::patch('/materias/{id}/toggle-activo', [\App\Http\Controllers\Director\CU3Materias\MateriaController::class, 'toggleActivo'])->name('materias.toggle-activo');
 
         // CU6 Malla Curricular
-        Route::post('/carreras/{id}/niveles', [\App\Http\Controllers\Director\CU6Malla\MallaController::class, 'storeNivel'])->name('malla.nivel.store');
-        Route::delete('/niveles/{id}', [\App\Http\Controllers\Director\CU6Malla\MallaController::class, 'destroyNivel'])->name('malla.nivel.destroy');
-        Route::post('/malla', [\App\Http\Controllers\Director\CU6Malla\MallaController::class, 'storeMalla'])->name('malla.store');
-        Route::delete('/malla/{id}', [\App\Http\Controllers\Director\CU6Malla\MallaController::class, 'destroyMalla'])->name('malla.destroy');
-        Route::post('/carreras/{id}/nueva-materia', [\App\Http\Controllers\Director\CU6Malla\MallaController::class, 'storeMateriaNueva'])->name('malla.materia.store');
+        Route::post('/carreras/{id}/niveles', [\App\Http\Controllers\Director\CU5Malla\MallaController::class, 'storeNivel'])->name('malla.nivel.store');
+        Route::delete('/niveles/{id}', [\App\Http\Controllers\Director\CU5Malla\MallaController::class, 'destroyNivel'])->name('malla.nivel.destroy');
+        Route::post('/malla', [\App\Http\Controllers\Director\CU5Malla\MallaController::class, 'storeMalla'])->name('malla.store');
+        Route::delete('/malla/{id}', [\App\Http\Controllers\Director\CU5Malla\MallaController::class, 'destroyMalla'])->name('malla.destroy');
+        Route::post('/carreras/{id}/nueva-materia', [\App\Http\Controllers\Director\CU5Malla\MallaController::class, 'storeMateriaNueva'])->name('malla.materia.store');
 
         // CU8 — Períodos Académicos
         Route::get('/periodos', [\App\Http\Controllers\Director\CU8Periodos\PeriodoController::class, 'index'])->name('periodos.index');
@@ -166,15 +166,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/perfil',           [\App\Http\Controllers\Secretaria\PerfilController::class, 'update'])          ->name('perfil.update');
         Route::put('/perfil/password',  [\App\Http\Controllers\Secretaria\PerfilController::class, 'cambiarPassword']) ->name('perfil.password');
 
-        Route::get('/inscripciones', [\App\Http\Controllers\Secretaria\CU2Inscripciones\InscripcionController::class, 'index'])->name('inscripciones.index');
-        Route::post('/inscripciones/manual', [\App\Http\Controllers\Secretaria\CU2Inscripciones\InscripcionController::class, 'storeManual'])->name('inscripciones.manual');
+        Route::get('/inscripciones', [\App\Http\Controllers\Secretaria\CU6Inscripciones\InscripcionController::class, 'index'])->name('inscripciones.index');
+        Route::post('/inscripciones/manual', [\App\Http\Controllers\Secretaria\CU6Inscripciones\InscripcionController::class, 'storeManual'])->name('inscripciones.manual');
 
         // CU7 — Gestión de Pagos (fase 1: lado admin)
-        Route::get('/pagos',                                      [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'index'])             ->name('pagos.index');
-        Route::get('/pagos/{id}',                                 [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'show'])              ->name('pagos.show');
-        Route::post('/pagos/{id}/matricula',                      [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'registrarMatricula'])->name('pagos.matricula');
-        Route::post('/pagos/{id}/carrera',                        [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'registrarCarrera'])  ->name('pagos.carrera');
-        Route::post('/pagos/cuota/{idPago}/{numCuota}',           [\App\Http\Controllers\Secretaria\CU3Pagos\PagoController::class, 'pagarCuota'])        ->name('pagos.cuota');
+        Route::get('/pagos',                                      [\App\Http\Controllers\Secretaria\CU7Pagos\PagoController::class, 'index'])             ->name('pagos.index');
+        Route::get('/pagos/{id}',                                 [\App\Http\Controllers\Secretaria\CU7Pagos\PagoController::class, 'show'])              ->name('pagos.show');
+        Route::post('/pagos/{id}/matricula',                      [\App\Http\Controllers\Secretaria\CU7Pagos\PagoController::class, 'registrarMatricula'])->name('pagos.matricula');
+        Route::post('/pagos/{id}/carrera',                        [\App\Http\Controllers\Secretaria\CU7Pagos\PagoController::class, 'registrarCarrera'])  ->name('pagos.carrera');
+        Route::post('/pagos/cuota/{idPago}/{numCuota}',           [\App\Http\Controllers\Secretaria\CU7Pagos\PagoController::class, 'pagarCuota'])        ->name('pagos.cuota');
     });
 
     // ──────────────── Panel Docente ──────────────────────────────────────────────────────────────────────────
@@ -225,3 +225,4 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/auth.php';
+

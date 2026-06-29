@@ -1,6 +1,6 @@
-<?php
+﻿<?php
 
-namespace App\Http\Controllers\Director\CU5Materias;
+namespace App\Http\Controllers\Director\CU3Materias;
 
 use App\Http\Controllers\Controller;
 use App\Models\Carrera;
@@ -31,7 +31,7 @@ class MateriaController extends Controller
         $materias        = $query->paginate(10)->withQueryString();
         $todasLasMaterias = Materia::orderBy('nombre')->get(['id_materia', 'codigo', 'nombre']);
 
-        return Inertia::render('Director/CU5Materias/Index', [
+        return Inertia::render('Director/CU3Materias/Index', [
             'materias'         => $materias,
             'todasLasMaterias' => $todasLasMaterias,
             'filtros'          => $request->only(['buscar', 'activo']),
@@ -113,7 +113,7 @@ class MateriaController extends Controller
             'mc.id_malla', 'mc.id_nivel', 'mc.orden_en_nivel', 'mc.obligatoria',
         ];
 
-        // ── Curso libre: lista plana sin niveles ─────────────────────────────
+        // â”€â”€ Curso libre: lista plana sin niveles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if ($carrera->tipo === 'curso_libre') {
             $materiasLibres = DB::table('malla_curricular as mc')
                 ->join('materias as m', 'mc.id_materia', '=', 'm.id_materia')
@@ -124,7 +124,7 @@ class MateriaController extends Controller
                 ->select($selectMalla)
                 ->get();
 
-            return Inertia::render('Director/CU5Materias/PorCarrera', [
+            return Inertia::render('Director/CU3Materias/PorCarrera', [
                 'carrera'             => $carrera,
                 'porNivel'            => [],
                 'materiasLibres'      => $materiasLibres,
@@ -132,7 +132,7 @@ class MateriaController extends Controller
             ]);
         }
 
-        // ── Carrera con niveles ───────────────────────────────────────────────
+        // â”€â”€ Carrera con niveles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         $niveles = DB::table('niveles_carrera')
             ->where('id_carrera', $id)
             ->orderBy('numero_nivel')
@@ -158,7 +158,7 @@ class MateriaController extends Controller
             ];
         })->values();
 
-        return Inertia::render('Director/CU5Materias/PorCarrera', [
+        return Inertia::render('Director/CU3Materias/PorCarrera', [
             'carrera'             => $carrera,
             'porNivel'            => $porNivel,
             'materiasLibres'      => [],
@@ -166,3 +166,4 @@ class MateriaController extends Controller
         ]);
     }
 }
+
