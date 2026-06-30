@@ -256,16 +256,19 @@ class EvaluacionController extends Controller
         if ($evals->isEmpty()) {
             DB::table('inscripciones')
                 ->where('id_inscripcion', $idInscripcion)
-                ->update(['calificacion_final' => null]);
+                ->update(['calificacion_final' => null, 'aprobado' => false]);
             return;
         }
 
         // Divide sobre 100 (peso total), no sobre los pesos existentes.
         // Así el final acumula: parcial1=100 → 25.00; parcial1+parcial2=100+80 → 45.00.
-        $nota = $evals->sum(fn($e) => $e->calificacion * $e->porcentaje) / 100;
+        $notaFinal = round($evals->sum(fn($e) => $e->calificacion * $e->porcentaje) / 100, 2);
 
         DB::table('inscripciones')
             ->where('id_inscripcion', $idInscripcion)
-            ->update(['calificacion_final' => round($nota, 2)]);
+            ->update([
+                'calificacion_final' => $notaFinal,
+                'aprobado'           => $notaFinal >= 51,
+            ]);
     }
 }
