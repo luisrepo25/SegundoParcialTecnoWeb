@@ -66,7 +66,7 @@ const submit = () => {
                     {{ form.processing ? 'Verificando...' : 'Verificar código' }}
                 </button>
 
-                <p style="margin:0;text-align:center;font-size:0.9rem;color:#475569;">
+                <p style="margin:0;text-align:center;font-size:0.9rem;color:var(--text-secondary);">
                     ¿No llegó?
                     <Link :href="route('password.request')" class="auth-link">Solicitá otro</Link>
                 </p>

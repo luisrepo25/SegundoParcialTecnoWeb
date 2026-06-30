@@ -17,6 +17,8 @@ Route::get('/', function () {
 // ── Oferta académica pública (sin autenticación) ───────────────────────────
 Route::prefix('oferta')->name('oferta.')->group(function () {
     Route::get('/', [\App\Http\Controllers\Public\OfertaController::class, 'index'])->name('index');
+    Route::get('/carreras', [\App\Http\Controllers\Public\OfertaController::class, 'carreras'])->name('carreras');
+    Route::get('/malla', [\App\Http\Controllers\Public\OfertaController::class, 'malla'])->name('malla');
     // /pago/* ANTES de /{id} para evitar colisión de rutas
     Route::get('/pago/{transId}/estado', [\App\Http\Controllers\Public\OfertaController::class, 'estado'])->name('estado');
     Route::get('/pago/{transId}', [\App\Http\Controllers\Public\OfertaController::class, 'pago'])->name('pago');
@@ -69,6 +71,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/perfil',          [\App\Http\Controllers\Propietario\PerfilController::class, 'index'])           ->name('perfil');
         Route::put('/perfil',          [\App\Http\Controllers\Propietario\PerfilController::class, 'update'])          ->name('perfil.update');
         Route::put('/perfil/password', [\App\Http\Controllers\Propietario\PerfilController::class, 'cambiarPassword']) ->name('perfil.password');
+    });
+
+    // Configuración del sitio — propietario + director
+    Route::middleware('role:propietario,director')->prefix('propietario')->name('propietario.')->group(function () {
+        Route::get('/configuracion',  [\App\Http\Controllers\Propietario\ConfiguracionSitioController::class, 'index'])  ->name('configuracion.index');
+        Route::post('/configuracion', [\App\Http\Controllers\Propietario\ConfiguracionSitioController::class, 'update']) ->name('configuracion.update');
     });
 
     // CU1 — Gestión de Usuarios — lectura para todos los roles admin

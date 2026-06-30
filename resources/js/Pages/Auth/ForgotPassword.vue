@@ -55,7 +55,7 @@ const submit = () => {
                     {{ form.processing ? 'Enviando...' : 'Enviar enlace de recuperación' }}
                 </button>
 
-                <p style="margin: 0; text-align: center; font-size: 0.9rem; color: #475569;">
+                <p style="margin: 0; text-align: center; font-size: 0.9rem; color: var(--text-secondary);">
                     <Link :href="route('login')" class="auth-link">Volver al inicio de sesión</Link>
                 </p>
             </form>

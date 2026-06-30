@@ -1,5 +1,5 @@
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import PublicLayout from '@/Layouts/PublicLayout.vue';
 
 defineProps({
     title: {
@@ -14,31 +14,19 @@ defineProps({
 </script>
 
 <template>
-    <div class="auth-screen">
-        <div class="auth-shell">
-            <section class="auth-visual">
-                <Link href="/" class="auth-brand">
-                    <img src="/images/logo.png" alt="Logo Instituto San Pablo" class="auth-brand-logo" />
-                    <span class="auth-brand-copy">
-                        <strong>Instituto San Pablo del Oriente</strong>
-                        <span>Acceso institucional por roles</span>
-                    </span>
-                </Link>
-
-                <div class="auth-hero">
+    <PublicLayout>
+        <div class="auth-page">
+            <div class="auth-page-inner">
+                <div class="auth-head">
                     <slot name="hero">
-                        <p class="auth-eyebrow">Plataforma académica</p>
-                        <h1>{{ title }}</h1>
-                        <p>{{ subtitle }}</p>
+                        <p class="auth-eyebrow"><span class="auth-eyebrow-dot"></span>Plataforma académica</p>
+                        <h1 class="auth-head-title">{{ title }}</h1>
+                        <p class="auth-head-sub">{{ subtitle }}</p>
                     </slot>
                 </div>
 
-                <slot name="visual-footer" />
-            </section>
-
-            <main class="auth-panel">
                 <slot />
-            </main>
+            </div>
         </div>
-    </div>
+    </PublicLayout>
 </template>

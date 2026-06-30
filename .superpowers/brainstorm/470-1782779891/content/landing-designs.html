@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diseños Landing — Instituto San Pablo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a12; color: #f1f5f9; font-family: 'Segoe UI', system-ui, sans-serif; padding: 2rem 1rem; }
+
+  h1 { text-align: center; font-size: 1.5rem; color: #94a3b8; margin-bottom: 0.5rem; font-weight: 500; }
+  .subtitle { text-align: center; font-size: 0.9rem; color: #475569; margin-bottom: 2.5rem; }
+
+  .designs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .design-card {
+    border-radius: 1.25rem;
+    border: 2px solid rgba(255,255,255,0.08);
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #0f0f1a;
+  }
+  .design-card:hover { border-color: rgba(56,189,248,0.5); transform: translateY(-4px); box-shadow: 0 20px 60px rgba(56,189,248,0.1); }
+  .design-card.selected { border-color: #38bdf8; box-shadow: 0 0 0 4px rgba(56,189,248,0.2), 0 20px 60px rgba(56,189,248,0.15); }
+
+  .design-label {
+    padding: 1rem 1.25rem;
+    display: flex; align-items: center; gap: 0.75rem;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.02);
+  }
+  .design-letter {
+    width: 2rem; height: 2rem; border-radius: 0.5rem;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 0.9rem; flex-shrink: 0;
+  }
+  .design-name { font-weight: 700; font-size: 1rem; color: #f1f5f9; }
+  .design-desc { font-size: 0.8rem; color: #64748b; margin-top: 0.15rem; }
+
+  .preview { height: 420px; overflow: hidden; position: relative; }
+
+  /* ─── DISEÑO A: AURORA ─── */
+  .preview-a {
+    background: #030712;
+    display: flex; flex-direction: column;
+  }
+  .a-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.7rem 1rem;
+    background: rgba(3,7,18,0.9);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    backdrop-filter: blur(12px);
+  }
+  .a-logo { display: flex; align-items: center; gap: 0.4rem; }
+  .a-logo-icon {
+    width: 1.6rem; height: 1.6rem; border-radius: 0.4rem;
+    background: linear-gradient(135deg,#38bdf8,#818cf8);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; font-weight: 800; color: #fff;
+  }
+  .a-logo-text { font-size: 0.75rem; font-weight: 700; color: #f1f5f9; }
+  .a-nav-link { font-size: 0.65rem; color: #38bdf8; }
+
+  .a-hero {
+    flex: 1;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+    padding: 1.5rem 1rem;
+    text-align: center;
+  }
+  .a-orbs {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 20% 30%, rgba(56,189,248,0.12) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 40% at 80% 60%, rgba(129,140,248,0.12) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 60% at 50% 90%, rgba(52,211,153,0.07) 0%, transparent 70%);
+  }
+  .a-hero-content { position: relative; z-index: 1; }
+  .a-badge { font-size: 0.55rem; font-weight: 700; letter-spacing: 0.1em; color: #38bdf8; text-transform: uppercase; margin-bottom: 0.6rem; }
+  .a-h1 { font-size: 1.6rem; font-weight: 800; line-height: 1.15; letter-spacing: -0.03em; color: #f1f5f9; margin-bottom: 0.5rem; }
+  .a-h1 span { background: linear-gradient(90deg,#38bdf8,#818cf8,#34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .a-sub { font-size: 0.7rem; color: #64748b; line-height: 1.6; margin-bottom: 1rem; max-width: 22rem; }
+  .a-search {
+    display: flex; align-items: center; gap: 0.5rem;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 999px; padding: 0.4rem 0.4rem 0.4rem 0.8rem;
+    max-width: 20rem; margin: 0 auto 0.8rem;
+    backdrop-filter: blur(8px);
+  }
+  .a-search-text { font-size: 0.65rem; color: #475569; flex: 1; }
+  .a-search-btn {
+    background: linear-gradient(135deg,#38bdf8,#818cf8);
+    border: none; border-radius: 999px;
+    padding: 0.3rem 0.8rem; font-size: 0.6rem; font-weight: 700; color: #0f172a;
+  }
+  .a-filters { display: flex; gap: 0.4rem; justify-content: center; flex-wrap: wrap; }
+  .a-filter {
+    font-size: 0.55rem; padding: 0.2rem 0.6rem; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.12); color: #94a3b8;
+  }
+  .a-filter.active { background: rgba(56,189,248,0.1); border-color: rgba(56,189,248,0.4); color: #38bdf8; }
+
+  .a-cards-strip {
+    display: flex; gap: 0.5rem; padding: 0.75rem 1rem;
+    overflow: hidden; border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .a-mini-card {
+    flex: 1; border-radius: 0.6rem; padding: 0.6rem 0.7rem;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+    min-width: 0;
+  }
+  .a-mini-badge { font-size: 0.45rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.1rem 0.35rem; border-radius: 999px; margin-bottom: 0.3rem; display: inline-block; }
+  .a-mini-title { font-size: 0.6rem; font-weight: 700; color: #e2e8f0; line-height: 1.3; margin-bottom: 0.25rem; }
+  .a-mini-meta { font-size: 0.5rem; color: #475569; }
+  .a-mini-cta { font-size: 0.5rem; color: #38bdf8; margin-top: 0.3rem; display: block; }
+
+  /* ─── DISEÑO B: PRISMA ─── */
+  .preview-b { background: #050510; display: flex; flex-direction: column; }
+  .b-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.7rem 1rem; border-bottom: 1px solid rgba(129,140,248,0.2);
+    background: rgba(5,5,16,0.95);
+  }
+  .b-logo { display: flex; align-items: center; gap: 0.5rem; }
+  .b-logo-icon {
+    width: 1.8rem; height: 1.8rem; border-radius: 0.35rem;
+    background: #818cf8; display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; font-weight: 900; color: #fff; letter-spacing: -0.05em;
+  }
+  .b-logo-text { font-size: 0.72rem; font-weight: 700; }
+  .b-logo-text strong { color: #818cf8; }
+  .b-logo-text span { color: #475569; font-size: 0.55rem; display: block; margin-top: -2px; }
+
+  .b-hero {
+    display: grid; grid-template-columns: 1fr 1fr;
+    flex: 1; overflow: hidden;
+  }
+  .b-hero-left {
+    padding: 1.5rem 1rem 1rem 1.25rem;
+    display: flex; flex-direction: column; justify-content: center;
+    border-right: 1px solid rgba(129,140,248,0.12);
+    background: linear-gradient(135deg, rgba(129,140,248,0.04) 0%, transparent 100%);
+  }
+  .b-tag {
+    font-size: 0.5rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+    color: #818cf8; border: 1px solid rgba(129,140,248,0.3);
+    padding: 0.15rem 0.5rem; border-radius: 0.25rem; display: inline-block; margin-bottom: 0.75rem;
+  }
+  .b-h1 { font-size: 1.4rem; font-weight: 900; line-height: 1.1; letter-spacing: -0.04em; color: #f8fafc; margin-bottom: 0.6rem; }
+  .b-h1 em { font-style: normal; color: #818cf8; }
+  .b-sub { font-size: 0.65rem; color: #64748b; line-height: 1.7; margin-bottom: 1rem; }
+  .b-btns { display: flex; gap: 0.5rem; }
+  .b-btn-primary {
+    font-size: 0.6rem; font-weight: 700; padding: 0.4rem 0.9rem; border-radius: 0.4rem;
+    background: #818cf8; color: #fff; border: none;
+  }
+  .b-btn-secondary {
+    font-size: 0.6rem; font-weight: 700; padding: 0.4rem 0.9rem; border-radius: 0.4rem;
+    background: transparent; color: #818cf8; border: 1px solid rgba(129,140,248,0.4);
+  }
+
+  .b-hero-right {
+    padding: 0.75rem; display: flex; flex-direction: column; gap: 0.4rem;
+    overflow: hidden; justify-content: center;
+  }
+  .b-stat-row { display: flex; gap: 0.4rem; }
+  .b-stat {
+    flex: 1; border-radius: 0.5rem; padding: 0.5rem 0.6rem;
+    background: rgba(129,140,248,0.06); border: 1px solid rgba(129,140,248,0.12);
+  }
+  .b-stat-num { font-size: 1rem; font-weight: 900; color: #818cf8; line-height: 1; }
+  .b-stat-lbl { font-size: 0.45rem; color: #475569; margin-top: 0.15rem; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .b-careers { margin-top: 0.4rem; display: flex; flex-direction: column; gap: 0.3rem; }
+  .b-career-row {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.4rem 0.5rem; border-radius: 0.4rem;
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
+  }
+  .b-career-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .b-career-name { font-size: 0.55rem; color: #cbd5e1; flex: 1; font-weight: 600; }
+  .b-career-price { font-size: 0.5rem; color: #475569; }
+  .b-career-arrow { font-size: 0.5rem; color: #818cf8; }
+
+  .b-bottom {
+    padding: 0.6rem 1rem; border-top: 1px solid rgba(129,140,248,0.1);
+    display: flex; align-items: center; gap: 0.5rem;
+    background: rgba(129,140,248,0.04);
+  }
+  .b-search-bar {
+    flex: 1; display: flex; align-items: center; gap: 0.4rem;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(129,140,248,0.2);
+    border-radius: 0.4rem; padding: 0.3rem 0.6rem;
+  }
+  .b-search-icon { font-size: 0.6rem; color: #818cf8; }
+  .b-search-text { font-size: 0.6rem; color: #475569; }
+  .b-search-go { font-size: 0.55rem; font-weight: 700; color: #818cf8; }
+
+  /* ─── DISEÑO C: COSMOS ─── */
+  .preview-c { background: #010108; display: flex; flex-direction: column; }
+
+  .c-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.6rem 1rem;
+    background: linear-gradient(180deg, rgba(1,1,8,1) 0%, transparent 100%);
+    position: relative;
+  }
+  .c-logo { display: flex; align-items: center; gap: 0.5rem; }
+  .c-logo-ring {
+    width: 2rem; height: 2rem; border-radius: 50%;
+    border: 2px solid transparent;
+    background: linear-gradient(135deg,#38bdf8,#f472b6,#818cf8) border-box;
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: destination-out;
+    mask-composite: exclude;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; font-weight: 800;
+    position: relative;
+  }
+  .c-logo-ring::after {
+    content: 'S';
+    position: absolute;
+    background: linear-gradient(135deg,#38bdf8,#f472b6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 900;
+  }
+  .c-logo-text { line-height: 1.1; }
+  .c-logo-name { font-size: 0.72rem; font-weight: 800; color: #f1f5f9; letter-spacing: -0.01em; }
+  .c-logo-sub { font-size: 0.48rem; color: #38bdf8; letter-spacing: 0.08em; text-transform: uppercase; }
+  .c-nav-links { display: flex; gap: 0.8rem; }
+  .c-nav-link { font-size: 0.58rem; color: #64748b; }
+  .c-nav-cta { font-size: 0.58rem; font-weight: 700; color: #0f172a; background: linear-gradient(135deg,#38bdf8,#f472b6); padding: 0.2rem 0.6rem; border-radius: 999px; }
+
+  .c-hero {
+    flex: 1; position: relative;
+    display: flex; align-items: center;
+    padding: 0 1.25rem 0;
+    overflow: hidden;
+  }
+  .c-stars {
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 15% 20%, rgba(255,255,255,0.6) 0%, transparent 100%),
+      radial-gradient(1px 1px at 35% 60%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(1.5px 1.5px at 55% 15%, rgba(255,255,255,0.5) 0%, transparent 100%),
+      radial-gradient(1px 1px at 70% 45%, rgba(255,255,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 85% 25%, rgba(255,255,255,0.5) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 70%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 25% 80%, rgba(255,255,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 60% 85%, rgba(255,255,255,0.4) 0%, transparent 100%);
+    background-repeat: no-repeat;
+  }
+  .c-glow {
+    position: absolute;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    filter: blur(60px);
+  }
+  .c-glow-1 { background: rgba(56,189,248,0.15); top: -30px; right: 30px; }
+  .c-glow-2 { background: rgba(244,114,182,0.1); bottom: -20px; right: 80px; }
+  .c-glow-3 { background: rgba(129,140,248,0.1); top: 20px; left: 60%; }
+
+  .c-content { position: relative; z-index: 1; max-width: 55%; }
+  .c-eyebrow { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.75rem; }
+  .c-eyebrow-dot { width: 5px; height: 5px; border-radius: 50%; background: #38bdf8; }
+  .c-eyebrow-text { font-size: 0.55rem; color: #38bdf8; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+
+  .c-h1 { font-size: 1.45rem; font-weight: 900; line-height: 1.1; letter-spacing: -0.04em; color: #fff; margin-bottom: 0.6rem; }
+  .c-h1 .grad { background: linear-gradient(90deg,#38bdf8,#f472b6,#818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+  .c-sub { font-size: 0.62rem; color: #64748b; line-height: 1.7; margin-bottom: 1rem; }
+
+  .c-search-container { position: relative; max-width: 20rem; margin-bottom: 0.8rem; }
+  .c-search {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(56,189,248,0.2);
+    border-radius: 0.6rem;
+    padding: 0.45rem 3rem 0.45rem 0.8rem;
+    font-size: 0.62rem; color: #94a3b8;
+  }
+  .c-search-action {
+    position: absolute; right: 0.3rem; top: 50%; transform: translateY(-50%);
+    background: linear-gradient(135deg,#38bdf8,#f472b6);
+    border: none; border-radius: 0.4rem; padding: 0.25rem 0.6rem;
+    font-size: 0.55rem; font-weight: 700; color: #fff;
+  }
+  .c-tags { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+  .c-tag { font-size: 0.5rem; padding: 0.15rem 0.45rem; border-radius: 999px; border: 1px solid rgba(255,255,255,0.1); color: #64748b; }
+
+  .c-cards-side {
+    position: absolute; right: 0; top: 0; bottom: 0;
+    width: 45%; padding: 0.75rem;
+    display: flex; flex-direction: column; gap: 0.4rem; justify-content: center;
+  }
+  .c-float-card {
+    border-radius: 0.65rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid rgba(255,255,255,0.07);
+    display: flex; align-items: flex-start; gap: 0.5rem;
+  }
+  .c-float-card:nth-child(1) { background: rgba(56,189,248,0.05); border-color: rgba(56,189,248,0.15); }
+  .c-float-card:nth-child(2) { background: rgba(129,140,248,0.05); border-color: rgba(129,140,248,0.15); }
+  .c-float-card:nth-child(3) { background: rgba(52,211,153,0.05); border-color: rgba(52,211,153,0.15); }
+  .c-card-icon { font-size: 1rem; flex-shrink: 0; margin-top: 0.1rem; }
+  .c-card-title { font-size: 0.6rem; font-weight: 700; color: #e2e8f0; line-height: 1.3; margin-bottom: 0.2rem; }
+  .c-card-meta { font-size: 0.5rem; color: #475569; line-height: 1.5; }
+  .c-card-price { font-size: 0.55rem; font-weight: 700; margin-top: 0.15rem; }
+
+  .c-footer-strip {
+    border-top: 1px solid rgba(255,255,255,0.05);
+    padding: 0.5rem 1.25rem;
+    display: flex; gap: 1rem; align-items: center;
+  }
+  .c-stat { text-align: center; }
+  .c-stat-num { font-size: 0.85rem; font-weight: 800; background: linear-gradient(135deg,#38bdf8,#818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .c-stat-lbl { font-size: 0.45rem; color: #475569; text-transform: uppercase; letter-spacing: 0.06em; }
+  .c-stat-divider { width: 1px; height: 1.5rem; background: rgba(255,255,255,0.08); }
+
+  /* Selected state */
+  .selected-badge {
+    display: none;
+    position: absolute; top: 0.75rem; right: 0.75rem;
+    background: #38bdf8; color: #0f172a;
+    font-size: 0.65rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 999px;
+  }
+  .design-card.selected .selected-badge { display: block; }
+  .design-card { position: relative; }
+
+  .footer-note {
+    text-align: center; margin-top: 2rem;
+    font-size: 0.8rem; color: #475569; padding-bottom: 2rem;
+  }
+  .footer-note strong { color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<h1>Diseño del Portal — Instituto San Pablo</h1>
+<p class="subtitle">Haz clic en el diseño que más te guste → luego dime en el chat</p>
+
+<div class="designs-grid">
+
+  <!-- ── DISEÑO A: AURORA ── -->
+  <div class="design-card" onclick="select(this,'a')">
+    <span class="selected-badge">✓ Seleccionado</span>
+    <div class="design-label">
+      <div class="design-letter" style="background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0f172a;">A</div>
+      <div>
+        <div class="design-name">Aurora</div>
+        <div class="design-desc">Hero centrado · Búsqueda prominente · Cards en strip inferior</div>
+      </div>
+    </div>
+    <div class="preview preview-a">
+      <!-- Navbar -->
+      <div class="a-nav">
+        <div class="a-logo">
+          <div class="a-logo-icon">S</div>
+          <span class="a-logo-text">Instituto San Pablo del Oriente</span>
+        </div>
+        <span class="a-nav-link">Iniciar sesión →</span>
+      </div>
+      <!-- Hero -->
+      <div class="a-hero">
+        <div class="a-orbs"></div>
+        <div class="a-hero-content">
+          <p class="a-badge">🎓 Instituto San Pablo del Oriente</p>
+          <h2 class="a-h1">Tu futuro comienza<br>con la <span>carrera correcta</span></h2>
+          <p class="a-sub">Carreras técnicas y superiores diseñadas para el mercado laboral del oriente boliviano</p>
+          <div class="a-search">
+            <span class="a-search-text">🔍 Buscar carrera, materia…</span>
+            <button class="a-search-btn">Buscar</button>
+          </div>
+          <div class="a-filters">
+            <span class="a-filter active">Todos</span>
+            <span class="a-filter">Técnico Superior</span>
+            <span class="a-filter">Técnico</span>
+            <span class="a-filter">Curso Libre</span>
+          </div>
+        </div>
+      </div>
+      <!-- Cards strip -->
+      <div class="a-cards-strip">
+        <div class="a-mini-card">
+          <span class="a-mini-badge" style="background:rgba(129,140,248,.15);color:#818cf8;">Téc. Superior</span>
+          <div class="a-mini-title">Ingeniería Informática</div>
+          <div class="a-mini-meta">4 niveles · Bs. 30.000</div>
+          <span class="a-mini-cta">Ver malla →</span>
+        </div>
+        <div class="a-mini-card">
+          <span class="a-mini-badge" style="background:rgba(52,211,153,.15);color:#34d399;">Curso Libre</span>
+          <div class="a-mini-title">Desarrollo Web</div>
+          <div class="a-mini-meta">6 meses · Bs. 2.000</div>
+          <span class="a-mini-cta">Ver malla →</span>
+        </div>
+        <div class="a-mini-card">
+          <span class="a-mini-badge" style="background:rgba(129,140,248,.15);color:#818cf8;">Téc. Superior</span>
+          <div class="a-mini-title">Téc. Administración</div>
+          <div class="a-mini-meta">4 niveles · Bs. 16.000</div>
+          <span class="a-mini-cta">Ver malla →</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DISEÑO B: PRISMA ── -->
+  <div class="design-card" onclick="select(this,'b')">
+    <span class="selected-badge">✓ Seleccionado</span>
+    <div class="design-label">
+      <div class="design-letter" style="background:linear-gradient(135deg,#818cf8,#6366f1);color:#fff;">B</div>
+      <div>
+        <div class="design-name">Prisma</div>
+        <div class="design-desc">Layout dividido · Estadísticas · Lista de carreras visible</div>
+      </div>
+    </div>
+    <div class="preview preview-b">
+      <div class="b-nav">
+        <div class="b-logo">
+          <div class="b-logo-icon">SP</div>
+          <div class="b-logo-text">
+            <strong>San Pablo</strong>
+            <span>Instituto de Educación Superior</span>
+          </div>
+        </div>
+        <span style="font-size:0.6rem;color:#818cf8;">Iniciar sesión →</span>
+      </div>
+      <div class="b-hero">
+        <div class="b-hero-left">
+          <span class="b-tag">⚡ Formación Técnica Superior</span>
+          <h2 class="b-h1">Carreras para el<br><em>mundo real</em></h2>
+          <p class="b-sub">Programas técnicos y superiores alineados con las demandas del mercado laboral de Santa Cruz y Bolivia.</p>
+          <div class="b-btns">
+            <button class="b-btn-primary">Ver todas las carreras</button>
+            <button class="b-btn-secondary">¿Cómo inscribirse?</button>
+          </div>
+        </div>
+        <div class="b-hero-right">
+          <div class="b-stat-row">
+            <div class="b-stat"><div class="b-stat-num">6+</div><div class="b-stat-lbl">Carreras</div></div>
+            <div class="b-stat"><div class="b-stat-num">100%</div><div class="b-stat-lbl">En línea</div></div>
+            <div class="b-stat"><div class="b-stat-num">2026</div><div class="b-stat-lbl">Inscripciones</div></div>
+          </div>
+          <div class="b-careers">
+            <div class="b-career-row">
+              <div class="b-career-dot" style="background:#818cf8;"></div>
+              <span class="b-career-name">Ingeniería Informática</span>
+              <span class="b-career-price">Bs. 30.000</span>
+              <span class="b-career-arrow">→</span>
+            </div>
+            <div class="b-career-row">
+              <div class="b-career-dot" style="background:#818cf8;"></div>
+              <span class="b-career-name">Ingeniería de Sistemas</span>
+              <span class="b-career-price">Bs. 35.000</span>
+              <span class="b-career-arrow">→</span>
+            </div>
+            <div class="b-career-row">
+              <div class="b-career-dot" style="background:#34d399;"></div>
+              <span class="b-career-name">Desarrollo Web</span>
+              <span class="b-career-price">Bs. 2.000</span>
+              <span class="b-career-arrow">→</span>
+            </div>
+            <div class="b-career-row">
+              <div class="b-career-dot" style="background:#34d399;"></div>
+              <span class="b-career-name">Diseño Gráfico</span>
+              <span class="b-career-price">Bs. 5.000</span>
+              <span class="b-career-arrow">→</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="b-bottom">
+        <div class="b-search-bar">
+          <span class="b-search-icon">🔍</span>
+          <span class="b-search-text">Buscar carrera o materia…</span>
+        </div>
+        <span class="b-search-go">Buscar →</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DISEÑO C: COSMOS ── -->
+  <div class="design-card" onclick="select(this,'c')">
+    <span class="selected-badge">✓ Seleccionado</span>
+    <div class="design-label">
+      <div class="design-letter" style="background:linear-gradient(135deg,#38bdf8,#f472b6);color:#fff;">C</div>
+      <div>
+        <div class="design-name">Cosmos</div>
+        <div class="design-desc">Fondo estelar · Split layout · Cards flotantes · Logo premium</div>
+      </div>
+    </div>
+    <div class="preview preview-c">
+      <div class="c-nav">
+        <div class="c-logo">
+          <div class="c-logo-ring"></div>
+          <div class="c-logo-text">
+            <div class="c-logo-name">Instituto San Pablo</div>
+            <div class="c-logo-sub">del Oriente · Bolivia</div>
+          </div>
+        </div>
+        <div class="c-nav-links">
+          <span class="c-nav-link">Carreras</span>
+          <span class="c-nav-link">Malla</span>
+          <span class="c-nav-cta">Inscribirse</span>
+        </div>
+      </div>
+      <div class="c-hero">
+        <div class="c-stars"></div>
+        <div class="c-glow c-glow-1"></div>
+        <div class="c-glow c-glow-2"></div>
+        <div class="c-glow c-glow-3"></div>
+        <div class="c-content">
+          <div class="c-eyebrow">
+            <div class="c-eyebrow-dot"></div>
+            <span class="c-eyebrow-text">Inscripciones 2026 abiertas</span>
+          </div>
+          <h2 class="c-h1">Forma tu<br><span class="grad">futuro profesional</span><br>en Bolivia</h2>
+          <p class="c-sub">Carreras técnicas y superiores con aval académico. Inscripción 100% en línea.</p>
+          <div class="c-search-container">
+            <input class="c-search" placeholder="🔍 Buscar carrera…" readonly>
+            <button class="c-search-action">Buscar</button>
+          </div>
+          <div class="c-tags">
+            <span class="c-tag">Técnico Superior</span>
+            <span class="c-tag">Cursos Libres</span>
+            <span class="c-tag">En línea</span>
+          </div>
+        </div>
+        <div class="c-cards-side">
+          <div class="c-float-card">
+            <div class="c-card-icon">💻</div>
+            <div>
+              <div class="c-card-title">Ingeniería Informática</div>
+              <div class="c-card-meta">Técnico Superior · 4 niveles</div>
+              <div class="c-card-price" style="color:#38bdf8;">Bs. 30.000</div>
+            </div>
+          </div>
+          <div class="c-float-card">
+            <div class="c-card-icon">🎨</div>
+            <div>
+              <div class="c-card-title">Diseño Gráfico</div>
+              <div class="c-card-meta">Curso Libre · 6 meses</div>
+              <div class="c-card-price" style="color:#818cf8;">Bs. 5.000</div>
+            </div>
+          </div>
+          <div class="c-float-card">
+            <div class="c-card-icon">🌐</div>
+            <div>
+              <div class="c-card-title">Desarrollo Web</div>
+              <div class="c-card-meta">Curso Libre · 6 meses</div>
+              <div class="c-card-price" style="color:#34d399;">Bs. 2.000</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="c-footer-strip">
+        <div class="c-stat">
+          <div class="c-stat-num">6+</div>
+          <div class="c-stat-lbl">Carreras</div>
+        </div>
+        <div class="c-stat-divider"></div>
+        <div class="c-stat">
+          <div class="c-stat-num">100%</div>
+          <div class="c-stat-lbl">En línea</div>
+        </div>
+        <div class="c-stat-divider"></div>
+        <div class="c-stat">
+          <div class="c-stat-num">2026</div>
+          <div class="c-stat-lbl">Inscripciones</div>
+        </div>
+        <div class="c-stat-divider"></div>
+        <div style="flex:1;font-size:0.55rem;color:#64748b;">Busca tu carrera, revisa la malla curricular e inscríbete en minutos.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="footer-note">Haz clic en el diseño que prefieras · Luego dime en el chat qué te gustó o cambiarías<br><strong>También puedes combinar elementos</strong> (ej: "El layout de B con los colores de C")</p>
+
+<script>
+  function select(el, choice) {
+    document.querySelectorAll('.design-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    if (window.recordChoice) window.recordChoice(choice, el.querySelector('.design-name').textContent);
+  }
+</script>
+</body>
+</html>

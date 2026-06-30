@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find \"/c/Users/USUARIO/.claude\" -iname \"landing-final.html\" 2>/dev/null)",
+      "Read(//c/Users/USUARIO/.claude/**)",
+      "Read(//c/Users/USUARIO/**)"
+    ]
+  }
+}

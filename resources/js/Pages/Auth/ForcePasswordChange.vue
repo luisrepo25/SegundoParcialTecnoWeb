@@ -25,9 +25,9 @@ const submit = () => {
         subtitle="Actualización de seguridad requerida."
     >
         <template #hero>
-            <p class="auth-eyebrow">Seguridad de la Cuenta</p>
-            <h1 class="login-title">Actualización<br><span class="login-title-highlight">Requerida</span></h1>
-            <p class="login-subtitle">
+            <p class="auth-eyebrow"><span class="auth-eyebrow-dot"></span>Seguridad de la Cuenta</p>
+            <h1 class="auth-head-title">Actualización <em>requerida</em></h1>
+            <p class="auth-head-sub">
                 Por motivos de seguridad, detectamos que aún utilizas tu Cédula de Identidad (DNI) como contraseña.
             </p>
 
@@ -90,29 +90,12 @@ const submit = () => {
 </template>
 
 <style scoped>
-.login-title {
-    margin: 0;
-    font-size: clamp(2.4rem, 3.8vw, 4rem);
-    line-height: 1;
-    letter-spacing: -0.04em;
-    color: #f8fafc;
-}
-.login-title-highlight {
-    background: linear-gradient(90deg, #38bdf8, #818cf8);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-.login-subtitle {
-    letter-spacing: -0.03em;
-}
-
 /* Pilares */
 .login-pilares {
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    padding-top: 0.5rem;
+    width: 100%;
 }
 .login-pilar {
     display: flex;
@@ -120,9 +103,9 @@ const submit = () => {
     gap: 0.9rem;
     padding: 0.9rem 1rem;
     border-radius: 0.9rem;
-    border: 1px solid rgba(148, 163, 184, 0.12);
-    background: rgba(15, 23, 42, 0.45);
-    backdrop-filter: blur(10px);
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    text-align: left;
 }
 .login-pilar-icon {
     font-size: 1.25rem;
@@ -136,11 +119,11 @@ const submit = () => {
 .login-pilar strong {
     font-size: 0.95rem;
     font-weight: 500;
-    color: #f8fafc;
+    color: var(--text-color);
 }
 .login-pilar span {
     font-size: 0.8rem;
-    color: #94a3b8;
+    color: var(--text-secondary);
     line-height: 1.4;
 }
 </style>

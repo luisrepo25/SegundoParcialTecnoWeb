@@ -28,21 +28,45 @@ const tabActiva = ref(props.afiliacion ? 'disponibles' : 'plan');
 const hoy = new Date().toISOString().split('T')[0];
 const esPeriodoActual = (g) => g.periodo_inicio <= hoy && hoy <= g.periodo_fin;
 
-// Agrupar grupos disponibles por período, con flag de "actual"
+// Agrupar grupos disponibles por período y por código de grupo (un grupo puede
+// tener una fila por cada día de la semana — se fusionan en una sola tarjeta
+// con todos sus horarios, igual que en "Oferta del Semestre")
 const gruposPorPeriodo = computed(() => {
     const map = {};
     for (const g of props.gruposDisponibles) {
         if (!map[g.periodo_nombre]) {
-            map[g.periodo_nombre] = { grupos: [], esActual: esPeriodoActual(g), inicio: g.periodo_inicio };
+            map[g.periodo_nombre] = { gruposMap: new Map(), esActual: esPeriodoActual(g), inicio: g.periodo_inicio };
         }
-        map[g.periodo_nombre].grupos.push(g);
+        const periodo  = map[g.periodo_nombre];
+        const grupoKey = g.codigo_grupo ?? ('_' + g.id_oferta);
+        if (!periodo.gruposMap.has(grupoKey)) {
+            periodo.gruposMap.set(grupoKey, {
+                id_oferta:         g.id_oferta,
+                codigo_grupo:      g.codigo_grupo,
+                materia_nombre:    g.materia_nombre,
+                materia_codigo:    g.materia_codigo,
+                vacantes_max:      g.vacantes_max,
+                vacantes_ocupadas: g.vacantes_ocupadas,
+                aula_nombre:       g.aula_nombre,
+                profesor_nombre:   g.profesor_nombre,
+                profesor_cv:       g.profesor_cv,
+                horarios:          [],
+            });
+        }
+        periodo.gruposMap.get(grupoKey).horarios.push({
+            dia_semana:  g.dia_semana,
+            hora_inicio: g.hora_inicio,
+            hora_fin:    g.hora_fin,
+        });
     }
     // Ordenar: actual primero, luego por fecha desc
-    return Object.entries(map).sort(([, a], [, b]) => {
-        if (a.esActual && !b.esActual) return -1;
-        if (!a.esActual && b.esActual) return 1;
-        return b.inicio.localeCompare(a.inicio);
-    });
+    return Object.entries(map)
+        .map(([periodo, data]) => [periodo, { grupos: Array.from(data.gruposMap.values()), esActual: data.esActual, inicio: data.inicio }])
+        .sort(([, a], [, b]) => {
+            if (a.esActual && !b.esActual) return -1;
+            if (!a.esActual && b.esActual) return 1;
+            return b.inicio.localeCompare(a.inicio);
+        });
 });
 
 const estadoLabel = (estado) => {
@@ -607,9 +631,18 @@ function elegirPlan(tipo) {
                                                 {{ g.materia_codigo }}
                                             </span>
                                             <span class="font-semibold text-sm" style="color: var(--text-color);">{{ g.materia_nombre }}</span>
+                                            <span v-if="g.codigo_grupo" class="font-mono text-xs font-bold" style="color: var(--primary-color);">
+                                                {{ g.codigo_grupo }}
+                                            </span>
                                         </div>
-                                        <div class="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5 text-xs" style="color: var(--text-secondary);">
-                                            <span>{{ cap(g.dia_semana) }} {{ fmtHora(g.hora_inicio) }}–{{ fmtHora(g.hora_fin) }}</span>
+                                        <div class="flex flex-wrap gap-1.5 mt-1.5">
+                                            <span v-for="h in g.horarios" :key="h.dia_semana"
+                                                  class="text-xs px-2 py-0.5 rounded-full font-medium"
+                                                  style="background-color: color-mix(in srgb, var(--primary-color) 10%, transparent); color: var(--primary-color);">
+                                                {{ cap(h.dia_semana) }} {{ fmtHora(h.hora_inicio) }}–{{ fmtHora(h.hora_fin) }}
+                                            </span>
+                                        </div>
+                                        <div class="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs" style="color: var(--text-secondary);">
                                             <span>{{ g.aula_nombre }}</span>
                                         <span class="flex items-center gap-1">
                                             {{ g.profesor_nombre }}

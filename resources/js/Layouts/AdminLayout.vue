@@ -65,6 +65,7 @@ const todasSecciones = [
             { name: 'CU1 · Gestión de Usuarios', route: 'propietario.usuarios.index', activeUrls: ['/propietario/usuarios'], roles: null },
             { name: 'CU2 · Gestión de Aulas',    route: 'propietario.aulas.index',    activeUrls: ['/propietario/aulas'],    roles: null },
             { name: 'CU11 · Gestión de Horarios',route: 'propietario.horarios.index', activeUrls: ['/propietario/horarios'], roles: null },
+            { name: '⚙️ Configuración del Sitio', route: 'propietario.configuracion.index', activeUrls: ['/propietario/configuracion'], roles: ['propietario', 'director'] },
         ],
     },
 ];

@@ -28,11 +28,49 @@ class OfertaController extends Controller
                 'nombre'                 => $c->nombre,
                 'descripcion'            => $c->descripcion,
                 'tipo'                   => $c->tipo,
+                'modalidad'              => $c->modalidad,
+                'duracion_unidad'        => $c->duracion_unidad ?? 'anos',
                 'duracion_niveles'       => $c->duracion_niveles,
                 'costo_carrera_completa' => (float) $c->costo_carrera_completa,
             ]);
 
         return Inertia::render('Public/Oferta/Index', compact('carreras'));
+    }
+
+    // ── Listado completo con búsqueda/filtros (pestaña Carreras) ───────────────
+    public function carreras(Request $request)
+    {
+        $carreras = Carrera::whereRaw('activo IS TRUE')
+            ->orderBy('nombre')
+            ->get()
+            ->map(fn($c) => [
+                'id_carrera'             => $c->id_carrera,
+                'codigo'                 => $c->codigo,
+                'nombre'                 => $c->nombre,
+                'descripcion'            => $c->descripcion,
+                'tipo'                   => $c->tipo,
+                'modalidad'              => $c->modalidad,
+                'duracion_unidad'        => $c->duracion_unidad ?? 'anos',
+                'duracion_niveles'       => $c->duracion_niveles,
+                'costo_carrera_completa' => (float) $c->costo_carrera_completa,
+            ]);
+
+        return Inertia::render('Public/Oferta/Carreras', [
+            'carreras' => $carreras,
+            'filtros'  => $request->only(['tipo', 'q']),
+        ]);
+    }
+
+    // ── Redirige a la malla de la primera carrera activa (pestaña Malla) ───────
+    public function malla()
+    {
+        $primera = Carrera::whereRaw('activo IS TRUE')->orderBy('nombre')->first();
+
+        if (!$primera) {
+            return redirect()->route('oferta.index');
+        }
+
+        return redirect()->route('oferta.show', $primera->id_carrera);
     }
 
     // ── Detalle de carrera + malla curricular ─────────────────────────────────
@@ -42,28 +80,50 @@ class OfertaController extends Controller
 
         $malla = [];
         if (Schema::hasTable('niveles_carrera') && Schema::hasTable('malla_curricular')) {
-            $niveles = DB::table('niveles_carrera')
-                ->where('id_carrera', $id)
-                ->orderBy('numero_nivel')
-                ->get();
-
-            foreach ($niveles as $nivel) {
+            if ($carrera->tipo === 'curso_libre') {
+                // Curso libre: materias con id_nivel NULL (sin nivel)
                 $materias = DB::table('malla_curricular as mc')
                     ->join('materias as m', 'mc.id_materia', '=', 'm.id_materia')
                     ->where('mc.id_carrera', $id)
-                    ->where('mc.id_nivel', $nivel->id_nivel)
+                    ->whereNull('mc.id_nivel')
                     ->orderBy('mc.orden_en_nivel')
                     ->select('m.nombre', 'm.codigo', 'mc.obligatoria', 'mc.orden_en_nivel')
                     ->get()
                     ->map(fn($m) => (array) $m)
                     ->toArray();
 
-                $malla[] = [
-                    'id_nivel'     => $nivel->id_nivel,
-                    'numero_nivel' => $nivel->numero_nivel,
-                    'nombre'       => $nivel->nombre,
-                    'materias'     => $materias,
-                ];
+                if (!empty($materias)) {
+                    $malla[] = [
+                        'id_nivel'     => null,
+                        'numero_nivel' => null,
+                        'nombre'       => 'Módulos del Curso',
+                        'materias'     => $materias,
+                    ];
+                }
+            } else {
+                $niveles = DB::table('niveles_carrera')
+                    ->where('id_carrera', $id)
+                    ->orderBy('numero_nivel')
+                    ->get();
+
+                foreach ($niveles as $nivel) {
+                    $materias = DB::table('malla_curricular as mc')
+                        ->join('materias as m', 'mc.id_materia', '=', 'm.id_materia')
+                        ->where('mc.id_carrera', $id)
+                        ->where('mc.id_nivel', $nivel->id_nivel)
+                        ->orderBy('mc.orden_en_nivel')
+                        ->select('m.nombre', 'm.codigo', 'mc.obligatoria', 'mc.orden_en_nivel')
+                        ->get()
+                        ->map(fn($m) => (array) $m)
+                        ->toArray();
+
+                    $malla[] = [
+                        'id_nivel'     => $nivel->id_nivel,
+                        'numero_nivel' => $nivel->numero_nivel,
+                        'nombre'       => $nivel->nombre,
+                        'materias'     => $materias,
+                    ];
+                }
             }
         }
 
@@ -74,6 +134,8 @@ class OfertaController extends Controller
                 'nombre'                 => $carrera->nombre,
                 'descripcion'            => $carrera->descripcion,
                 'tipo'                   => $carrera->tipo,
+                'modalidad'              => $carrera->modalidad,
+                'duracion_unidad'        => $carrera->duracion_unidad ?? 'anos',
                 'duracion_niveles'       => $carrera->duracion_niveles,
                 'costo_carrera_completa' => (float) $carrera->costo_carrera_completa,
             ],
@@ -92,6 +154,7 @@ class OfertaController extends Controller
                 'id_carrera'             => $carrera->id_carrera,
                 'nombre'                 => $carrera->nombre,
                 'tipo'                   => $carrera->tipo,
+                'duracion_unidad'        => $carrera->duracion_unidad ?? 'anos',
                 'duracion_niveles'       => $carrera->duracion_niveles,
                 'costo_carrera_completa' => (float) $carrera->costo_carrera_completa,
             ],

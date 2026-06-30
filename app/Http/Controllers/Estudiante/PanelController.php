@@ -121,17 +121,19 @@ class PanelController extends Controller
         $proximaMateriaInfo = null;
         $cronogramaInscripcion = null; // referencia final para la vista
 
-        // Períodos activos de la carrera del estudiante con ventana de inscripción abierta.
-        // Lógica: si el período tiene fecha_inicio_inscripcion → usa esas fechas propias.
-        // Si no → acepta si el cronograma global de inscripción está activo.
+        // Períodos de la carrera del estudiante con ventana de inscripción abierta.
+        // Lógica: si el período tiene fecha_inicio_inscripcion → usa esas fechas propias
+        // (la inscripción suele abrir ANTES de que el período de clases empiece, por eso
+        // no se filtra aquí por fecha_inicio/fecha_fin del dictado).
+        // Si no tiene fechas propias → acepta si el cronograma global de inscripción está
+        // activo Y el período de clases está vigente.
         $periodosCarrera = [];
         if ($carrera) {
             $periodosCarrera = DB::table('periodos_dictado as pd')
                 ->where('pd.id_carrera', $est->id_carrera_actual)
                 ->whereNull('pd.id_nivel')
                 ->whereRaw('pd.activo IS TRUE')
-                ->whereRaw("CURRENT_DATE BETWEEN pd.fecha_inicio AND pd.fecha_fin")
-                ->select('pd.id_periodo', 'pd.fecha_inicio_inscripcion', 'pd.fecha_fin_inscripcion')
+                ->select('pd.id_periodo', 'pd.fecha_inicio', 'pd.fecha_fin', 'pd.fecha_inicio_inscripcion', 'pd.fecha_fin_inscripcion')
                 ->get();
         }
 
@@ -142,8 +144,10 @@ class PanelController extends Controller
                 return now()->toDateString() >= $p->fecha_inicio_inscripcion
                     && now()->toDateString() <= $p->fecha_fin_inscripcion;
             }
-            // Sin fechas propias → depende del cronograma global
-            return $cronogramaInscripcionGlobal !== null;
+            // Sin fechas propias → depende del cronograma global y de que el período esté vigente
+            return $cronogramaInscripcionGlobal !== null
+                && now()->toDateString() >= $p->fecha_inicio
+                && now()->toDateString() <= $p->fecha_fin;
         })->pluck('id_periodo');
 
         $inscripcionesAbiertas = $idsPeriodoConInscripcionAbierta->isNotEmpty();
