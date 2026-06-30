@@ -254,6 +254,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ── Panel Estudiante ───────────────────────────────────────────────────────
     Route::middleware('role:estudiante')->prefix('estudiante')->name('estudiante.')->group(function () {
         Route::get('/panel',                          [\App\Http\Controllers\Estudiante\PanelController::class, 'index'])             ->name('panel');
+        Route::get('/materias',                       [\App\Http\Controllers\Estudiante\PanelController::class, 'materias'])          ->name('materias');
         Route::get('/malla',                          [\App\Http\Controllers\Estudiante\PanelController::class, 'malla'])             ->name('malla');
         Route::get('/notas',                          [\App\Http\Controllers\Estudiante\PanelController::class, 'notas'])             ->name('notas');
         Route::get('/pagos',                          [\App\Http\Controllers\Estudiante\PanelController::class, 'pagos'])             ->name('pagos');

@@ -9,15 +9,11 @@ const user = computed(() => page.props.auth.user);
 
 const secciones = [
     {
-        label: 'Principal',
-        items: [
-            { name: 'Dashboard', route: 'estudiante.panel', activeUrls: ['/estudiante/panel', '/panel/estudiante'] },
-        ],
-    },
-    {
         label: 'Académico',
         items: [
-            { name: 'Mi Malla Académica',  route: 'estudiante.malla', activeUrls: ['/estudiante/malla'] },
+            { name: 'Dashboard',           route: 'estudiante.panel',    activeUrls: ['/estudiante/panel', '/panel/estudiante'] },
+            { name: 'Mis Materias',        route: 'estudiante.materias', activeUrls: ['/estudiante/materias'] },
+            { name: 'Mi Malla Académica',  route: 'estudiante.malla',    activeUrls: ['/estudiante/malla'] },
             { name: 'Historial de Notas',  route: 'estudiante.notas', activeUrls: ['/estudiante/notas'] },
         ],
     },
@@ -68,7 +64,7 @@ const showUserMenu   = ref(false);
             <!-- Badge rol -->
             <div class="px-4 py-3 border-b" style="border-color: var(--border-color);">
                 <span class="text-xs font-semibold px-2 py-0.5 rounded-full" style="background-color: var(--primary-color); color: var(--primary-text);">
-                    🎒 Estudiante
+                    Estudiante
                 </span>
             </div>
 

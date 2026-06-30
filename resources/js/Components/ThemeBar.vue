@@ -15,9 +15,9 @@ const props = defineProps({
 const { theme, contrast, setTheme, toggleContrast, changeFontScale } = useTheme();
 
 const themes = [
-    { value: 'adults', icon: '☀️', label: 'Adultos' },
-    { value: 'youth',  icon: '🌙', label: 'Jóvenes' },
-    { value: 'kids',   icon: '🧸', label: 'Niños'   },
+    { value: 'adults', label: 'Adultos' },
+    { value: 'youth',  label: 'Jóvenes' },
+    { value: 'kids',   label: 'Niños'   },
 ];
 </script>
 
@@ -37,8 +37,7 @@ const themes = [
                     ? `background-color: ${activeColor}; color: ${activeTextColor};`
                     : 'color: var(--text-secondary);'"
             >
-                <span>{{ t.icon }}</span>
-                <span v-if="!compact">{{ t.label }}</span>
+                <span>{{ t.label }}</span>
             </button>
         </div>
 

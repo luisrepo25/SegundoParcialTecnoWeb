@@ -10,14 +10,83 @@ use Inertia\Inertia;
 
 class PanelController extends Controller
 {
-    // ── Panel principal ────────────────────────────────────────────────────────
+    // ── Dashboard (resumen rápido) ───────────────────────────────────────────────
     public function index()
     {
         $userId = auth()->id();
         $est    = DB::table('estudiantes')->where('id_usuario', $userId)->first();
 
         if (!$est) {
-            return Inertia::render('Dashboard/Estudiante', [
+            return Inertia::render('Dashboard/Estudiante', ['estudiante' => null]);
+        }
+
+        $carrera  = $est->id_carrera_actual
+            ? DB::table('carreras')->where('id_carrera', $est->id_carrera_actual)->first()
+            : null;
+
+        $matricula = DB::table('matricula_unica')->where('id_estudiante', $est->id_estudiante)->first();
+
+        $afiliacion = DB::table('afiliaciones_estudiante')
+            ->where('id_estudiante', $est->id_estudiante)
+            ->where('estado', 'activo')
+            ->orderByDesc('fecha_inicio')
+            ->first();
+
+        $pagoCarrera = DB::table('pago_carrera_completa')
+            ->where('id_estudiante', $est->id_estudiante)
+            ->whereIn('estado', ['pagado', 'parcial'])
+            ->orderByDesc('fecha_contrato')
+            ->first();
+
+        $resumen = $this->resumenAcademico($est, $carrera);
+
+        $totalInscripciones = DB::table('inscripciones')
+            ->where('id_estudiante', $est->id_estudiante)
+            ->where('estado', '!=', 'pendiente_matricula')
+            ->count();
+
+        return Inertia::render('Dashboard/Estudiante', [
+            'estudiante' => [
+                'id_estudiante'   => $est->id_estudiante,
+                'legajo'          => $est->legajo,
+                'tiene_matricula' => $matricula !== null,
+                'matricula'       => $matricula ? [
+                    'fecha_pago'   => $matricula->fecha_pago,
+                    'monto_pagado' => (float) $matricula->monto_pagado,
+                ] : null,
+                'carrera' => $carrera ? [
+                    'id_carrera' => $carrera->id_carrera,
+                    'nombre'     => $carrera->nombre,
+                    'tipo'       => $carrera->tipo,
+                    'codigo'     => $carrera->codigo,
+                ] : null,
+            ],
+            'afiliacion'  => $afiliacion ? [
+                'tipo_programa' => $afiliacion->tipo_programa,
+                'fecha_inicio'  => $afiliacion->fecha_inicio,
+                'estado'        => $afiliacion->estado,
+            ] : null,
+            'pagoCarrera' => $pagoCarrera ? [
+                'forma_pago'   => $pagoCarrera->forma_pago,
+                'monto_total'  => (float) $pagoCarrera->monto_total,
+                'monto_pagado' => (float) ($pagoCarrera->monto_pagado ?? 0),
+                'estado'       => $pagoCarrera->estado,
+            ] : null,
+            'materiaEnCurso'            => $resumen['materiaEnCursoInfo'],
+            'materiaReprobadaEsperando' => $resumen['materiaReprobadaEsperandoInfo'],
+            'proximaMateria'            => $resumen['proximaMateriaInfo'],
+            'totalInscripciones'        => $totalInscripciones,
+        ]);
+    }
+
+    // ── Mis Materias: Plan de Carrera / Oferta del Semestre / Mis Grupos / Inscripciones
+    public function materias()
+    {
+        $userId = auth()->id();
+        $est    = DB::table('estudiantes')->where('id_usuario', $userId)->first();
+
+        if (!$est) {
+            return Inertia::render('Estudiante/MisMaterias', [
                 'estudiante' => null, 'inscripciones' => [],
                 'gruposDisponibles' => [], 'afiliacion' => null, 'pagoCarrera' => null, 'planOpciones' => [],
             ]);
@@ -108,137 +177,53 @@ class PanelController extends Controller
 
         $gruposInscritos = array_column($inscripciones, 'id_oferta');
 
-        // Cronograma de inscripción global (fallback cuando el período no tiene fechas propias)
-        $cronogramaInscripcionGlobal = DB::table('cronogramas')
-            ->where('tipo_periodo', 'inscripcion')
-            ->where('activo', true)
-            ->whereRaw('CURRENT_DATE BETWEEN fecha_inicio AND fecha_fin')
-            ->orderBy('fecha_inicio', 'desc')
-            ->first();
+        $resumen = $this->resumenAcademico($est, $carrera);
+        $cronogramaInscripcionGlobal     = $resumen['cronogramaInscripcionGlobal'];
+        $sqlOcupadasGrupo                = $resumen['sqlOcupadasGrupo'];
+        $idsPeriodoConInscripcionAbierta = $resumen['idsPeriodoConInscripcionAbierta'];
+        $inscripcionesAbiertas           = $resumen['inscripcionesAbiertas'];
+        $materiaEnCursoInfo              = $resumen['materiaEnCursoInfo'];
+        $materiaReprobadaEsperandoInfo   = $resumen['materiaReprobadaEsperandoInfo'];
+        $proximaMateriaInfo              = $resumen['proximaMateriaInfo'];
+        $cronogramaInscripcion           = $cronogramaInscripcionGlobal; // para vista (compat)
 
-        // Grupos disponibles — solo si hay ventana de inscripción abierta
-        $gruposDisponibles  = [];
-        $proximaMateriaInfo = null;
-        $materiaEnCursoInfo = null;
-        $cronogramaInscripcion = null; // referencia final para la vista
+        // Grupos disponibles — solo si hay ventana de inscripción abierta y una próxima materia
+        $gruposDisponibles = [];
+        if ($idsPeriodoConInscripcionAbierta->isNotEmpty() && $proximaMateriaInfo) {
+            $proximaMateria = $proximaMateriaInfo['id_materia'];
+            $query = DB::table('grupos as g')
+                ->join('materias as m',          'g.id_materia',  '=', 'm.id_materia')
+                ->join('periodos_dictado as pd', 'g.id_periodo',  '=', 'pd.id_periodo')
+                ->join('horarios as h',          'g.id_horario',  '=', 'h.id_horario')
+                ->join('aulas as a',             'g.id_aula',     '=', 'a.id_aula')
+                ->join('profesores as p',        'g.id_profesor', '=', 'p.id_profesor')
+                ->join('usuarios as u',          'p.id_usuario',  '=', 'u.id_usuario')
+                ->whereIn('g.id_periodo', $idsPeriodoConInscripcionAbierta)
+                ->where('g.id_materia', $proximaMateria)
+                ->whereRaw('g.activo IS TRUE')
+                ->whereRaw("{$sqlOcupadasGrupo} < g.vacantes_max");
 
-        // Períodos de la carrera del estudiante con ventana de inscripción abierta.
-        // Lógica: si el período tiene fecha_inicio_inscripcion → usa esas fechas propias
-        // (la inscripción suele abrir ANTES de que el período de clases empiece, por eso
-        // no se filtra aquí por fecha_inicio/fecha_fin del dictado).
-        // Si no tiene fechas propias → acepta si el cronograma global de inscripción está
-        // activo Y el período de clases está vigente.
-        $periodosCarrera = [];
-        if ($carrera) {
-            $periodosCarrera = DB::table('periodos_dictado as pd')
-                ->where('pd.id_carrera', $est->id_carrera_actual)
-                ->whereNull('pd.id_nivel')
-                ->whereRaw('pd.activo IS TRUE')
-                ->select('pd.id_periodo', 'pd.fecha_inicio', 'pd.fecha_fin', 'pd.fecha_inicio_inscripcion', 'pd.fecha_fin_inscripcion')
-                ->get();
-        }
-
-        // Filtrar períodos con inscripción abierta
-        $idsPeriodoConInscripcionAbierta = collect($periodosCarrera)->filter(function ($p) use ($cronogramaInscripcionGlobal) {
-            if ($p->fecha_inicio_inscripcion && $p->fecha_fin_inscripcion) {
-                // Período tiene fechas propias → usar esas
-                return now()->toDateString() >= $p->fecha_inicio_inscripcion
-                    && now()->toDateString() <= $p->fecha_fin_inscripcion;
+            if (!empty($gruposInscritos)) {
+                $query->whereNotIn('g.id_oferta', $gruposInscritos);
             }
-            // Sin fechas propias → depende del cronograma global y de que el período esté vigente
-            return $cronogramaInscripcionGlobal !== null
-                && now()->toDateString() >= $p->fecha_inicio
-                && now()->toDateString() <= $p->fecha_fin;
-        })->pluck('id_periodo');
 
-        $inscripcionesAbiertas = $idsPeriodoConInscripcionAbierta->isNotEmpty();
-        $cronogramaInscripcion = $cronogramaInscripcionGlobal; // para vista (compat)
-
-        // Las materias son mensuales y secuenciales: si el estudiante ya tiene una
-        // inscripción 'activo' (materia en curso, aún no aprobada), no se le debe
-        // ofrecer ningún grupo nuevo hasta que la complete — coincide con el guard
-        // de inscribir().
-        $materiaEnCurso = DB::table('inscripciones as i')
-            ->join('grupos as g2',    'i.id_oferta',  '=', 'g2.id_oferta')
-            ->join('materias as m2',  'g2.id_materia', '=', 'm2.id_materia')
-            ->where('i.id_estudiante', $est->id_estudiante)
-            ->where('i.estado', 'activo')
-            ->select('m2.id_materia', 'm2.nombre', 'm2.codigo')
-            ->first();
-
-        if ($materiaEnCurso) {
-            $materiaEnCursoInfo = (array) $materiaEnCurso;
-        }
-
-        if ($carrera && $inscripcionesAbiertas && !$materiaEnCurso) {
-            // ── Calcular la próxima materia del estudiante en su malla ────────
-            $mallaOrdenada = DB::table('malla_curricular as mc')
-                ->leftJoin('niveles_carrera as n', 'mc.id_nivel', '=', 'n.id_nivel')
-                ->where('mc.id_carrera', $est->id_carrera_actual)
-                ->where('mc.obligatoria', true)
-                ->orderByRaw('COALESCE(n.numero_nivel, 0)')
-                ->orderByRaw('COALESCE(mc.orden_en_nivel, 0)')
-                ->pluck('mc.id_materia')
+            $gruposDisponibles = $query
+                ->select(
+                    'g.id_oferta', 'g.codigo_grupo', 'g.vacantes_max',
+                    DB::raw("{$sqlOcupadasGrupo} as vacantes_ocupadas"),
+                    'm.nombre as materia_nombre', 'm.codigo as materia_codigo',
+                    'pd.id_periodo', 'pd.nombre as periodo_nombre',
+                    'pd.fecha_inicio as periodo_inicio', 'pd.fecha_fin as periodo_fin',
+                    'h.dia_semana', 'h.hora_inicio', 'h.hora_fin',
+                    'a.nombre as aula_nombre',
+                    DB::raw("u.nombre || ' ' || u.apellido as profesor_nombre"),
+                    DB::raw("p.archivo_cv /* v2 */ as profesor_cv")
+                )
+                ->orderBy('h.dia_semana')
+                ->orderBy('h.hora_inicio')
+                ->get()
+                ->map(fn($r) => (array) $r)
                 ->toArray();
-
-            $materiasYaHechas = DB::table('inscripciones as i')
-                ->join('grupos as g2', 'i.id_oferta', '=', 'g2.id_oferta')
-                ->where('i.id_estudiante', $est->id_estudiante)
-                ->where('i.estado', 'aprobado')
-                ->pluck('g2.id_materia')
-                ->toArray();
-
-            $proximaMateria = null;
-            foreach ($mallaOrdenada as $mId) {
-                if (!in_array($mId, $materiasYaHechas)) {
-                    $proximaMateria = $mId;
-                    break;
-                }
-            }
-
-            if ($proximaMateria) {
-                $mat = DB::table('materias')->where('id_materia', $proximaMateria)
-                    ->select('id_materia', 'nombre', 'codigo')->first();
-                $proximaMateriaInfo = $mat ? (array) $mat : null;
-            }
-
-            // ── Grupos del período activo filtrados a la próxima materia ─────
-            $idsPeriodo = $idsPeriodoConInscripcionAbierta;
-
-            if ($idsPeriodo->isNotEmpty() && $proximaMateria) {
-                $query = DB::table('grupos as g')
-                    ->join('materias as m',          'g.id_materia',  '=', 'm.id_materia')
-                    ->join('periodos_dictado as pd', 'g.id_periodo',  '=', 'pd.id_periodo')
-                    ->join('horarios as h',          'g.id_horario',  '=', 'h.id_horario')
-                    ->join('aulas as a',             'g.id_aula',     '=', 'a.id_aula')
-                    ->join('profesores as p',        'g.id_profesor', '=', 'p.id_profesor')
-                    ->join('usuarios as u',          'p.id_usuario',  '=', 'u.id_usuario')
-                    ->whereIn('g.id_periodo', $idsPeriodo)
-                    ->where('g.id_materia', $proximaMateria)
-                    ->whereRaw('g.activo IS TRUE')
-                    ->whereRaw('COALESCE(g.vacantes_ocupadas, 0) < g.vacantes_max');
-
-                if (!empty($gruposInscritos)) {
-                    $query->whereNotIn('g.id_oferta', $gruposInscritos);
-                }
-
-                $gruposDisponibles = $query
-                    ->select(
-                        'g.id_oferta', 'g.codigo_grupo', 'g.vacantes_max', 'g.vacantes_ocupadas',
-                        'm.nombre as materia_nombre', 'm.codigo as materia_codigo',
-                        'pd.id_periodo', 'pd.nombre as periodo_nombre',
-                        'pd.fecha_inicio as periodo_inicio', 'pd.fecha_fin as periodo_fin',
-                        'h.dia_semana', 'h.hora_inicio', 'h.hora_fin',
-                        'a.nombre as aula_nombre',
-                        DB::raw("u.nombre || ' ' || u.apellido as profesor_nombre"),
-                        DB::raw("p.archivo_cv /* v2 */ as profesor_cv")
-                    )
-                    ->orderBy('h.dia_semana')
-                    ->orderBy('h.hora_inicio')
-                    ->get()
-                    ->map(fn($r) => (array) $r)
-                    ->toArray();
-            }
         }
 
         // Maestro de oferta general — todos los grupos de la carrera en el período con inscripción abierta
@@ -262,7 +247,8 @@ class PanelController extends Controller
                 ->whereIn('g.id_periodo', $idsPeriodo)
                 ->whereRaw('g.activo IS TRUE')
                 ->select(
-                    'g.id_oferta', 'g.codigo_grupo', 'g.vacantes_max', 'g.vacantes_ocupadas',
+                    'g.id_oferta', 'g.codigo_grupo', 'g.vacantes_max',
+                    DB::raw("{$sqlOcupadasGrupo} as vacantes_ocupadas"),
                     'm.id_materia', 'm.nombre as materia_nombre', 'm.codigo as materia_codigo',
                     'pd.nombre as periodo_nombre',
                     'h.dia_semana', 'h.hora_inicio', 'h.hora_fin',
@@ -282,7 +268,7 @@ class PanelController extends Controller
                 ->toArray();
         }
 
-        return Inertia::render('Dashboard/Estudiante', [
+        return Inertia::render('Estudiante/MisMaterias', [
             'estudiante' => [
                 'id_estudiante'   => $est->id_estudiante,
                 'legajo'          => $est->legajo,
@@ -317,12 +303,163 @@ class PanelController extends Controller
             'ofertaGeneral'          => $ofertaGeneral,
             'proximaMateria'         => $proximaMateriaInfo,
             'materiaEnCurso'         => $materiaEnCursoInfo,
+            'materiaReprobadaEsperando' => $materiaReprobadaEsperandoInfo,
             'cronogramaInscripcion'  => $cronogramaInscripcion ? [
                 'nombre'      => $cronogramaInscripcion->nombre,
                 'fecha_inicio' => $cronogramaInscripcion->fecha_inicio,
                 'fecha_fin'    => $cronogramaInscripcion->fecha_fin,
             ] : null,
         ]);
+    }
+
+    // ── Resumen académico compartido: materia en curso/reprobada/próxima ────────
+    // Usado tanto por el Dashboard (resumen rápido) como por Mis Materias (oferta completa).
+    private function resumenAcademico($est, $carrera): array
+    {
+        // Cronograma de inscripción global (fallback cuando el período no tiene fechas propias)
+        $cronogramaInscripcionGlobal = DB::table('cronogramas')
+            ->where('tipo_periodo', 'inscripcion')
+            ->where('activo', true)
+            ->whereRaw('CURRENT_DATE BETWEEN fecha_inicio AND fecha_fin')
+            ->orderBy('fecha_inicio', 'desc')
+            ->first();
+
+        // Inicio de la convocatoria de inscripción vigente: las vacantes ocupadas de
+        // un grupo se cuentan desde esta fecha (no por estado='activo'), porque el
+        // cupo de este mes NO debe liberarse solo porque un alumno ya fue calificado
+        // (reprobado/aprobado) mientras la inscripción de este mismo mes sigue abierta
+        // — otros estudiantes todavía pueden inscribirse en ese cupo. El contador
+        // recién vuelve a cero cuando abre la convocatoria del siguiente mes (otra
+        // fecha de inicio), no antes.
+        $ventanaInscripcionDesde = $cronogramaInscripcionGlobal
+            ? now()->parse($cronogramaInscripcionGlobal->fecha_inicio)->toDateString()
+            : '1900-01-01';
+        $sqlOcupadasGrupo = "(SELECT COUNT(*) FROM inscripciones ii WHERE ii.id_oferta = g.id_oferta AND ii.estado != 'retirado' AND ii.fecha_inscripcion::date >= COALESCE(pd.fecha_inicio_inscripcion, '{$ventanaInscripcionDesde}'::date))";
+
+        // Períodos de la carrera del estudiante con ventana de inscripción abierta.
+        // Lógica: si el período tiene fecha_inicio_inscripcion → usa esas fechas propias
+        // (la inscripción suele abrir ANTES de que el período de clases empiece, por eso
+        // no se filtra aquí por fecha_inicio/fecha_fin del dictado).
+        // Si no tiene fechas propias → acepta si el cronograma global de inscripción está
+        // activo Y el período de clases está vigente.
+        $periodosCarrera = [];
+        if ($carrera) {
+            $periodosCarrera = DB::table('periodos_dictado as pd')
+                ->where('pd.id_carrera', $est->id_carrera_actual)
+                ->whereNull('pd.id_nivel')
+                ->whereRaw('pd.activo IS TRUE')
+                ->select('pd.id_periodo', 'pd.fecha_inicio', 'pd.fecha_fin', 'pd.fecha_inicio_inscripcion', 'pd.fecha_fin_inscripcion')
+                ->get();
+        }
+
+        // Filtrar períodos con inscripción abierta
+        $idsPeriodoConInscripcionAbierta = collect($periodosCarrera)->filter(function ($p) use ($cronogramaInscripcionGlobal) {
+            if ($p->fecha_inicio_inscripcion && $p->fecha_fin_inscripcion) {
+                // Período tiene fechas propias → usar esas
+                return now()->toDateString() >= $p->fecha_inicio_inscripcion
+                    && now()->toDateString() <= $p->fecha_fin_inscripcion;
+            }
+            // Sin fechas propias → depende del cronograma global y de que el período esté vigente
+            return $cronogramaInscripcionGlobal !== null
+                && now()->toDateString() >= $p->fecha_inicio
+                && now()->toDateString() <= $p->fecha_fin;
+        })->pluck('id_periodo');
+
+        $inscripcionesAbiertas = $idsPeriodoConInscripcionAbierta->isNotEmpty();
+
+        // Las materias son mensuales y secuenciales: si el estudiante ya tiene una
+        // inscripción 'activo' (materia en curso, aún no aprobada), no se le debe
+        // ofrecer ningún grupo nuevo hasta que la complete — coincide con el guard
+        // de inscribir().
+        $materiaEnCurso = DB::table('inscripciones as i')
+            ->join('grupos as g2',    'i.id_oferta',  '=', 'g2.id_oferta')
+            ->join('materias as m2',  'g2.id_materia', '=', 'm2.id_materia')
+            ->where('i.id_estudiante', $est->id_estudiante)
+            ->where('i.estado', 'activo')
+            ->select('m2.id_materia', 'm2.nombre', 'm2.codigo')
+            ->first();
+        $materiaEnCursoInfo = $materiaEnCurso ? (array) $materiaEnCurso : null;
+
+        // Las materias son modulares (1 mes = 1 materia). El "mes" de una materia
+        // NO está delimitado por periodos_dictado.fecha_fin (eso es la ventana larga
+        // de dictado de la carrera, puede durar varios meses) sino por el ciclo de
+        // inscripción mensual: si el grupo donde reprobó pertenece a un período que
+        // SIGUE siendo el que tiene inscripción abierta ahora mismo, sigue dentro de
+        // ese mismo mes y debe esperar a que se lance la convocatoria del siguiente
+        // mes (nuevo período con inscripción abierta) para reintentarla.
+        $materiaReprobadaEsperando = DB::table('inscripciones as i')
+            ->join('grupos as g2',   'i.id_oferta',   '=', 'g2.id_oferta')
+            ->join('materias as m2', 'g2.id_materia', '=', 'm2.id_materia')
+            ->where('i.id_estudiante', $est->id_estudiante)
+            ->where('i.estado', 'reprobado')
+            ->whereIn('g2.id_periodo', $idsPeriodoConInscripcionAbierta)
+            ->select('m2.id_materia', 'm2.nombre', 'm2.codigo')
+            ->first();
+
+        $materiaReprobadaEsperandoInfo = null;
+        if ($materiaReprobadaEsperando) {
+            $materiaReprobadaEsperandoInfo = (array) $materiaReprobadaEsperando;
+
+            // Hint informativo: próxima convocatoria de inscripción ya programada (si existe).
+            // Solo cronogramas 'mensual' — uno 'semestral'/'anual' no es la convocatoria
+            // del siguiente mes, es la ventana larga de otro ciclo y daría una fecha falsa.
+            $proximaConvocatoria = DB::table('cronogramas')
+                ->where('tipo_periodo', 'inscripcion')
+                ->where('modalidad', 'mensual')
+                ->where('activo', true)
+                ->where('fecha_inicio', '>', now()->toDateString())
+                ->orderBy('fecha_inicio')
+                ->first();
+
+            if ($proximaConvocatoria) {
+                $materiaReprobadaEsperandoInfo['proxima_convocatoria'] = $proximaConvocatoria->fecha_inicio;
+            }
+        }
+
+        $proximaMateriaInfo = null;
+        if ($carrera && $inscripcionesAbiertas && !$materiaEnCurso && !$materiaReprobadaEsperando) {
+            // ── Calcular la próxima materia del estudiante en su malla ────────
+            $mallaOrdenada = DB::table('malla_curricular as mc')
+                ->leftJoin('niveles_carrera as n', 'mc.id_nivel', '=', 'n.id_nivel')
+                ->where('mc.id_carrera', $est->id_carrera_actual)
+                ->where('mc.obligatoria', true)
+                ->orderByRaw('COALESCE(n.numero_nivel, 0)')
+                ->orderByRaw('COALESCE(mc.orden_en_nivel, 0)')
+                ->pluck('mc.id_materia')
+                ->toArray();
+
+            $materiasYaHechas = DB::table('inscripciones as i')
+                ->join('grupos as g2', 'i.id_oferta', '=', 'g2.id_oferta')
+                ->where('i.id_estudiante', $est->id_estudiante)
+                ->where('i.estado', 'aprobado')
+                ->pluck('g2.id_materia')
+                ->toArray();
+
+            $proximaMateria = null;
+            foreach ($mallaOrdenada as $mId) {
+                if (!in_array($mId, $materiasYaHechas)) {
+                    $proximaMateria = $mId;
+                    break;
+                }
+            }
+
+            if ($proximaMateria) {
+                $mat = DB::table('materias')->where('id_materia', $proximaMateria)
+                    ->select('id_materia', 'nombre', 'codigo')->first();
+                $proximaMateriaInfo = $mat ? (array) $mat : null;
+            }
+        }
+
+        return [
+            'cronogramaInscripcionGlobal'      => $cronogramaInscripcionGlobal,
+            'ventanaInscripcionDesde'          => $ventanaInscripcionDesde,
+            'sqlOcupadasGrupo'                 => $sqlOcupadasGrupo,
+            'idsPeriodoConInscripcionAbierta'  => $idsPeriodoConInscripcionAbierta,
+            'inscripcionesAbiertas'            => $inscripcionesAbiertas,
+            'materiaEnCursoInfo'               => $materiaEnCursoInfo,
+            'materiaReprobadaEsperandoInfo'    => $materiaReprobadaEsperandoInfo,
+            'proximaMateriaInfo'               => $proximaMateriaInfo,
+        ];
     }
 
     // ── Mi Malla Académica ──────────────────────────────────────────────────────
@@ -507,7 +644,7 @@ class PanelController extends Controller
                 'fecha_inicio'  => now()->toDateString(),
                 'estado'        => 'activo',
             ]);
-            return redirect()->route('estudiante.panel')->with('success', '¡Plan activado! Ya puedes inscribirte en materias. Pagas cada materia al inscribirte.');
+            return redirect()->route('estudiante.materias')->with('success', '¡Plan activado! Ya puedes inscribirte en materias. Pagas cada materia al inscribirte.');
         }
 
         // CONTADO (≥80% = con 20% descuento) o CRÉDITO (≥30% = enganche)
@@ -647,12 +784,30 @@ class PanelController extends Controller
             ->join('periodos_dictado as pd', 'g.id_periodo', '=', 'pd.id_periodo')
             ->where('g.id_oferta', $idOferta)
             ->whereRaw('g.activo IS TRUE')
-            ->select('g.*', 'm.nombre as materia_nombre', 'pd.nombre as periodo_nombre')
+            ->select('g.*', 'm.nombre as materia_nombre', 'pd.nombre as periodo_nombre', 'pd.fecha_inicio_inscripcion')
             ->first();
 
         if (!$grupo) abort(404);
 
-        if (($grupo->vacantes_max - ($grupo->vacantes_ocupadas ?? 0)) <= 0) {
+        // Ocupación en vivo desde el inicio de la convocatoria vigente (no por
+        // estado='activo'): el cupo de este mes no se libera solo porque un alumno
+        // ya fue calificado mientras la inscripción de este mismo mes sigue abierta.
+        $cronogramaInscripcionGlobal = DB::table('cronogramas')
+            ->where('tipo_periodo', 'inscripcion')
+            ->where('activo', true)
+            ->whereRaw('CURRENT_DATE BETWEEN fecha_inicio AND fecha_fin')
+            ->orderBy('fecha_inicio', 'desc')
+            ->first();
+        $ventanaInscripcionDesde = $grupo->fecha_inicio_inscripcion
+            ?? ($cronogramaInscripcionGlobal ? now()->parse($cronogramaInscripcionGlobal->fecha_inicio)->toDateString() : '1900-01-01');
+
+        $ocupadasActuales = DB::table('inscripciones')
+            ->where('id_oferta', $idOferta)
+            ->where('estado', '!=', 'retirado')
+            ->whereRaw('fecha_inscripcion::date >= ?', [$ventanaInscripcionDesde])
+            ->count();
+
+        if (($grupo->vacantes_max - $ocupadasActuales) <= 0) {
             return back()->withErrors(['general' => 'No hay vacantes disponibles en este grupo.']);
         }
 
@@ -713,6 +868,30 @@ class PanelController extends Controller
             ]);
         }
 
+        // Las materias son modulares (1 mes = 1 materia): si reprobó una materia cuyo
+        // grupo pertenece a un período que SIGUE teniendo inscripción abierta ahora
+        // mismo, sigue dentro de ese mismo mes — debe esperar a la convocatoria del
+        // siguiente mes para reintentarla (no se mide por la fecha_fin larga del
+        // período de dictado).
+        if ($est->id_carrera_actual) {
+            $idsPeriodoAbierto = $this->periodosConInscripcionAbierta($est->id_carrera_actual);
+
+            $materiaReprobadaEsperando = DB::table('inscripciones as i')
+                ->join('grupos as g2',   'i.id_oferta',   '=', 'g2.id_oferta')
+                ->join('materias as m2', 'g2.id_materia', '=', 'm2.id_materia')
+                ->where('i.id_estudiante', $est->id_estudiante)
+                ->where('i.estado', 'reprobado')
+                ->whereIn('g2.id_periodo', $idsPeriodoAbierto)
+                ->select('m2.nombre as materia_nombre')
+                ->first();
+
+            if ($materiaReprobadaEsperando) {
+                return back()->withErrors([
+                    'general' => "Reprobaste '{$materiaReprobadaEsperando->materia_nombre}'. Debes esperar a la convocatoria de inscripción del siguiente mes para reintentarla.",
+                ]);
+            }
+        }
+
         // Caso 1: inscripción en pendiente_matricula pero ya tiene pago_materia_suelta
         // (trigger corrió pero no actualizó el estado — activar manualmente)
         $inscConPagoExistente = DB::table('inscripciones as i')
@@ -726,7 +905,7 @@ class PanelController extends Controller
             DB::table('inscripciones')
                 ->where('id_inscripcion', $inscConPagoExistente)
                 ->update(['estado' => 'activo']);
-            return redirect()->route('estudiante.panel')
+            return redirect()->route('estudiante.materias')
                 ->with('success', 'Tu pago ya estaba registrado. ¡Inscripción activada correctamente!');
         }
 
@@ -782,8 +961,7 @@ class PanelController extends Controller
                     'estado'           => 'activo',
                     'fecha_inscripcion' => now(),
                 ]);
-                DB::table('grupos')->where('id_oferta', $idOferta)->increment('vacantes_ocupadas');
-                return redirect()->route('estudiante.panel')->with('success', '¡Inscripción exitosa en ' . $grupo->materia_nombre . '!');
+                return redirect()->route('estudiante.materias')->with('success', '¡Inscripción exitosa en ' . $grupo->materia_nombre . '!');
             } catch (\Throwable $e) {
                 return back()->withErrors(['general' => 'Error al inscribirse: ' . $e->getMessage()]);
             }
@@ -924,11 +1102,6 @@ class PanelController extends Controller
                     DB::table('pagofacil_transacciones')
                         ->where('id_transaccion_pf', $transId)->where('estado', 'pendiente')
                         ->update(['estado' => 'pagado']);
-                    // Actualizar vacantes manualmente (el trigger no lo hace)
-                    if ($trans->id_inscripcion) {
-                        $insc = DB::table('inscripciones')->where('id_inscripcion', $trans->id_inscripcion)->first();
-                        if ($insc) DB::table('grupos')->where('id_oferta', $insc->id_oferta)->increment('vacantes_ocupadas');
-                    }
                     return response()->json(['estado' => 'pagado']);
                 }
             } catch (\Throwable) {}
@@ -954,5 +1127,35 @@ class PanelController extends Controller
             'fecha_inicio'  => now()->toDateString(),
             'estado'        => 'activo',
         ]);
+    }
+
+    // ── Helper: períodos de dictado de una carrera con ventana de inscripción
+    // abierta ahora mismo. Misma lógica usada en index() — usa fechas propias del
+    // período si las tiene, o cae al cronograma global de inscripción.
+    private function periodosConInscripcionAbierta(int $idCarrera): \Illuminate\Support\Collection
+    {
+        $cronogramaGlobal = DB::table('cronogramas')
+            ->where('tipo_periodo', 'inscripcion')
+            ->where('activo', true)
+            ->whereRaw('CURRENT_DATE BETWEEN fecha_inicio AND fecha_fin')
+            ->orderBy('fecha_inicio', 'desc')
+            ->first();
+
+        $periodos = DB::table('periodos_dictado as pd')
+            ->where('pd.id_carrera', $idCarrera)
+            ->whereNull('pd.id_nivel')
+            ->whereRaw('pd.activo IS TRUE')
+            ->select('pd.id_periodo', 'pd.fecha_inicio', 'pd.fecha_fin', 'pd.fecha_inicio_inscripcion', 'pd.fecha_fin_inscripcion')
+            ->get();
+
+        return collect($periodos)->filter(function ($p) use ($cronogramaGlobal) {
+            if ($p->fecha_inicio_inscripcion && $p->fecha_fin_inscripcion) {
+                return now()->toDateString() >= $p->fecha_inicio_inscripcion
+                    && now()->toDateString() <= $p->fecha_fin_inscripcion;
+            }
+            return $cronogramaGlobal !== null
+                && now()->toDateString() >= $p->fecha_inicio
+                && now()->toDateString() <= $p->fecha_fin;
+        })->pluck('id_periodo');
     }
 }

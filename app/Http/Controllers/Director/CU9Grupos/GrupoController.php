@@ -11,6 +11,22 @@ class GrupoController extends Controller
 {
     public function index()
     {
+        // Vacantes ocupadas se cuentan desde el inicio de la convocatoria de
+        // inscripción vigente (no por estado='activo'): el cupo de este mes no debe
+        // liberarse solo porque un alumno ya fue calificado mientras la inscripción
+        // de ese mismo mes sigue abierta. Recién vuelve a cero con la convocatoria
+        // del siguiente mes. Ver lógica equivalente en Estudiante\PanelController.
+        $cronogramaInscripcionGlobal = DB::table('cronogramas')
+            ->where('tipo_periodo', 'inscripcion')
+            ->where('activo', true)
+            ->whereRaw('CURRENT_DATE BETWEEN fecha_inicio AND fecha_fin')
+            ->orderBy('fecha_inicio', 'desc')
+            ->first();
+        $ventanaInscripcionDesde = $cronogramaInscripcionGlobal
+            ? now()->parse($cronogramaInscripcionGlobal->fecha_inicio)->toDateString()
+            : '1900-01-01';
+        $sqlOcupadasGrupo = "(SELECT COUNT(*) FROM inscripciones ii WHERE ii.id_oferta = g.id_oferta AND ii.estado != 'retirado' AND ii.fecha_inscripcion::date >= COALESCE(pd.fecha_inicio_inscripcion, '{$ventanaInscripcionDesde}'::date))";
+
         // ── Todos los grupos con sus relaciones ──────────────────────────────
         $gruposRaw = DB::table('grupos as g')
             ->join('materias as m',    'g.id_materia',  '=', 'm.id_materia')
@@ -18,10 +34,12 @@ class GrupoController extends Controller
             ->join('profesores as p',  'g.id_profesor', '=', 'p.id_profesor')
             ->join('usuarios as u',    'p.id_usuario',  '=', 'u.id_usuario')
             ->join('horarios as h',    'g.id_horario',  '=', 'h.id_horario')
+            ->leftJoin('periodos_dictado as pd', 'g.id_periodo', '=', 'pd.id_periodo')
             ->orderBy('g.id_periodo')
             ->orderBy('m.nombre')
             ->select(
-                'g.id_oferta', 'g.id_periodo', 'g.vacantes_max', 'g.vacantes_ocupadas',
+                'g.id_oferta', 'g.id_periodo', 'g.vacantes_max',
+                DB::raw("{$sqlOcupadasGrupo} as vacantes_ocupadas"),
                 'g.activo', 'g.codigo_grupo',
                 'm.id_materia', 'm.nombre as materia_nombre', 'm.codigo as materia_codigo',
                 'a.id_aula', 'a.nombre as aula_nombre', 'a.capacidad as aula_capacidad',
@@ -318,8 +336,26 @@ class GrupoController extends Controller
             ->get();
         $idsHermanos = $hermanos->pluck('id_oferta')->toArray();
 
-        // Validar vacantes vs ocupadas
-        $maxOcupadas = $hermanos->max('vacantes_ocupadas') ?? 0;
+        // Validar vacantes vs ocupadas, contadas desde el inicio de la convocatoria
+        // de inscripción vigente (no por estado='activo' — ver PanelController).
+        $periodo = DB::table('periodos_dictado')->where('id_periodo', $grupo->id_periodo)->first();
+        $cronogramaInscripcionGlobal = DB::table('cronogramas')
+            ->where('tipo_periodo', 'inscripcion')
+            ->where('activo', true)
+            ->whereRaw('CURRENT_DATE BETWEEN fecha_inicio AND fecha_fin')
+            ->orderBy('fecha_inicio', 'desc')
+            ->first();
+        $ventanaInscripcionDesde = $periodo?->fecha_inicio_inscripcion
+            ?? ($cronogramaInscripcionGlobal ? now()->parse($cronogramaInscripcionGlobal->fecha_inicio)->toDateString() : '1900-01-01');
+
+        $maxOcupadas = DB::table('inscripciones')
+            ->whereIn('id_oferta', $idsHermanos)
+            ->where('estado', '!=', 'retirado')
+            ->whereRaw('fecha_inscripcion::date >= ?', [$ventanaInscripcionDesde])
+            ->groupBy('id_oferta')
+            ->select(DB::raw('COUNT(*) as c'))
+            ->get()
+            ->max('c') ?? 0;
         if ($request->vacantes_max < $maxOcupadas) {
             return redirect()->back()->withErrors([
                 'grupo' => "No se puede reducir vacantes por debajo de las ya ocupadas ({$maxOcupadas}).",
@@ -609,6 +645,19 @@ class GrupoController extends Controller
     // ── CU9: Ver inscritos en un grupo específico ──────────────────────────────
     public function inscritos(int $idOferta)
     {
+        // Vacantes ocupadas desde el inicio de la convocatoria vigente (no por
+        // estado='activo' — ver PanelController).
+        $cronogramaInscripcionGlobal = DB::table('cronogramas')
+            ->where('tipo_periodo', 'inscripcion')
+            ->where('activo', true)
+            ->whereRaw('CURRENT_DATE BETWEEN fecha_inicio AND fecha_fin')
+            ->orderBy('fecha_inicio', 'desc')
+            ->first();
+        $ventanaInscripcionDesde = $cronogramaInscripcionGlobal
+            ? now()->parse($cronogramaInscripcionGlobal->fecha_inicio)->toDateString()
+            : '1900-01-01';
+        $sqlOcupadasGrupo = "(SELECT COUNT(*) FROM inscripciones ii WHERE ii.id_oferta = g.id_oferta AND ii.estado != 'retirado' AND ii.fecha_inscripcion::date >= COALESCE(pd.fecha_inicio_inscripcion, '{$ventanaInscripcionDesde}'::date))";
+
         $grupo = DB::table('grupos as g')
             ->join('materias as m',         'g.id_materia',  '=', 'm.id_materia')
             ->join('periodos_dictado as pd', 'g.id_periodo',  '=', 'pd.id_periodo')
@@ -618,7 +667,9 @@ class GrupoController extends Controller
             ->join('horarios as h',         'g.id_horario',  '=', 'h.id_horario')
             ->where('g.id_oferta', $idOferta)
             ->select(
-                'g.id_oferta', 'g.id_periodo', 'g.codigo_grupo', 'g.vacantes_max', 'g.vacantes_ocupadas', 'g.activo',
+                'g.id_oferta', 'g.id_periodo', 'g.codigo_grupo', 'g.vacantes_max',
+                DB::raw("{$sqlOcupadasGrupo} as vacantes_ocupadas"),
+                'g.activo',
                 'm.nombre as materia_nombre', 'm.codigo as materia_codigo',
                 'pd.nombre as periodo_nombre', 'pd.fecha_inicio', 'pd.fecha_fin',
                 'a.nombre as aula_nombre',

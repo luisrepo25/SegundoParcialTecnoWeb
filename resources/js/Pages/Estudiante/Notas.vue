@@ -7,8 +7,10 @@ const props = defineProps({
     notas: { type: Array, default: () => [] },
 });
 
-const filtroNivel   = ref('');
-const filtroMateria = ref('');
+const filtroNivel     = ref('');
+const filtroMateria   = ref('');
+const filtroAnio      = ref('');
+const filtroSemestre  = ref('');
 
 const niveles = computed(() => {
     const map = new Map();
@@ -25,9 +27,21 @@ const materias = computed(() => {
     return [...map.entries()].map(([id_materia, nombre]) => ({ id_materia, nombre }));
 });
 
+// Año/mes de la nota: fecha_aprobacion si existe (cuando se calificó), si no fecha_inscripcion.
+const fechaNota = (n) => n.fecha_aprobacion ?? n.fecha_inscripcion;
+const anioDe      = (n) => Number(fechaNota(n).slice(0, 4));
+const semestreDe  = (n) => (Number(fechaNota(n).slice(5, 7)) <= 6 ? 1 : 2);
+
+const anios = computed(() => {
+    const set = new Set(props.notas.filter(n => fechaNota(n)).map(anioDe));
+    return [...set].sort((a, b) => b - a);
+});
+
 const notasFiltradas = computed(() => props.notas.filter(n =>
     (filtroNivel.value === '' || (n.numero_nivel ?? 0) === Number(filtroNivel.value)) &&
-    (filtroMateria.value === '' || n.id_materia === Number(filtroMateria.value))
+    (filtroMateria.value === '' || n.id_materia === Number(filtroMateria.value)) &&
+    (filtroAnio.value === '' || (fechaNota(n) && anioDe(n) === Number(filtroAnio.value))) &&
+    (filtroSemestre.value === '' || (fechaNota(n) && semestreDe(n) === Number(filtroSemestre.value)))
 ));
 
 const promedio = computed(() => {
@@ -83,7 +97,23 @@ const ESTADO = {
                     <option v-for="m in materias" :key="m.id_materia" :value="m.id_materia">{{ m.nombre }}</option>
                 </select>
 
-                <button v-if="filtroNivel || filtroMateria" @click="filtroNivel = ''; filtroMateria = ''"
+                <label class="text-sm font-medium ml-2" style="color: var(--text-secondary);">Año:</label>
+                <select v-model="filtroAnio" class="rounded-lg text-sm px-3 py-1.5"
+                        style="background-color: var(--input-bg, var(--card-bg)); border: 1px solid var(--border-color); color: var(--text-color);">
+                    <option value="">Todos</option>
+                    <option v-for="a in anios" :key="a" :value="a">{{ a }}</option>
+                </select>
+
+                <label class="text-sm font-medium ml-2" style="color: var(--text-secondary);">Semestre:</label>
+                <select v-model="filtroSemestre" class="rounded-lg text-sm px-3 py-1.5"
+                        style="background-color: var(--input-bg, var(--card-bg)); border: 1px solid var(--border-color); color: var(--text-color);">
+                    <option value="">Todos</option>
+                    <option value="1">1 (ene-jun)</option>
+                    <option value="2">2 (jul-dic)</option>
+                </select>
+
+                <button v-if="filtroNivel || filtroMateria || filtroAnio || filtroSemestre"
+                        @click="filtroNivel = ''; filtroMateria = ''; filtroAnio = ''; filtroSemestre = ''"
                         class="text-xs font-medium ml-auto px-3 py-1.5 rounded-lg"
                         style="background-color: color-mix(in srgb,var(--text-color) 8%,transparent); color: var(--text-secondary);">
                     Limpiar filtros

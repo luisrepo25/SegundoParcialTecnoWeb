@@ -73,7 +73,7 @@ const showUserMenu   = ref(false);
             <div class="px-4 pt-4 pb-2">
                 <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
                       style="background-color: var(--primary-color); color: var(--primary-text);">
-                    {{ roleBadge.emoji }} {{ roleBadge.label }}
+                    {{ roleBadge.label }}
                 </span>
             </div>
 

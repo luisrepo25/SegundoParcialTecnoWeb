@@ -145,10 +145,23 @@ class ReporteController extends Controller
             ->map(fn($r) => ['label' => $r->label, 'valor' => (int) $r->valor])
             ->values();
 
-        // Ocupación de grupos por periodo (últimos 6)
+        // Ocupación de grupos por periodo (últimos 6). Las vacantes ocupadas se
+        // cuentan desde el inicio de la convocatoria de inscripción vigente (no por
+        // estado='activo' — ver PanelController): el cupo de este mes no se libera
+        // solo porque un alumno ya fue calificado mientras la inscripción sigue abierta.
+        $cronogramaInscripcionGlobal = DB::table('cronogramas')
+            ->where('tipo_periodo', 'inscripcion')
+            ->where('activo', true)
+            ->whereRaw('CURRENT_DATE BETWEEN fecha_inicio AND fecha_fin')
+            ->orderBy('fecha_inicio', 'desc')
+            ->first();
+        $ventanaInscripcionDesde = $cronogramaInscripcionGlobal
+            ? now()->parse($cronogramaInscripcionGlobal->fecha_inicio)->toDateString()
+            : '1900-01-01';
+
         $ocupacionGrupos = DB::table('grupos as g')
             ->join('periodos_dictado as p', 'g.id_periodo', '=', 'p.id_periodo')
-            ->selectRaw("p.nombre as label, SUM(g.vacantes_max) as capacidad, SUM(COALESCE(g.vacantes_ocupadas, 0)) as ocupadas")
+            ->selectRaw("p.nombre as label, SUM(g.vacantes_max) as capacidad, SUM((SELECT COUNT(*) FROM inscripciones ii WHERE ii.id_oferta = g.id_oferta AND ii.estado != 'retirado' AND ii.fecha_inscripcion::date >= COALESCE(p.fecha_inicio_inscripcion, '{$ventanaInscripcionDesde}'::date))) as ocupadas")
             ->groupBy('p.id_periodo', 'p.nombre', 'p.fecha_inicio')
             ->orderBy('p.fecha_inicio', 'desc')
             ->limit(6)

@@ -6,7 +6,7 @@ import { useTheme } from '@/Composables/useTheme';
 const { theme, setTheme, changeFontScale } = useTheme();
 
 const toggleDayNight = () => setTheme(theme.value === 'youth' ? 'adults' : 'youth');
-const dayNightIcon   = computed(() => theme.value === 'youth' ? '☀️' : '🌙');
+const esModoNoche    = computed(() => theme.value === 'youth');
 
 const sitio = computed(() => usePage().props.sitio ?? {});
 const logoUrl = computed(() => sitio.value.logo_url ?? '/images/logo.png');
@@ -22,11 +22,11 @@ const navActive = (names) => names.some(n => route().current(n));
         <div class="access-bar">
             <div class="age-group">
                 <button :class="['age-btn', theme === 'adults' ? 'active' : '']"
-                        @click="setTheme('adults')">☀️ Adultos</button>
+                        @click="setTheme('adults')">Adultos</button>
                 <button :class="['age-btn', theme === 'youth'  ? 'active' : '']"
-                        @click="setTheme('youth')">🌙 Jóvenes</button>
+                        @click="setTheme('youth')">Jóvenes</button>
                 <button :class="['age-btn', theme === 'kids'   ? 'active' : '']"
-                        @click="setTheme('kids')">🧸 Niños</button>
+                        @click="setTheme('kids')">Niños</button>
             </div>
             <div class="acc-sep"></div>
             <div class="font-group">
@@ -35,8 +35,13 @@ const navActive = (names) => names.some(n => route().current(n));
                 <button class="font-btn" @click="changeFontScale('increase')">A+</button>
             </div>
             <div class="acc-sep"></div>
-            <button class="day-night-btn" @click="toggleDayNight" :title="dayNightIcon === '🌙' ? 'Modo noche' : 'Modo día'">
-                {{ dayNightIcon }}
+            <button class="day-night-btn" @click="toggleDayNight" :title="esModoNoche ? 'Modo día' : 'Modo noche'">
+                <svg v-if="esModoNoche" xmlns="http://www.w3.org/2000/svg" class="day-night-icon" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" class="day-night-icon" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+                </svg>
             </button>
         </div>
 
@@ -194,11 +199,12 @@ const navActive = (names) => names.some(n => route().current(n));
     border: 1px solid var(--border-color);
     background: var(--bg-color);
     color: var(--text-secondary);
-    cursor: pointer; font-size: 0.85rem;
+    cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: all 0.2s;
 }
-.day-night-btn:hover { border-color: var(--primary-color); transform: rotate(15deg); }
+.day-night-btn:hover { border-color: var(--primary-color); color: var(--primary-color); transform: rotate(15deg); }
+.day-night-icon { width: 1rem; height: 1rem; }
 
 /* ── Navbar ── */
 .navbar {

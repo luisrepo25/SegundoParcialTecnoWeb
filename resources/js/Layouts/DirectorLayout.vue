@@ -71,7 +71,7 @@ const showUserMenu   = ref(false);
             <!-- Badge rol -->
             <div class="px-4 py-3 border-b" style="border-color: var(--border-color);">
                 <span class="text-xs font-semibold px-2 py-0.5 rounded-full" style="background-color: var(--primary-color); color: var(--primary-text);">
-                    🎓 Director
+                    Director
                 </span>
             </div>
 

@@ -60,14 +60,6 @@ class CallbackController extends Controller
                         }
                     }
 
-                    // Actualizar vacantes tras pago de materia (el trigger activa la inscripción,
-                    // pero el conteo de vacantes_ocupadas lo manejamos aquí)
-                    if ($trans->concepto === 'materia' && $trans->id_inscripcion) {
-                        $insc = DB::table('inscripciones')->where('id_inscripcion', $trans->id_inscripcion)->first();
-                        if ($insc) {
-                            DB::table('grupos')->where('id_oferta', $insc->id_oferta)->increment('vacantes_ocupadas');
-                        }
-                    }
                 }
             }
         }
