@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Head, useForm, usePage, Link } from '@inertiajs/vue3';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import EstudianteLayout from '@/Layouts/EstudianteLayout.vue';
 
 const props = defineProps({
     perfil: { type: Object, required: true },
@@ -80,7 +80,7 @@ const tipoLabel = (tipo) => ({ tecnico_superior: 'Técnico Superior', tecnico_me
 
 <template>
     <Head title="Mi Perfil" />
-    <AuthenticatedLayout>
+    <EstudianteLayout>
         <template #header>
             <div class="flex items-center gap-3">
                 <Link :href="route('estudiante.panel')"
@@ -353,5 +353,5 @@ const tipoLabel = (tipo) => ({ tecnico_superior: 'Técnico Superior', tecnico_me
             </form>
 
         </div>
-    </AuthenticatedLayout>
+    </EstudianteLayout>
 </template>
