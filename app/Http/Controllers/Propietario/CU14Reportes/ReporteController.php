@@ -9,6 +9,7 @@ use App\Models\Horario;
 use App\Models\Materia;
 use App\Models\Usuario;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
@@ -20,9 +21,24 @@ class ReporteController extends Controller
             'activo_usuarios' => $request->input('activo_usuarios', 'todos'),
             'activo_aulas'    => $request->input('activo_aulas',    'todos'),
             'activo_horarios' => $request->input('activo_horarios', 'todos'),
+            'nombre_periodo'  => $request->input('nombre_periodo')  ?: null,
+            'id_carrera'      => $request->input('id_carrera') ? (int) $request->input('id_carrera') : null,
         ];
 
-        $esPropietario = auth()->user()?->id_rol === 1;
+        // Períodos únicos por nombre (una fila por carrera, se deduplican por nombre)
+        $periodos = DB::table('periodos_dictado')
+            ->selectRaw('nombre, MAX(fecha_inicio) as max_fecha')
+            ->groupBy('nombre')
+            ->orderByRaw('MAX(fecha_inicio) DESC NULLS LAST')
+            ->get(['nombre', 'max_fecha']);
+
+        // Carreras activas para el selector
+        $carreras = DB::table('carreras')
+            ->whereRaw('activo IS TRUE')
+            ->orderBy('nombre')
+            ->get(['id_carrera', 'nombre']);
+
+        $esPropietario = Auth::user()?->id_rol === 1;
 
         // ── ADMINISTRATIVO ────────────────────────────────────────────────────
 
@@ -55,10 +71,22 @@ class ReporteController extends Controller
             'valor' => (int) ($horarioRaw->get($dia)?->total ?? 0),
         ])->values();
 
-        // Inscripciones por carrera
-        $inscripcionesPorCarrera = DB::table('inscripciones as i')
-            ->join('estudiantes as e', 'i.id_estudiante', '=', 'e.id_estudiante')
-            ->leftJoin('carreras as c', 'e.id_carrera_actual', '=', 'c.id_carrera')
+        // IDs de períodos que coinciden con el nombre seleccionado (usado en 4 queries)
+        $idsPeriodoFiltro = $filtros['nombre_periodo']
+            ? DB::table('periodos_dictado')
+                ->where('nombre', $filtros['nombre_periodo'])
+                ->when($filtros['id_carrera'], fn($q) => $q->where('id_carrera', $filtros['id_carrera']))
+                ->pluck('id_periodo')
+            : null;
+
+        // Inscripciones por carrera (filtrable por período y carrera)
+        $qInscCarrera = DB::table('inscripciones as i')
+            ->join('grupos as g',      'i.id_oferta',         '=', 'g.id_oferta')
+            ->join('estudiantes as e', 'i.id_estudiante',     '=', 'e.id_estudiante')
+            ->leftJoin('carreras as c','e.id_carrera_actual', '=', 'c.id_carrera');
+        if ($idsPeriodoFiltro)      $qInscCarrera->whereIn('g.id_periodo', $idsPeriodoFiltro);
+        if ($filtros['id_carrera']) $qInscCarrera->where('c.id_carrera', $filtros['id_carrera']);
+        $inscripcionesPorCarrera = $qInscCarrera
             ->selectRaw("COALESCE(c.nombre, 'Sin carrera') as label, COUNT(*) as valor")
             ->groupBy('c.nombre')
             ->orderByRaw('COUNT(*) DESC')
@@ -67,11 +95,18 @@ class ReporteController extends Controller
             ->map(fn($r) => ['label' => $r->label, 'valor' => (int) $r->valor])
             ->values();
 
-        // Carga horaria de profesores (grupos activos asignados)
-        $cargaHoraria = DB::table('grupos as g')
-            ->join('profesores as p',  'g.id_profesor', '=', 'p.id_profesor')
-            ->join('usuarios as u',    'p.id_usuario',  '=', 'u.id_usuario')
-            ->whereRaw('g.activo IS TRUE')
+        // Carga horaria de profesores (filtrable por período y carrera)
+        $qCarga = DB::table('grupos as g')
+            ->join('profesores as p',       'g.id_profesor', '=', 'p.id_profesor')
+            ->join('usuarios as u',         'p.id_usuario',  '=', 'u.id_usuario')
+            ->join('periodos_dictado as pd', 'g.id_periodo',  '=', 'pd.id_periodo');
+        if ($idsPeriodoFiltro) {
+            $qCarga->whereIn('g.id_periodo', $idsPeriodoFiltro);
+        } else {
+            $qCarga->whereRaw('g.activo IS TRUE');
+        }
+        if ($filtros['id_carrera']) $qCarga->where('pd.id_carrera', $filtros['id_carrera']);
+        $cargaHoraria = $qCarga
             ->selectRaw("u.nombre || ' ' || u.apellido as label, COUNT(g.id_oferta) as valor")
             ->groupBy('u.id_usuario', 'u.nombre', 'u.apellido')
             ->orderByRaw('COUNT(g.id_oferta) DESC')
@@ -112,11 +147,15 @@ class ReporteController extends Controller
 
         // ── ACADÉMICO ─────────────────────────────────────────────────────────
 
-        // Tasa de aprobación por materia (top 8 por volumen)
-        $tasaAprobacion = DB::table('inscripciones as i')
-            ->join('grupos as g',   'i.id_oferta',   '=', 'g.id_oferta')
-            ->join('materias as m', 'g.id_materia',  '=', 'm.id_materia')
-            ->whereNotNull('i.calificacion_final')
+        // Tasa de aprobación por materia — filtrable por período y carrera
+        $qTasa = DB::table('inscripciones as i')
+            ->join('grupos as g',      'i.id_oferta',      '=', 'g.id_oferta')
+            ->join('materias as m',    'g.id_materia',     '=', 'm.id_materia')
+            ->join('estudiantes as est','i.id_estudiante', '=', 'est.id_estudiante')
+            ->whereNotNull('i.calificacion_final');
+        if ($idsPeriodoFiltro)      $qTasa->whereIn('g.id_periodo', $idsPeriodoFiltro);
+        if ($filtros['id_carrera']) $qTasa->where('est.id_carrera_actual', $filtros['id_carrera']);
+        $tasaAprobacion = $qTasa
             ->selectRaw("m.nombre as label, COUNT(*) as total, SUM(CASE WHEN i.aprobado IS TRUE THEN 1 ELSE 0 END) as aprobados")
             ->groupBy('m.id_materia', 'm.nombre')
             ->orderByRaw('COUNT(*) DESC')
@@ -130,14 +169,18 @@ class ReporteController extends Controller
             ])
             ->values();
 
-        // Estudiantes en riesgo (inscripción activa con nota < 51 o sin nota)
-        $estudiantesEnRiesgo = DB::table('inscripciones as i')
+        // Estudiantes en riesgo — filtrable por período y carrera
+        $qRiesgo = DB::table('inscripciones as i')
+            ->join('grupos as g',        'i.id_oferta',         '=', 'g.id_oferta')
             ->join('estudiantes as e',   'i.id_estudiante',     '=', 'e.id_estudiante')
             ->leftJoin('carreras as c',  'e.id_carrera_actual', '=', 'c.id_carrera')
-            ->where('i.estado', 'activo')
+            ->where('i.estado', '!=', 'abandonado')
             ->where(function ($q) {
                 $q->whereRaw('i.calificacion_final < 51')->orWhereNull('i.calificacion_final');
-            })
+            });
+        if ($idsPeriodoFiltro)      $qRiesgo->whereIn('g.id_periodo', $idsPeriodoFiltro);
+        if ($filtros['id_carrera']) $qRiesgo->where('e.id_carrera_actual', $filtros['id_carrera']);
+        $estudiantesEnRiesgo = $qRiesgo
             ->selectRaw("COALESCE(c.nombre, 'Sin carrera') as label, COUNT(DISTINCT i.id_estudiante) as valor")
             ->groupBy('c.nombre')
             ->orderByRaw('COUNT(DISTINCT i.id_estudiante) DESC')
@@ -227,6 +270,8 @@ class ReporteController extends Controller
         return Inertia::render('Propietario/CU14Reportes/Index', [
             'esPropietario' => $esPropietario,
             'filtros'       => $filtros,
+            'periodos'      => $periodos,
+            'carreras'      => $carreras,
             'administrativo' => [
                 'usuariosPorRol'          => $usuariosPorRol,
                 'aulasPorTipo'            => $aulasPorTipo,

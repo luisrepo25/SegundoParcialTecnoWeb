@@ -13,6 +13,8 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, LineElement
 const props = defineProps({
     esPropietario:  Boolean,
     filtros:        Object,
+    periodos:       { type: Array, default: () => [] },
+    carreras:       { type: Array, default: () => [] },
     administrativo: Object,
     academico:      Object,
     financiero:     Object,
@@ -22,16 +24,26 @@ const props = defineProps({
 const fUsuarios = ref(props.filtros.activo_usuarios);
 const fAulas    = ref(props.filtros.activo_aulas);
 const fHorarios = ref(props.filtros.activo_horarios);
+const fPeriodo  = ref(props.filtros.nombre_periodo ?? '');
+const fCarrera  = ref(props.filtros.id_carrera     ?? '');
 
 function aplicarFiltros() {
     router.get(route('propietario.reportes.index'), {
         activo_usuarios: fUsuarios.value !== 'todos' ? fUsuarios.value : undefined,
         activo_aulas:    fAulas.value    !== 'todos' ? fAulas.value    : undefined,
         activo_horarios: fHorarios.value !== 'todos' ? fHorarios.value : undefined,
+        nombre_periodo:  fPeriodo.value  || undefined,
+        id_carrera:      fCarrera.value  || undefined,
     }, { preserveState: true, preserveScroll: true, replace: true });
 }
 
-watch([fUsuarios, fAulas, fHorarios], aplicarFiltros);
+watch([fUsuarios, fAulas, fHorarios, fPeriodo, fCarrera], aplicarFiltros);
+
+const carreraSeleccionada = computed(() =>
+    props.carreras.find(c => c.id_carrera === props.filtros.id_carrera)
+);
+
+const hayFiltroActivo = computed(() => !!(fPeriodo.value || fCarrera.value));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function mesLabel(yyyymm) {
@@ -227,7 +239,7 @@ const totalInscripciones  = computed(() => props.administrativo.inscripcionesPor
         </template>
 
         <!-- Volver -->
-        <div class="mb-6">
+        <div class="mb-4">
             <Link :href="route('dashboard.propietario')"
                 class="inline-flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-70"
                 style="color: var(--text-secondary);">
@@ -235,10 +247,67 @@ const totalInscripciones  = computed(() => props.administrativo.inscripcionesPor
             </Link>
         </div>
 
+        <!-- ── Barra de filtros globales ── -->
+        <div class="rounded-xl px-5 py-3.5 mb-6 flex flex-wrap items-center gap-4"
+             style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+
+            <!-- Período -->
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-semibold shrink-0" style="color: var(--text-secondary);">Período</span>
+                <select v-model="fPeriodo"
+                        class="text-xs rounded-lg px-3 py-1.5 focus:outline-none"
+                        style="background-color: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color);">
+                    <option value="">Todos</option>
+                    <option v-for="p in periodos" :key="p.nombre" :value="p.nombre">{{ p.nombre }}</option>
+                </select>
+            </div>
+
+            <div class="w-px self-stretch" style="background-color: var(--border-color);"></div>
+
+            <!-- Carrera -->
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-semibold shrink-0" style="color: var(--text-secondary);">Carrera</span>
+                <select v-model="fCarrera"
+                        class="text-xs rounded-lg px-3 py-1.5 focus:outline-none"
+                        style="background-color: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color);">
+                    <option value="">Todas</option>
+                    <option v-for="c in carreras" :key="c.id_carrera" :value="c.id_carrera">{{ c.nombre }}</option>
+                </select>
+            </div>
+
+            <!-- Chips activos -->
+            <div class="flex flex-wrap gap-1.5 ml-1">
+                <span v-if="fPeriodo"
+                      class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium"
+                      style="background-color: color-mix(in srgb, var(--primary-color) 15%, transparent); color: var(--primary-color);">
+                    {{ fPeriodo }}
+                    <button @click="fPeriodo = ''" class="opacity-60 hover:opacity-100 leading-none">✕</button>
+                </span>
+                <span v-if="fCarrera && carreraSeleccionada"
+                      class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium"
+                      style="background-color: color-mix(in srgb, #10b981 15%, transparent); color: #10b981;">
+                    {{ carreraSeleccionada.nombre }}
+                    <button @click="fCarrera = ''" class="opacity-60 hover:opacity-100 leading-none">✕</button>
+                </span>
+            </div>
+
+            <span class="text-[11px] ml-auto shrink-0" style="color: var(--text-secondary);">
+                Afecta: aprobación · riesgo · inscripciones · carga horaria
+            </span>
+        </div>
+
+        <!-- Aviso de filtro activo -->
+        <div v-if="hayFiltroActivo"
+             class="rounded-xl px-4 py-3 mb-2 flex items-center gap-2 text-sm"
+             style="background-color: color-mix(in srgb,#6366f1 8%,transparent); border: 1px solid color-mix(in srgb,#6366f1 25%,transparent); color:#6366f1;">
+            <span>🔍</span>
+            <span>Mostrando solo los reportes que varían con el filtro activo.</span>
+        </div>
+
         <div class="space-y-10">
 
             <!-- ══ ADMINISTRATIVO ════════════════════════════════════════ -->
-            <section>
+            <section v-if="!hayFiltroActivo">
                 <p class="text-[11px] font-semibold uppercase tracking-widest mb-5"
                    style="color: var(--text-secondary);">Administrativo</p>
 
@@ -324,7 +393,9 @@ const totalInscripciones  = computed(() => props.administrativo.inscripcionesPor
                         <div class="flex items-center justify-between mb-4">
                             <div>
                                 <h3 class="text-sm font-semibold" style="color: var(--text-color);">Carga horaria</h3>
-                                <p class="text-[11px] mt-0.5" style="color: var(--text-secondary);">Grupos activos por profesor</p>
+                                <p class="text-[11px] mt-0.5" style="color: var(--text-secondary);">
+                                    {{ fPeriodo || 'Grupos activos' }} · por profesor
+                                </p>
                             </div>
                             <span class="text-[11px] px-2 py-0.5 rounded-full font-medium"
                                   style="background-color: rgba(16,185,129,0.15); color: #10b981;">grupos</span>
@@ -361,8 +432,8 @@ const totalInscripciones  = computed(() => props.administrativo.inscripcionesPor
                 <p class="text-[11px] font-semibold uppercase tracking-widest mb-5"
                    style="color: var(--text-secondary);">Académico</p>
 
-                <!-- Fila 1: Carreras + Materias + Horarios -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <!-- Fila 1: Carreras + Materias + Horarios — solo sin filtro -->
+                <div v-if="!hayFiltroActivo" class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 
                     <!-- Carreras -->
                     <div class="rounded-xl p-6" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
@@ -417,7 +488,7 @@ const totalInscripciones  = computed(() => props.administrativo.inscripcionesPor
                 </div>
 
                 <!-- Fila 2: Tasa aprobación + Ocupación grupos -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div :class="hayFiltroActivo ? 'mb-6' : 'grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6'">
 
                     <!-- Tasa de aprobación por materia -->
                     <div class="rounded-xl p-6" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
@@ -440,8 +511,8 @@ const totalInscripciones  = computed(() => props.administrativo.inscripcionesPor
                         </div>
                     </div>
 
-                    <!-- Ocupación de grupos por periodo -->
-                    <div class="rounded-xl p-6" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                    <!-- Ocupación de grupos por periodo (sin filtro activo) -->
+                    <div v-if="!hayFiltroActivo" class="rounded-xl p-6" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
                         <div class="flex items-center justify-between mb-4">
                             <div>
                                 <h3 class="text-sm font-semibold" style="color: var(--text-color);">Ocupación de grupos por periodo</h3>
@@ -489,7 +560,7 @@ const totalInscripciones  = computed(() => props.administrativo.inscripcionesPor
             </section>
 
             <!-- ══ FINANCIERO ═════════════════════════════════════════════ -->
-            <section>
+            <section v-if="!hayFiltroActivo">
                 <p class="text-[11px] font-semibold uppercase tracking-widest mb-5"
                    style="color: var(--text-secondary);">Financiero</p>
 
@@ -584,7 +655,7 @@ const totalInscripciones  = computed(() => props.administrativo.inscripcionesPor
             </section>
 
             <!-- ══ AUDITORÍA (solo propietario) ══════════════════════════ -->
-            <section v-if="esPropietario">
+            <section v-if="esPropietario && !hayFiltroActivo">
                 <p class="text-[11px] font-semibold uppercase tracking-widest mb-5"
                    style="color: var(--text-secondary);">Auditoría del Sistema</p>
 
