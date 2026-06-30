@@ -160,8 +160,8 @@ class PanelController extends Controller
         // Verificar que el grupo pertenece al profesor
         $grupo = DB::table('grupos')
             ->join('materias', 'grupos.id_materia', '=', 'materias.id_materia')
-            ->where('id_oferta', $idGrupo)
-            ->where('id_profesor', $profesor->id_profesor)
+            ->where('grupos.id_oferta', $idGrupo)
+            ->where('grupos.id_profesor', $profesor->id_profesor)
             ->select('grupos.*', 'materias.nombre as materia_nombre')
             ->first();
 
@@ -169,11 +169,19 @@ class PanelController extends Controller
             abort(403, 'Acceso denegado o grupo no encontrado.');
         }
 
+        // Todos los id_oferta del mismo grupo (mismo codigo_grupo + periodo),
+        // para cubrir grupos multi-horario donde cada día es una fila separada.
+        $todosLosIdOfertas = DB::table('grupos')
+            ->where('codigo_grupo', $grupo->codigo_grupo)
+            ->where('id_periodo',   $grupo->id_periodo)
+            ->where('id_profesor',  $profesor->id_profesor)
+            ->pluck('id_oferta');
+
         // Obtener estudiantes
         $estudiantes = DB::table('inscripciones')
             ->join('estudiantes', 'inscripciones.id_estudiante', '=', 'estudiantes.id_estudiante')
             ->join('usuarios', 'estudiantes.id_usuario', '=', 'usuarios.id_usuario')
-            ->where('inscripciones.id_oferta', $idGrupo)
+            ->whereIn('inscripciones.id_oferta', $todosLosIdOfertas)
             ->select(
                 'usuarios.id_usuario',
                 'usuarios.nombre',

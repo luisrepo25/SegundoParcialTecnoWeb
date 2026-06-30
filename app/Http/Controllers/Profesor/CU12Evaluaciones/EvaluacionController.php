@@ -32,7 +32,20 @@ class EvaluacionController extends Controller
         $this->verificarActaAbierta($request->id_inscripcion);
 
         foreach ($request->evaluaciones as $eval) {
-            if ($eval['calificacion'] === null || $eval['calificacion'] === '') continue;
+            $isEmpty = ($eval['calificacion'] === null || $eval['calificacion'] === '');
+
+            $existing = DB::table('evaluaciones')
+                ->where('id_inscripcion', $request->id_inscripcion)
+                ->where('tipo', $eval['tipo'])
+                ->first();
+
+            // Campo vacío → eliminar evaluación existente
+            if ($isEmpty) {
+                if ($existing) {
+                    DB::table('evaluaciones')->where('id_evaluacion', $existing->id_evaluacion)->delete();
+                }
+                continue;
+            }
 
             $porcentaje = self::PORCENTAJES[$eval['tipo']];
 
@@ -45,11 +58,6 @@ class EvaluacionController extends Controller
             if ($eval['tipo'] === 'otros' && !empty($eval['descripcion'])) {
                 $data['descripcion'] = $eval['descripcion'];
             }
-
-            $existing = DB::table('evaluaciones')
-                ->where('id_inscripcion', $request->id_inscripcion)
-                ->where('tipo', $eval['tipo'])
-                ->first();
 
             if ($existing) {
                 DB::table('evaluaciones')
@@ -96,11 +104,19 @@ class EvaluacionController extends Controller
 
         $descripcionExtra = $request->descripcion_extra ?? 'Nota Extra';
 
-        // Validar que todas las inscripciones pertenecen a esta oferta
+        // Todos los id_oferta del mismo grupo (multi-horario: un id_oferta por día).
+        $grupoBase = DB::table('grupos')->where('id_oferta', $request->id_oferta)->first();
+        if (!$grupoBase) abort(404, 'Grupo no encontrado.');
+        $todosLosIdOfertas = DB::table('grupos')
+            ->where('codigo_grupo', $grupoBase->codigo_grupo)
+            ->where('id_periodo',   $grupoBase->id_periodo)
+            ->pluck('id_oferta');
+
+        // Validar que todas las inscripciones pertenecen a alguna oferta de este grupo
         $idsInscripcion = array_column($request->notas, 'id_inscripcion');
         $pertenecen = DB::table('inscripciones')
             ->whereIn('id_inscripcion', $idsInscripcion)
-            ->where('id_oferta', $request->id_oferta)
+            ->whereIn('id_oferta', $todosLosIdOfertas)
             ->count();
         if ($pertenecen !== count($idsInscripcion)) {
             abort(403, 'Una o más inscripciones no pertenecen a este grupo.');
@@ -237,12 +253,16 @@ class EvaluacionController extends Controller
             ->where('id_inscripcion', $idInscripcion)
             ->get();
 
-        if ($evals->isEmpty()) return;
+        if ($evals->isEmpty()) {
+            DB::table('inscripciones')
+                ->where('id_inscripcion', $idInscripcion)
+                ->update(['calificacion_final' => null]);
+            return;
+        }
 
-        $totalPeso = $evals->sum('porcentaje');
-        $nota = $totalPeso > 0
-            ? $evals->sum(fn($e) => $e->calificacion * $e->porcentaje) / $totalPeso
-            : $evals->avg('calificacion');
+        // Divide sobre 100 (peso total), no sobre los pesos existentes.
+        // Así el final acumula: parcial1=100 → 25.00; parcial1+parcial2=100+80 → 45.00.
+        $nota = $evals->sum(fn($e) => $e->calificacion * $e->porcentaje) / 100;
 
         DB::table('inscripciones')
             ->where('id_inscripcion', $idInscripcion)
