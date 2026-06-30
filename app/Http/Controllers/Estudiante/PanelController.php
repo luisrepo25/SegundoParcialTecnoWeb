@@ -119,6 +119,7 @@ class PanelController extends Controller
         // Grupos disponibles — solo si hay ventana de inscripción abierta
         $gruposDisponibles  = [];
         $proximaMateriaInfo = null;
+        $materiaEnCursoInfo = null;
         $cronogramaInscripcion = null; // referencia final para la vista
 
         // Períodos de la carrera del estudiante con ventana de inscripción abierta.
@@ -153,7 +154,23 @@ class PanelController extends Controller
         $inscripcionesAbiertas = $idsPeriodoConInscripcionAbierta->isNotEmpty();
         $cronogramaInscripcion = $cronogramaInscripcionGlobal; // para vista (compat)
 
-        if ($carrera && $inscripcionesAbiertas) {
+        // Las materias son mensuales y secuenciales: si el estudiante ya tiene una
+        // inscripción 'activo' (materia en curso, aún no aprobada), no se le debe
+        // ofrecer ningún grupo nuevo hasta que la complete — coincide con el guard
+        // de inscribir().
+        $materiaEnCurso = DB::table('inscripciones as i')
+            ->join('grupos as g2',    'i.id_oferta',  '=', 'g2.id_oferta')
+            ->join('materias as m2',  'g2.id_materia', '=', 'm2.id_materia')
+            ->where('i.id_estudiante', $est->id_estudiante)
+            ->where('i.estado', 'activo')
+            ->select('m2.id_materia', 'm2.nombre', 'm2.codigo')
+            ->first();
+
+        if ($materiaEnCurso) {
+            $materiaEnCursoInfo = (array) $materiaEnCurso;
+        }
+
+        if ($carrera && $inscripcionesAbiertas && !$materiaEnCurso) {
             // ── Calcular la próxima materia del estudiante en su malla ────────
             $mallaOrdenada = DB::table('malla_curricular as mc')
                 ->leftJoin('niveles_carrera as n', 'mc.id_nivel', '=', 'n.id_nivel')
@@ -167,7 +184,7 @@ class PanelController extends Controller
             $materiasYaHechas = DB::table('inscripciones as i')
                 ->join('grupos as g2', 'i.id_oferta', '=', 'g2.id_oferta')
                 ->where('i.id_estudiante', $est->id_estudiante)
-                ->whereIn('i.estado', ['activo', 'aprobado'])
+                ->where('i.estado', 'aprobado')
                 ->pluck('g2.id_materia')
                 ->toArray();
 
@@ -299,11 +316,161 @@ class PanelController extends Controller
             'gruposDisponibles'      => $gruposDisponibles,
             'ofertaGeneral'          => $ofertaGeneral,
             'proximaMateria'         => $proximaMateriaInfo,
+            'materiaEnCurso'         => $materiaEnCursoInfo,
             'cronogramaInscripcion'  => $cronogramaInscripcion ? [
                 'nombre'      => $cronogramaInscripcion->nombre,
                 'fecha_inicio' => $cronogramaInscripcion->fecha_inicio,
                 'fecha_fin'    => $cronogramaInscripcion->fecha_fin,
             ] : null,
+        ]);
+    }
+
+    // ── Mi Malla Académica ──────────────────────────────────────────────────────
+    public function malla()
+    {
+        $userId = auth()->id();
+        $est    = DB::table('estudiantes')->where('id_usuario', $userId)->first();
+
+        if (!$est || !$est->id_carrera_actual) {
+            return Inertia::render('Estudiante/Malla', ['carrera' => null, 'niveles' => []]);
+        }
+
+        $carrera = DB::table('carreras')->where('id_carrera', $est->id_carrera_actual)->first();
+
+        $mallaRows = DB::table('malla_curricular as mc')
+            ->leftJoin('niveles_carrera as n', 'mc.id_nivel', '=', 'n.id_nivel')
+            ->join('materias as m', 'mc.id_materia', '=', 'm.id_materia')
+            ->where('mc.id_carrera', $est->id_carrera_actual)
+            ->where('mc.obligatoria', true)
+            ->select(
+                'm.id_materia', 'm.nombre as materia_nombre', 'm.codigo as materia_codigo',
+                'n.numero_nivel', 'n.nombre as nivel_nombre'
+            )
+            ->orderByRaw('COALESCE(n.numero_nivel, 0)')
+            ->orderByRaw('COALESCE(mc.orden_en_nivel, 0)')
+            ->get();
+
+        // Último intento por materia (más reciente primero → unique() se queda con ese)
+        $ultimoIntentoPorMateria = DB::table('inscripciones as i')
+            ->join('grupos as g', 'i.id_oferta', '=', 'g.id_oferta')
+            ->where('i.id_estudiante', $est->id_estudiante)
+            ->whereIn('i.estado', ['activo', 'aprobado', 'reprobado'])
+            ->select('g.id_materia', 'i.estado', 'i.calificacion_final', 'i.fecha_inscripcion', 'i.fecha_aprobacion')
+            ->orderByDesc('i.fecha_inscripcion')
+            ->get()
+            ->unique('id_materia')
+            ->keyBy('id_materia');
+
+        $niveles = [];
+        foreach ($mallaRows as $row) {
+            $key = $row->numero_nivel ?? 0;
+            if (!isset($niveles[$key])) {
+                $niveles[$key] = [
+                    'numero_nivel' => $row->numero_nivel,
+                    'nivel_nombre' => $row->nivel_nombre ?? ($row->numero_nivel ? "Nivel {$row->numero_nivel}" : 'Módulos'),
+                    'materias'     => [],
+                ];
+            }
+            $h = $ultimoIntentoPorMateria->get($row->id_materia);
+            $niveles[$key]['materias'][] = [
+                'id_materia'         => $row->id_materia,
+                'nombre'             => $row->materia_nombre,
+                'codigo'             => $row->materia_codigo,
+                'estado'             => $h ? $h->estado : 'pendiente', // activo | aprobado | reprobado | pendiente
+                'calificacion_final' => $h && $h->calificacion_final !== null ? (float) $h->calificacion_final : null,
+                'fecha'              => $h ? ($h->fecha_aprobacion ?? $h->fecha_inscripcion) : null,
+            ];
+        }
+
+        return Inertia::render('Estudiante/Malla', [
+            'carrera' => $carrera ? ['nombre' => $carrera->nombre, 'codigo' => $carrera->codigo] : null,
+            'niveles' => array_values($niveles),
+        ]);
+    }
+
+    // ── Historial de Notas ──────────────────────────────────────────────────────
+    public function notas()
+    {
+        $userId = auth()->id();
+        $est    = DB::table('estudiantes')->where('id_usuario', $userId)->first();
+
+        if (!$est) {
+            return Inertia::render('Estudiante/Notas', ['notas' => []]);
+        }
+
+        $notas = DB::table('inscripciones as i')
+            ->join('grupos as g',           'i.id_oferta',  '=', 'g.id_oferta')
+            ->join('materias as m',         'g.id_materia', '=', 'm.id_materia')
+            ->join('periodos_dictado as pd','g.id_periodo', '=', 'pd.id_periodo')
+            ->leftJoin('malla_curricular as mc', function ($join) use ($est) {
+                $join->on('m.id_materia', '=', 'mc.id_materia')
+                     ->where('mc.id_carrera', $est->id_carrera_actual);
+            })
+            ->leftJoin('niveles_carrera as n', 'mc.id_nivel', '=', 'n.id_nivel')
+            ->where('i.id_estudiante', $est->id_estudiante)
+            ->whereIn('i.estado', ['aprobado', 'reprobado'])
+            ->select(
+                'i.id_inscripcion', 'i.estado', 'i.calificacion_final', 'i.fecha_aprobacion', 'i.fecha_inscripcion',
+                'm.id_materia', 'm.nombre as materia_nombre', 'm.codigo as materia_codigo',
+                'pd.nombre as periodo_nombre',
+                'n.numero_nivel', 'n.nombre as nivel_nombre'
+            )
+            ->orderByDesc('i.fecha_aprobacion')
+            ->orderByDesc('i.fecha_inscripcion')
+            ->get()
+            ->map(fn($r) => (array) $r)
+            ->toArray();
+
+        return Inertia::render('Estudiante/Notas', ['notas' => $notas]);
+    }
+
+    // ── Historial de Pagos ──────────────────────────────────────────────────────
+    public function pagos()
+    {
+        $userId = auth()->id();
+        $est    = DB::table('estudiantes')->where('id_usuario', $userId)->first();
+
+        if (!$est) {
+            return Inertia::render('Estudiante/Pagos', ['matricula' => null, 'planCarrera' => null, 'pagosMateria' => []]);
+        }
+
+        $matricula = DB::table('matricula_unica')->where('id_estudiante', $est->id_estudiante)->first();
+
+        $planCarrera = DB::table('pago_carrera_completa')
+            ->where('id_estudiante', $est->id_estudiante)
+            ->orderByDesc('fecha_contrato')
+            ->first();
+
+        $pagosMateria = DB::table('pago_materia_suelta as pms')
+            ->join('inscripciones as i', 'pms.id_inscripcion', '=', 'i.id_inscripcion')
+            ->join('grupos as g',        'i.id_oferta',        '=', 'g.id_oferta')
+            ->join('materias as m',      'g.id_materia',       '=', 'm.id_materia')
+            ->where('i.id_estudiante', $est->id_estudiante)
+            ->select(
+                'pms.id_pago_materia', 'pms.monto_pagado', 'pms.fecha_pago', 'pms.estado',
+                'm.nombre as materia_nombre', 'm.codigo as materia_codigo'
+            )
+            ->orderByDesc('pms.fecha_pago')
+            ->get()
+            ->map(fn($r) => (array) $r)
+            ->toArray();
+
+        return Inertia::render('Estudiante/Pagos', [
+            'matricula' => $matricula ? [
+                'fecha_pago'   => $matricula->fecha_pago,
+                'monto_pagado' => (float) $matricula->monto_pagado,
+                'estado'       => $matricula->estado,
+                'comprobante'  => $matricula->comprobante,
+            ] : null,
+            'planCarrera' => $planCarrera ? [
+                'forma_pago'         => $planCarrera->forma_pago,
+                'monto_total'        => (float) $planCarrera->monto_total,
+                'monto_pagado'       => (float) ($planCarrera->monto_pagado ?? 0),
+                'estado'             => $planCarrera->estado,
+                'fecha_contrato'     => $planCarrera->fecha_contrato,
+                'materias_cubiertas' => $planCarrera->materias_cubiertas,
+            ] : null,
+            'pagosMateria' => $pagosMateria,
         ]);
     }
 

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Head, useForm, usePage } from '@inertiajs/vue3';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import EstudianteLayout from '@/Layouts/EstudianteLayout.vue';
 
 const props = defineProps({
     estudiante:             { type: Object, default: null },
@@ -12,6 +12,7 @@ const props = defineProps({
     gruposDisponibles:      { type: Array,  default: () => [] },
     ofertaGeneral:          { type: Array,  default: () => [] },
     proximaMateria:         { type: Object, default: null },
+    materiaEnCurso:         { type: Object, default: null },
     cronogramaInscripcion:  { type: Object, default: null },
 });
 
@@ -111,6 +112,7 @@ const ofertaAgrupada = computed(() => {
                 materia_nombre:  row.materia_nombre,
                 materia_codigo:  row.materia_codigo,
                 es_proxima:      props.proximaMateria?.id_materia === row.id_materia,
+                es_en_curso:     props.materiaEnCurso?.id_materia === row.id_materia,
                 grupos:          new Map(),
             });
         }
@@ -168,7 +170,7 @@ function elegirPlan(tipo) {
 
 <template>
     <Head title="Mi Panel" />
-    <AuthenticatedLayout>
+    <EstudianteLayout>
         <template #header>
             <span class="font-semibold text-lg" style="color: var(--text-color);">Mi Panel</span>
         </template>
@@ -453,23 +455,28 @@ function elegirPlan(tipo) {
                                 <div class="space-y-3">
                                     <div v-for="materia in nivel.materias" :key="materia.id_materia"
                                          class="rounded-xl overflow-hidden"
-                                         :style="materia.es_proxima
-                                            ? 'border: 2px solid #22c55e; background-color: color-mix(in srgb,#22c55e 5%,var(--card-bg));'
+                                         :style="(materia.es_proxima || materia.es_en_curso)
+                                            ? `border: 2px solid ${materia.es_en_curso ? '#f59e0b' : '#22c55e'}; background-color: color-mix(in srgb,${materia.es_en_curso ? '#f59e0b' : '#22c55e'} 5%,var(--card-bg));`
                                             : 'border: 1px solid var(--border-color); background-color: var(--card-bg);'">
 
                                         <!-- Header materia -->
                                         <div class="flex items-center gap-3 px-4 py-2.5 border-b"
-                                             :style="materia.es_proxima
-                                                ? 'border-color: #86efac; background-color: color-mix(in srgb,#22c55e 10%,transparent);'
+                                             :style="(materia.es_proxima || materia.es_en_curso)
+                                                ? `border-color: ${materia.es_en_curso ? '#fcd34d' : '#86efac'}; background-color: color-mix(in srgb,${materia.es_en_curso ? '#f59e0b' : '#22c55e'} 10%,transparent);`
                                                 : 'border-color: var(--border-color);'">
                                             <span class="font-mono text-xs font-semibold px-2 py-0.5 rounded"
                                                   style="background-color: color-mix(in srgb,var(--text-color) 8%,transparent); color: var(--text-secondary);">
                                                 {{ materia.materia_codigo }}
                                             </span>
-                                            <span class="font-semibold text-sm flex-1" :style="materia.es_proxima ? 'color:#15803d' : 'color:var(--text-color)'">
+                                            <span class="font-semibold text-sm flex-1" :style="materia.es_en_curso ? 'color:#92400e' : (materia.es_proxima ? 'color:#15803d' : 'color:var(--text-color)')">
                                                 {{ materia.materia_nombre }}
                                             </span>
-                                            <span v-if="materia.es_proxima"
+                                            <span v-if="materia.es_en_curso"
+                                                  class="px-2.5 py-0.5 rounded-full text-xs font-bold"
+                                                  style="background-color:#f59e0b; color:#fff;">
+                                                ⏳ En curso
+                                            </span>
+                                            <span v-else-if="materia.es_proxima"
                                                   class="px-2.5 py-0.5 rounded-full text-xs font-bold"
                                                   style="background-color:#22c55e; color:#fff;">
                                                 ← Tu próxima
@@ -515,8 +522,13 @@ function elegirPlan(tipo) {
                                                         <span class="text-xs font-normal" style="color: var(--text-secondary);">/ {{ grupo.vacantes_max }}</span>
                                                     </p>
                                                 </div>
-                                                <!-- Badge "tu próxima" — solo informativo -->
-                                                <span v-if="materia.es_proxima"
+                                                <!-- Badge informativo -->
+                                                <span v-if="materia.es_en_curso"
+                                                      class="shrink-0 text-xs px-2.5 py-1 rounded-lg font-semibold"
+                                                      style="background-color: color-mix(in srgb,#f59e0b 15%,transparent); color:#92400e; border:1px solid #fcd34d;">
+                                                    En curso
+                                                </span>
+                                                <span v-else-if="materia.es_proxima"
                                                       class="shrink-0 text-xs px-2.5 py-1 rounded-lg font-semibold"
                                                       style="background-color: color-mix(in srgb,#22c55e 15%,transparent); color:#15803d; border:1px solid #86efac;">
                                                     Tu próxima
@@ -549,8 +561,20 @@ function elegirPlan(tipo) {
                         <span>Período de inscripciones cerrado. Consulta el cronograma académico.</span>
                     </div>
 
+                    <!-- Banner: materia en curso (mensual, bloquea nuevas inscripciones) -->
+                    <div v-if="materiaEnCurso"
+                         class="rounded-xl px-4 py-3 mb-3 flex items-center gap-2 text-sm"
+                         style="background-color: color-mix(in srgb,#f59e0b 10%,transparent); border: 1px solid color-mix(in srgb,#f59e0b 30%,transparent); color:#92400e;">
+                        <span>⏳</span>
+                        <span>
+                            Tienes <strong>{{ materiaEnCurso.nombre }}</strong>
+                            <span class="opacity-70">({{ materiaEnCurso.codigo }})</span>
+                            en curso. Las materias son mensuales: debes completarla antes de poder inscribirte y pagar la siguiente.
+                        </span>
+                    </div>
+
                     <!-- Banner materia que le corresponde -->
-                    <div v-if="cronogramaInscripcion && proximaMateria"
+                    <div v-else-if="cronogramaInscripcion && proximaMateria"
                          class="rounded-xl px-4 py-3 mb-3 flex items-center gap-2 text-sm"
                          style="background-color: color-mix(in srgb,#6366f1 10%,transparent); border: 1px solid color-mix(in srgb,#6366f1 30%,transparent); color:#4338ca;">
                         <span>📚</span>
@@ -580,12 +604,14 @@ function elegirPlan(tipo) {
                          style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
                         <p class="text-4xl mb-3">📅</p>
                         <p class="font-medium" style="color: var(--text-color);">
-                            <template v-if="!cronogramaInscripcion">Las inscripciones están cerradas.</template>
+                            <template v-if="materiaEnCurso">Ya tienes <strong>{{ materiaEnCurso.nombre }}</strong> en curso este mes.</template>
+                            <template v-else-if="!cronogramaInscripcion">Las inscripciones están cerradas.</template>
                             <template v-else-if="!proximaMateria">Ya completaste todas las materias de la malla.</template>
                             <template v-else>No hay grupos disponibles para <strong>{{ proximaMateria.nombre }}</strong> en este período.</template>
                         </p>
                         <p class="text-sm mt-1" style="color: var(--text-secondary);">
-                            <template v-if="!cronogramaInscripcion">Consulta el cronograma académico para las próximas fechas.</template>
+                            <template v-if="materiaEnCurso">No se ofrecen nuevas materias hasta que la completes.</template>
+                            <template v-else-if="!cronogramaInscripcion">Consulta el cronograma académico para las próximas fechas.</template>
                             <template v-else-if="!proximaMateria">Consulta con la dirección para tu siguiente paso.</template>
                             <template v-else>El director aún no ha publicado grupos para esta materia.</template>
                         </p>
@@ -731,5 +757,5 @@ function elegirPlan(tipo) {
 
             </template>
         </div>
-    </AuthenticatedLayout>
+    </EstudianteLayout>
 </template>
