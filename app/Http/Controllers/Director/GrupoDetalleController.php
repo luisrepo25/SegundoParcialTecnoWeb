@@ -20,10 +20,17 @@ class GrupoDetalleController extends Controller
             abort(404, 'Grupo no encontrado.');
         }
 
+        // Todos los id_oferta del mismo grupo (mismo codigo_grupo + periodo),
+        // para cubrir grupos multi-horario donde cada día es una fila separada.
+        $todosLosIdOfertas = DB::table('grupos')
+            ->where('codigo_grupo', $grupo->codigo_grupo)
+            ->where('id_periodo',   $grupo->id_periodo)
+            ->pluck('id_oferta');
+
         $estudiantes = DB::table('inscripciones')
             ->join('estudiantes', 'inscripciones.id_estudiante', '=', 'estudiantes.id_estudiante')
             ->join('usuarios', 'estudiantes.id_usuario', '=', 'usuarios.id_usuario')
-            ->where('inscripciones.id_oferta', $idGrupo)
+            ->whereIn('inscripciones.id_oferta', $todosLosIdOfertas)
             ->select(
                 'usuarios.id_usuario',
                 'usuarios.nombre',

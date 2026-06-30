@@ -77,6 +77,8 @@ const estadoLabel = (estado) => {
         pendiente_matricula:  { label: 'Pend. matr.', color: '#f59e0b' },
         completado:           { label: 'Completado',  color: '#3b82f6' },
         abandonado:           { label: 'Abandonado',  color: '#ef4444' },
+        aprobado:             { label: 'Aprobado',    color: '#22c55e' },
+        reprobado:            { label: 'Reprobado',   color: '#ef4444' },
     };
     return m[estado] ?? { label: estado, color: '#6b7280' };
 };

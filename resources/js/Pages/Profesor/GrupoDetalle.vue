@@ -65,6 +65,9 @@ const totalCalificados = computed(() =>
 const totalAprobados = computed(() =>
     props.estudiantes.filter(e => e.calificacion_final !== null && e.calificacion_final >= 51).length
 );
+const totalReprobados = computed(() =>
+    props.estudiantes.filter(e => e.calificacion_final !== null && e.calificacion_final < 51).length
+);
 
 // ── Modal individual ──────────────────────────────────────────────────────────
 const modalEst   = ref(null);
@@ -91,14 +94,12 @@ function submitIndividual() {
 
     router.post(route('profesor.evaluaciones.store'), {
         id_inscripcion: modalEst.value.id_inscripcion,
-        evaluaciones: modalEst.value.evals
-            .filter(e => e.calificacion !== '')
-            .map(e => ({
-                tipo:         e.tipo,
-                calificacion: parseFloat(e.calificacion),
-                fecha:        e.fecha || props.hoy,
-                ...(e.tipo === 'otros' && { descripcion: nombreExtra.value }),
-            })),
+        evaluaciones: modalEst.value.evals.map(e => ({
+            tipo:         e.tipo,
+            calificacion: e.calificacion !== '' ? parseFloat(e.calificacion) : null,
+            fecha:        e.fecha || props.hoy,
+            ...(e.tipo === 'otros' && { descripcion: nombreExtra.value }),
+        })),
     }, {
         preserveScroll: true,
         onSuccess: () => { modalEst.value = null; },
@@ -214,6 +215,10 @@ function submitMasivo() {
                 <div class="rounded-xl px-4 py-3 text-center border" style="background-color:var(--card-bg);border-color:var(--border-color);min-width:80px;">
                     <p class="text-2xl font-bold" style="color:#10b981;">{{ totalAprobados }}</p>
                     <p class="text-xs mt-0.5" style="color:var(--text-secondary);">Aprobados</p>
+                </div>
+                <div class="rounded-xl px-4 py-3 text-center border" style="background-color:var(--card-bg);border-color:var(--border-color);min-width:80px;">
+                    <p class="text-2xl font-bold" style="color:#ef4444;">{{ totalReprobados }}</p>
+                    <p class="text-xs mt-0.5" style="color:var(--text-secondary);">Reprobados</p>
                 </div>
             </div>
 
