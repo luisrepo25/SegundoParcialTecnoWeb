@@ -36,7 +36,7 @@ class BusquedaController extends Controller
                 'tipo'     => 'Carrera',
                 'texto'    => $c->nombre,
                 'subtexto' => $c->codigo . ' · ' . ucfirst($c->tipo),
-                'url'      => '/director/carreras',
+                'url'      => route('director.carreras.index'),
             ];
         }
 
@@ -56,7 +56,7 @@ class BusquedaController extends Controller
                 'tipo'     => 'Materia',
                 'texto'    => $m->nombre,
                 'subtexto' => $m->codigo,
-                'url'      => '/director/materias',
+                'url'      => route('director.materias.index'),
             ];
         }
 
@@ -79,7 +79,7 @@ class BusquedaController extends Controller
                     'tipo'     => 'Estudiante',
                     'texto'    => $e->apellido . ', ' . $e->nombre,
                     'subtexto' => $e->legajo,
-                    'url'      => '/propietario/usuarios',
+                    'url'      => route('propietario.usuarios.index'),
                 ];
             }
         }
@@ -102,7 +102,7 @@ class BusquedaController extends Controller
                     'tipo'     => 'Profesor',
                     'texto'    => $p->apellido . ', ' . $p->nombre,
                     'subtexto' => $p->email,
-                    'url'      => '/propietario/usuarios',
+                    'url'      => route('propietario.usuarios.index'),
                 ];
             }
         }
