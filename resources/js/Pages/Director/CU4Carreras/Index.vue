@@ -1,5 +1,6 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import Pagination from '@/Components/Pagination.vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
 import { errCodigo, errTexto, errEntero, errDecimal } from '@/utils/validacion.js';
@@ -281,25 +282,7 @@ function formatCosto(val) {
                     </div>
 
                     <!-- Paginación -->
-                    <div v-if="carreras.last_page > 1" class="flex items-center justify-between gap-2 px-4 py-3 border-t"
-                         style="border-color: var(--border-color);">
-                        <p class="text-sm" style="color: var(--text-secondary);">
-                            Mostrando {{ carreras.from }}–{{ carreras.to }} de {{ carreras.total }} carreras
-                        </p>
-                        <div class="flex gap-1">
-                            <template v-for="link in carreras.links" :key="link.label">
-                                <button v-if="link.url" @click="router.get(link.url)"
-                                    class="px-3 py-1 rounded text-sm border transition"
-                                    :style="link.active
-                                        ? 'background-color: var(--primary-color); color: var(--primary-text); border-color: var(--primary-color);'
-                                        : 'background-color: var(--card-bg); color: var(--text-color); border-color: var(--border-color);'"
-                                    v-html="link.label" />
-                                <span v-else class="px-3 py-1 rounded text-sm border"
-                                    style="color: var(--text-secondary); border-color: var(--border-color); opacity: 0.5;"
-                                    v-html="link.label" />
-                            </template>
-                        </div>
-                    </div>
+                    <Pagination :data="carreras" label="carreras" />
                 </div>
             </div>
         </div>

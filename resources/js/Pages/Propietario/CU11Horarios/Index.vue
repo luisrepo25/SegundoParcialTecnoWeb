@@ -1,5 +1,6 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import Pagination from '@/Components/Pagination.vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
 import { errHora, errHoraFin } from '@/utils/validacion.js';
@@ -222,25 +223,7 @@ function formatHora(t) { return t ? t.substring(0, 5) : '—'; }
                     </div>
 
                     <!-- Paginación -->
-                    <div v-if="horarios.last_page > 1" class="flex items-center justify-between gap-2 px-4 py-3 border-t"
-                         style="border-color: var(--border-color);">
-                        <p class="text-sm" style="color: var(--text-secondary);">
-                            Mostrando {{ horarios.from }}–{{ horarios.to }} de {{ horarios.total }} horarios
-                        </p>
-                        <div class="flex gap-1">
-                            <template v-for="link in horarios.links" :key="link.label">
-                                <button v-if="link.url" @click="router.get(link.url)"
-                                    class="px-3 py-1 rounded text-sm border"
-                                    :style="link.active
-                                        ? 'background-color: var(--primary-color); color: var(--primary-text); border-color: var(--primary-color);'
-                                        : 'background-color: var(--card-bg); color: var(--text-color); border-color: var(--border-color);'"
-                                    v-html="link.label" />
-                                <span v-else class="px-3 py-1 rounded text-sm border"
-                                    style="color: var(--text-secondary); border-color: var(--border-color); opacity: 0.5;"
-                                    v-html="link.label" />
-                            </template>
-                        </div>
-                    </div>
+                    <Pagination :data="horarios" label="horarios" />
                 </div>
             </div>
         </div>
