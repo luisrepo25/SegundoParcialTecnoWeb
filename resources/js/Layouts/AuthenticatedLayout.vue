@@ -6,6 +6,7 @@ import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 import ThemeBar from '@/Components/ThemeBar.vue';
+import PageFooter from '@/Components/PageFooter.vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import { useTheme } from '@/Composables/useTheme';
 
@@ -143,6 +144,8 @@ const roleInfo = computed(() => roleLabels[userRole.value] ?? { label: 'Panel', 
             <main>
                 <slot />
             </main>
+
+            <PageFooter />
         </div>
     </div>
 </template>

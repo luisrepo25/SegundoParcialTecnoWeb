@@ -135,17 +135,6 @@ class ReporteController extends Controller
             ])
             ->values();
 
-        // Auditoría (solo propietario)
-        $auditoria = [];
-        if ($esPropietario) {
-            $auditoria = DB::table('seguimiento_log as sl')
-                ->join('usuarios as u', 'sl.id_usuario', '=', 'u.id_usuario')
-                ->selectRaw("sl.id_log, sl.accion, sl.descripcion, sl.ip_origen, sl.fecha_hora, u.nombre || ' ' || u.apellido as usuario_nombre")
-                ->orderBy('sl.fecha_hora', 'desc')
-                ->limit(50)
-                ->get()
-                ->toArray();
-        }
 
         // ── ACADÉMICO ─────────────────────────────────────────────────────────
 
@@ -282,7 +271,6 @@ class ReporteController extends Controller
                 'inscripcionesPorCarrera' => $inscripcionesPorCarrera,
                 'cargaHoraria'            => $cargaHoraria,
                 'disponibilidadAulas'     => $disponibilidadAulas,
-                'auditoria'               => $auditoria,
             ],
             'academico' => [
                 'carrerasActivas'    => Carrera::whereRaw('activo IS TRUE')->count(),

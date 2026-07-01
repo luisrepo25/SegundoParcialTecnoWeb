@@ -4,9 +4,10 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 
 const props = defineProps({
-    logs:     Object,
-    acciones: Array,
-    filtros:  Object,
+    logs:               Object,
+    acciones:           Array,
+    filtros:            Object,
+    recursosAccedidos:  Array,
 });
 
 // ── Filtros reactivos ──────────────────────────────────────────────────────────
@@ -15,12 +16,16 @@ const accion      = ref(props.filtros?.accion      ?? '');
 const fechaDesde  = ref(props.filtros?.fecha_desde ?? '');
 const fechaHasta  = ref(props.filtros?.fecha_hasta ?? '');
 
-let buscarTimeout = null;
-watch(buscar, () => {
-    clearTimeout(buscarTimeout);
-    buscarTimeout = setTimeout(aplicarFiltros, 400);
-});
-watch([accion, fechaDesde, fechaHasta], aplicarFiltros);
+let debounceTimer = null;
+function debounced(ms = 700) {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(aplicarFiltros, ms);
+}
+
+watch(buscar,    () => debounced(600));
+watch(accion,    () => debounced(300));
+watch(fechaDesde, () => debounced(800));
+watch(fechaHasta, () => debounced(800));
 
 function aplicarFiltros() {
     router.get(route('propietario.bitacora.index'), {
@@ -69,6 +74,8 @@ function accionBadgeStyle(accion) {
         return 'background: rgba(245,158,11,0.18); color: #f59e0b;';
     if (a.includes('elimin') || a.includes('destroy') || a.includes('borra'))
         return 'background: rgba(239,68,68,0.18); color: #f87171;';
+    if (a === 'login_fallido')
+        return 'background: rgba(239,68,68,0.18); color: #f87171;';
     if (a.includes('login') || a.includes('logout') || a.includes('acceso') || a.includes('sesion'))
         return 'background: rgba(99,102,241,0.18); color: #818cf8;';
     if (a.includes('desactiv') || a.includes('bloqueo') || a.includes('toggle'))
@@ -108,6 +115,40 @@ const hayFiltro = () => buscar.value || accion.value || fechaDesde.value || fech
                         Registro cronológico de todas las acciones realizadas por los usuarios del sistema.
                         Solo el <strong style="color: var(--text-color);">Propietario</strong> puede consultar esta bitácora.
                     </p>
+                </div>
+
+                <!-- Recursos más accedidos -->
+                <div v-if="recursosAccedidos && recursosAccedidos.length"
+                     class="mb-5 rounded-xl px-5 py-4"
+                     style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                    <h3 class="text-sm font-semibold mb-3" style="color: var(--text-color);">
+                        Páginas más visitadas
+                    </h3>
+                    <div class="flex flex-col gap-1.5">
+                        <div v-for="(rec, i) in recursosAccedidos" :key="rec.pagina"
+                             class="flex items-center gap-3">
+                            <!-- Posición -->
+                            <span class="text-xs font-mono w-5 text-right shrink-0" style="color: var(--text-secondary);">
+                                {{ i + 1 }}.
+                            </span>
+                            <!-- Barra de progreso relativa -->
+                            <div class="flex-1 rounded-full overflow-hidden h-1.5"
+                                 style="background-color: color-mix(in srgb, var(--primary-color) 12%, transparent);">
+                                <div class="h-full rounded-full"
+                                     style="background-color: var(--primary-color);"
+                                     :style="{ width: Math.round((rec.visitas / recursosAccedidos[0].visitas) * 100) + '%' }">
+                                </div>
+                            </div>
+                            <!-- Nombre de ruta -->
+                            <span class="text-xs font-mono truncate max-w-[220px]" style="color: var(--text-color);">
+                                {{ rec.pagina }}
+                            </span>
+                            <!-- Contador -->
+                            <span class="text-xs font-semibold shrink-0" style="color: var(--primary-color);">
+                                {{ rec.visitas.toLocaleString('es-BO') }}
+                            </span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Barra de filtros -->
@@ -307,6 +348,16 @@ const hayFiltro = () => buscar.value || accion.value || fechaDesde.value || fech
 .badge-green  { background: rgba(16,185,129,0.2);  color: #34d399; }
 .badge-yellow { background: rgba(245,158,11,0.2);  color: #fbbf24; }
 .badge-gray   { background: rgba(107,114,128,0.2); color: #9ca3af; }
+
+/* Icono del calendario visible en temas oscuros */
+input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+    cursor: pointer;
+    opacity: 0.8;
+}
+input[type="date"] {
+    color-scheme: dark;
+}
 
 /* Texto recortado a 2 líneas */
 .line-clamp-2 {

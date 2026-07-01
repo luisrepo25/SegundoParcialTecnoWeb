@@ -42,6 +42,7 @@ class HandleInertiaRequests extends Middleware
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
             ],
+            'visitas_pagina' => $request->attributes->get('visitas_pagina', 0),
         ];
     }
 

@@ -124,6 +124,10 @@ const navActive = (names) => names.some(n => route().current(n));
             <div class="footer-bottom">
                 <span class="footer-cr">© {{ new Date().getFullYear() }} Instituto San Pablo del Oriente — Sistema de Gestión Académica</span>
                 <span class="footer-cr" style="font-style:italic;">Todos los derechos reservados</span>
+                <span class="footer-cr">
+                    Visitas a esta página:
+                    <strong style="color: var(--primary-color);">{{ ($page.props.visitas_pagina ?? 0).toLocaleString('es-BO') }}</strong>
+                </span>
             </div>
         </footer>
     </div>

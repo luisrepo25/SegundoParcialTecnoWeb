@@ -33,7 +33,7 @@ const miniStats = computed(() => [
 ]);
 
 const accesosRapidos = [
-    { label: 'Reportes y Estadísticas', desc: 'Financiero, académico y auditoría',   ruta: 'propietario.reportes.index'   },
+    { label: 'Reportes y Estadísticas', desc: 'Financiero y académico',              ruta: 'propietario.reportes.index'   },
     { label: 'Seguimiento Académico',   desc: 'Historial y progreso de estudiantes', ruta: 'propietario.seguimiento.index' },
     { label: 'Caja y Pagos',            desc: 'Matrículas, cuotas y cobros',         ruta: 'secretaria.pagos.index'       },
     { label: 'Gestión de Usuarios',     desc: 'Crear, editar y gestionar cuentas',   ruta: 'propietario.usuarios.index'   },

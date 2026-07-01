@@ -27,14 +27,14 @@ class BitacoraController extends Controller
             ->pluck('accion');
 
         $query = DB::table('seguimiento_log as sl')
-            ->join('usuarios as u', 'sl.id_usuario', '=', 'u.id_usuario')
+            ->leftJoin('usuarios as u', 'sl.id_usuario', '=', 'u.id_usuario')
             ->select(
                 'sl.id_log',
                 'sl.accion',
                 'sl.descripcion',
                 'sl.ip_origen',
                 'sl.fecha_hora',
-                DB::raw("u.nombre || ' ' || u.apellido AS usuario_nombre"),
+                DB::raw("COALESCE(u.nombre || ' ' || u.apellido, '(Desconocido)') AS usuario_nombre"),
                 'u.nombre   AS usuario_nombre_solo',
                 'u.apellido AS usuario_apellido',
                 'u.foto_perfil',
@@ -72,10 +72,16 @@ class BitacoraController extends Controller
             ->paginate(25)
             ->withQueryString();
 
+        $recursosAccedidos = DB::table('page_views')
+            ->orderByDesc('visitas')
+            ->limit(10)
+            ->get(['pagina', 'visitas']);
+
         return Inertia::render('Propietario/CU15Bitacora/Index', [
-            'logs'    => $logs,
-            'acciones'=> $acciones,
-            'filtros' => $filtros,
+            'logs'              => $logs,
+            'acciones'          => $acciones,
+            'filtros'           => $filtros,
+            'recursosAccedidos' => $recursosAccedidos,
         ]);
     }
 }

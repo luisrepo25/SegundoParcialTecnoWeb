@@ -45,6 +45,9 @@ Route::get('/dashboard', function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
+    // ── Búsqueda global del encabezado ────────────────────────────────────────
+    Route::get('/buscar', [\App\Http\Controllers\BusquedaController::class, 'buscar'])->name('buscar');
+
     // ── Panel Propietario ──────────────────────────────────────────────────────
     Route::get('/panel/propietario', function () {
         return Inertia::render('Dashboard/Propietario', [

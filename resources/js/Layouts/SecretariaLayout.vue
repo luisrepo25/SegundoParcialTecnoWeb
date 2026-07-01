@@ -3,6 +3,8 @@ import { ref, computed } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import InstituteLogo from '@/Components/InstituteLogo.vue';
 import ThemeBar from '@/Components/ThemeBar.vue';
+import PageFooter from '@/Components/PageFooter.vue';
+import HeaderSearch from '@/Components/HeaderSearch.vue';
 
 const page = usePage();
 const user = computed(() => page.props.auth.user);
@@ -175,22 +177,16 @@ const showUserMenu = ref(false);
         <!-- CONTENIDO PRINCIPAL -->
         <div class="flex-1 flex flex-col min-w-0 overflow-hidden relative">
             
-            <!-- Top Bar del contenido (Fondo blanco/tarjeta para separar del fondo principal) -->
+            <!-- Top Bar del contenido -->
             <header class="h-16 flex items-center justify-between px-6 shrink-0 z-10 border-b shadow-sm" style="background-color: var(--card-bg); border-color: var(--border-color);">
-                <div class="flex items-center gap-4 w-full">
-                    <!-- Botón Hamburger para Móvil -->
-                    <button @click="showMobileMenu = true" class="lg:hidden text-sm font-medium tracking-wide" style="color: var(--text-secondary);">
-                        MENÚ
-                    </button>
-                    
-                    <div class="flex-1 min-w-0 truncate pr-4">
-                        <slot name="header">
-                            <!-- Slot header para el título -->
-                        </slot>
+                <div class="flex items-center gap-3 flex-1 min-w-0">
+                    <button @click="showMobileMenu = true" class="lg:hidden text-sm font-medium tracking-wide shrink-0" style="color: var(--text-secondary);">MENÚ</button>
+                    <div class="hidden lg:block shrink-0 min-w-0 max-w-[180px] truncate">
+                        <slot name="header" />
                     </div>
+                    <HeaderSearch />
                 </div>
-
-                <div class="flex items-center gap-4 pl-4 border-l" style="border-color: var(--border-color);">
+                <div class="flex items-center gap-4 pl-4 border-l shrink-0" style="border-color: var(--border-color);">
                     <ThemeBar />
                 </div>
             </header>
@@ -200,6 +196,7 @@ const showUserMenu = ref(false);
                 <div class="mx-auto max-w-6xl">
                     <slot />
                 </div>
+                <PageFooter />
             </main>
         </div>
     </div>

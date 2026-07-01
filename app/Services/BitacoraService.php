@@ -24,15 +24,10 @@ class BitacoraService
     public static function registrar(string $accion, string $descripcion, ?int $idUsuario = null): void
     {
         try {
-            $uid = $idUsuario ?? Auth::id();
-
-            // Si no hay usuario (logout ya cerró sesión), intentar recuperar del request
-            if (!$uid) {
-                return;
-            }
+            $uid = $idUsuario ?? Auth::id() ?? null;
 
             DB::table('seguimiento_log')->insert([
-                'id_usuario'  => $uid,
+                'id_usuario'  => $uid ?: null,
                 'accion'      => strtoupper($accion),
                 'descripcion' => $descripcion,
                 'ip_origen'   => Request::ip(),

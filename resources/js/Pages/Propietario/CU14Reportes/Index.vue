@@ -680,52 +680,6 @@ const totalInscripciones  = computed(() => props.administrativo.inscripcionesPor
 
             </section>
 
-            <!-- ══ AUDITORÍA (solo propietario) ══════════════════════════ -->
-            <section v-if="esPropietario && !hayFiltroActivo">
-                <p class="text-[11px] font-semibold uppercase tracking-widest mb-5"
-                   style="color: var(--text-secondary);">Auditoría del Sistema</p>
-
-                <div class="rounded-xl overflow-hidden" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
-
-                    <div v-if="administrativo.auditoria && administrativo.auditoria.length" class="overflow-x-auto">
-                        <table class="w-full text-xs">
-                            <thead>
-                                <tr style="border-bottom: 1px solid var(--border-color);">
-                                    <th class="text-left px-4 py-3 font-semibold whitespace-nowrap" style="color: var(--text-secondary);">Fecha / Hora</th>
-                                    <th class="text-left px-4 py-3 font-semibold whitespace-nowrap" style="color: var(--text-secondary);">Usuario</th>
-                                    <th class="text-left px-4 py-3 font-semibold whitespace-nowrap" style="color: var(--text-secondary);">Acción</th>
-                                    <th class="text-left px-4 py-3 font-semibold" style="color: var(--text-secondary);">Descripción</th>
-                                    <th class="text-left px-4 py-3 font-semibold whitespace-nowrap" style="color: var(--text-secondary);">IP</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="log in administrativo.auditoria" :key="log.id_log"
-                                    style="border-bottom: 1px solid var(--border-color);"
-                                    class="transition-colors hover:bg-black/5">
-                                    <td class="px-4 py-2.5 whitespace-nowrap font-mono" style="color: var(--text-secondary);">
-                                        {{ log.fecha_hora ? new Date(log.fecha_hora).toLocaleString('es-BO') : '—' }}
-                                    </td>
-                                    <td class="px-4 py-2.5 whitespace-nowrap" style="color: var(--text-color);">{{ log.usuario_nombre }}</td>
-                                    <td class="px-4 py-2.5 whitespace-nowrap">
-                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium"
-                                              style="background-color: color-mix(in srgb, var(--primary-color) 12%, transparent); color: var(--primary-color);">
-                                            {{ log.accion }}
-                                        </span>
-                                    </td>
-                                    <td class="px-4 py-2.5 max-w-xs truncate" style="color: var(--text-color);">{{ log.descripcion }}</td>
-                                    <td class="px-4 py-2.5 font-mono whitespace-nowrap" style="color: var(--text-secondary);">{{ log.ip_origen || '—' }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div v-else class="flex flex-col items-center justify-center py-12 text-center">
-                        <p class="text-sm font-medium" style="color: var(--text-secondary);">Sin registros de auditoría</p>
-                        <p class="text-xs mt-1" style="color: var(--text-secondary);">La tabla seguimiento_log está vacía</p>
-                    </div>
-
-                </div>
-            </section>
 
         </div>
     </AdminLayout>

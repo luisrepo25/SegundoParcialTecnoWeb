@@ -2,10 +2,12 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Services\BitacoraService;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -46,6 +48,14 @@ class LoginRequest extends FormRequest
 
         if (! $token) {
             RateLimiter::hit($this->throttleKey());
+
+            $email   = $this->input('email');
+            $usuario = DB::table('usuarios')->where('email', $email)->first();
+            BitacoraService::registrar(
+                'LOGIN_FALLIDO',
+                "Intento fallido de inicio de sesión para: {$email}",
+                $usuario?->id_usuario
+            );
 
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
