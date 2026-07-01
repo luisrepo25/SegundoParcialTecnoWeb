@@ -206,7 +206,7 @@ class ReporteController extends Controller
 
         $ocupacionGrupos = DB::table('grupos as g')
             ->join('periodos_dictado as p', 'g.id_periodo', '=', 'p.id_periodo')
-            ->selectRaw("p.nombre as label, SUM(g.vacantes_max) as capacidad, SUM((SELECT COUNT(*) FROM inscripciones ii WHERE ii.id_oferta = g.id_oferta AND ii.estado != 'retirado' AND ii.fecha_inscripcion::date >= COALESCE(p.fecha_inicio_inscripcion, '{$ventanaInscripcionDesde}'::date))) as ocupadas")
+            ->selectRaw("p.nombre as label, SUM(g.vacantes_max) as capacidad, SUM((SELECT COUNT(*) FROM inscripciones ii WHERE ii.id_oferta = g.id_oferta AND ii.estado != 'retirado' AND (ii.estado IN ('activo','pendiente_matricula') OR ii.fecha_inscripcion::date >= COALESCE(p.fecha_inicio_inscripcion, '{$ventanaInscripcionDesde}'::date)))) as ocupadas")
             ->groupBy('p.id_periodo', 'p.nombre', 'p.fecha_inicio')
             ->orderBy('p.fecha_inicio', 'desc')
             ->limit(6)

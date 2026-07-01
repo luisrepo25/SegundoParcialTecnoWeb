@@ -334,7 +334,10 @@ class PanelController extends Controller
         $ventanaInscripcionDesde = $cronogramaInscripcionGlobal
             ? now()->parse($cronogramaInscripcionGlobal->fecha_inicio)->toDateString()
             : '1900-01-01';
-        $sqlOcupadasGrupo = "(SELECT COUNT(*) FROM inscripciones ii WHERE ii.id_oferta = g.id_oferta AND ii.estado != 'retirado' AND ii.fecha_inscripcion::date >= COALESCE(pd.fecha_inicio_inscripcion, '{$ventanaInscripcionDesde}'::date))";
+        // Cupos ocupados = estudiantes activos/pendientes (sin importar cuándo inscribieron,
+        // siguen ocupando el cupo) MÁS quienes se inscribieron en esta ventana aunque ya
+        // estén calificados (el cupo no se libera hasta que cierre la convocatoria).
+        $sqlOcupadasGrupo = "(SELECT COUNT(*) FROM inscripciones ii WHERE ii.id_oferta = g.id_oferta AND ii.estado != 'retirado' AND (ii.estado IN ('activo','pendiente_matricula') OR ii.fecha_inscripcion::date >= COALESCE(pd.fecha_inicio_inscripcion, '{$ventanaInscripcionDesde}'::date)))";
 
         // Períodos de la carrera del estudiante con ventana de inscripción abierta.
         // Lógica: si el período tiene fecha_inicio_inscripcion → usa esas fechas propias
@@ -804,7 +807,10 @@ class PanelController extends Controller
         $ocupadasActuales = DB::table('inscripciones')
             ->where('id_oferta', $idOferta)
             ->where('estado', '!=', 'retirado')
-            ->whereRaw('fecha_inscripcion::date >= ?', [$ventanaInscripcionDesde])
+            ->where(function ($q) use ($ventanaInscripcionDesde) {
+                $q->whereIn('estado', ['activo', 'pendiente_matricula'])
+                  ->orWhereRaw('fecha_inscripcion::date >= ?', [$ventanaInscripcionDesde]);
+            })
             ->count();
 
         if (($grupo->vacantes_max - $ocupadasActuales) <= 0) {

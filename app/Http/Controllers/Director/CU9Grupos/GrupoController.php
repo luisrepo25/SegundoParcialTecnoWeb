@@ -25,7 +25,7 @@ class GrupoController extends Controller
         $ventanaInscripcionDesde = $cronogramaInscripcionGlobal
             ? now()->parse($cronogramaInscripcionGlobal->fecha_inicio)->toDateString()
             : '1900-01-01';
-        $sqlOcupadasGrupo = "(SELECT COUNT(*) FROM inscripciones ii WHERE ii.id_oferta = g.id_oferta AND ii.estado != 'retirado' AND ii.fecha_inscripcion::date >= COALESCE(pd.fecha_inicio_inscripcion, '{$ventanaInscripcionDesde}'::date))";
+        $sqlOcupadasGrupo = "(SELECT COUNT(*) FROM inscripciones ii WHERE ii.id_oferta = g.id_oferta AND ii.estado != 'retirado' AND (ii.estado IN ('activo','pendiente_matricula') OR ii.fecha_inscripcion::date >= COALESCE(pd.fecha_inicio_inscripcion, '{$ventanaInscripcionDesde}'::date)))";
 
         // ── Todos los grupos con sus relaciones ──────────────────────────────
         $gruposRaw = DB::table('grupos as g')
@@ -351,7 +351,10 @@ class GrupoController extends Controller
         $maxOcupadas = DB::table('inscripciones')
             ->whereIn('id_oferta', $idsHermanos)
             ->where('estado', '!=', 'retirado')
-            ->whereRaw('fecha_inscripcion::date >= ?', [$ventanaInscripcionDesde])
+            ->where(function ($q) use ($ventanaInscripcionDesde) {
+                $q->whereIn('estado', ['activo', 'pendiente_matricula'])
+                  ->orWhereRaw('fecha_inscripcion::date >= ?', [$ventanaInscripcionDesde]);
+            })
             ->groupBy('id_oferta')
             ->select(DB::raw('COUNT(*) as c'))
             ->get()
@@ -656,7 +659,7 @@ class GrupoController extends Controller
         $ventanaInscripcionDesde = $cronogramaInscripcionGlobal
             ? now()->parse($cronogramaInscripcionGlobal->fecha_inicio)->toDateString()
             : '1900-01-01';
-        $sqlOcupadasGrupo = "(SELECT COUNT(*) FROM inscripciones ii WHERE ii.id_oferta = g.id_oferta AND ii.estado != 'retirado' AND ii.fecha_inscripcion::date >= COALESCE(pd.fecha_inicio_inscripcion, '{$ventanaInscripcionDesde}'::date))";
+        $sqlOcupadasGrupo = "(SELECT COUNT(*) FROM inscripciones ii WHERE ii.id_oferta = g.id_oferta AND ii.estado != 'retirado' AND (ii.estado IN ('activo','pendiente_matricula') OR ii.fecha_inscripcion::date >= COALESCE(pd.fecha_inicio_inscripcion, '{$ventanaInscripcionDesde}'::date)))";
 
         $grupo = DB::table('grupos as g')
             ->join('materias as m',         'g.id_materia',  '=', 'm.id_materia')
