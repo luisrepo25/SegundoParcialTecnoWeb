@@ -221,6 +221,7 @@ function toggleActivo(u) {
 
                 <!-- Tabla -->
                 <div class="overflow-hidden rounded-xl shadow" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                    <div class="overflow-x-auto">
                     <table class="min-w-full divide-y" style="border-color: var(--border-color);">
                         <thead>
                             <tr style="background-color: var(--bg-color);">
@@ -276,6 +277,7 @@ function toggleActivo(u) {
                             </tr>
                         </tbody>
                     </table>
+                    </div>
 
                     <!-- Paginación -->
                     <div v-if="usuarios.last_page > 1" class="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-3 border-t"

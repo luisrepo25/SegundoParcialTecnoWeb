@@ -166,6 +166,7 @@ function formatHora(t) { return t ? t.substring(0, 5) : '—'; }
 
                 <!-- Tabla -->
                 <div class="overflow-hidden rounded-xl shadow" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                    <div class="overflow-x-auto">
                     <table class="min-w-full">
                         <thead>
                             <tr style="background-color: var(--bg-color);">
@@ -218,6 +219,7 @@ function formatHora(t) { return t ? t.substring(0, 5) : '—'; }
                             </tr>
                         </tbody>
                     </table>
+                    </div>
 
                     <!-- Paginación -->
                     <div v-if="horarios.last_page > 1" class="flex items-center justify-between gap-2 px-4 py-3 border-t"

@@ -1,18 +1,16 @@
 <script setup>
 import { Link, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
-import { useTheme } from '@/Composables/useTheme';
-
-const { theme, setTheme, changeFontScale } = useTheme();
-
-const toggleDayNight = () => setTheme(theme.value === 'youth' ? 'adults' : 'youth');
-const esModoNoche    = computed(() => theme.value === 'youth');
+import { ref, computed } from 'vue';
+import ThemeBar from '@/Components/ThemeBar.vue';
 
 const sitio = computed(() => usePage().props.sitio ?? {});
 const logoUrl = computed(() => sitio.value.logo_url ?? '/images/logo.png');
 const nombre  = computed(() => sitio.value.nombre_institucion ?? 'Instituto San Pablo');
 
 const navActive = (names) => names.some(n => route().current(n));
+
+const showMobileNav = ref(false);
+function cerrarMobile() { showMobileNav.value = false; }
 </script>
 
 <template>
@@ -20,34 +18,12 @@ const navActive = (names) => names.some(n => route().current(n));
 
         <!-- ══ BARRA ACCESIBILIDAD ══ -->
         <div class="access-bar">
-            <div class="age-group">
-                <button :class="['age-btn', theme === 'adults' ? 'active' : '']"
-                        @click="setTheme('adults')">Adultos</button>
-                <button :class="['age-btn', theme === 'youth'  ? 'active' : '']"
-                        @click="setTheme('youth')">Jóvenes</button>
-                <button :class="['age-btn', theme === 'kids'   ? 'active' : '']"
-                        @click="setTheme('kids')">Niños</button>
-            </div>
-            <div class="acc-sep"></div>
-            <div class="font-group">
-                <button class="font-btn" @click="changeFontScale('decrease')">A−</button>
-                <button class="font-btn" @click="changeFontScale('reset')">A</button>
-                <button class="font-btn" @click="changeFontScale('increase')">A+</button>
-            </div>
-            <div class="acc-sep"></div>
-            <button class="day-night-btn" @click="toggleDayNight" :title="esModoNoche ? 'Modo día' : 'Modo noche'">
-                <svg v-if="esModoNoche" xmlns="http://www.w3.org/2000/svg" class="day-night-icon" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
-                </svg>
-                <svg v-else xmlns="http://www.w3.org/2000/svg" class="day-night-icon" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
-                </svg>
-            </button>
+            <ThemeBar />
         </div>
 
         <!-- ══ NAVBAR ══ -->
         <nav class="navbar">
-            <Link :href="route('oferta.index')" class="logo">
+            <Link :href="route('oferta.index')" class="logo" @click="cerrarMobile">
                 <div class="logo-shield">
                     <img :src="logoUrl" :alt="'Escudo ' + nombre"
                          @error="$event.target.style.display='none'; $event.target.nextElementSibling.style.display='flex'">
@@ -61,14 +37,34 @@ const navActive = (names) => names.some(n => route().current(n));
                 </div>
             </Link>
 
-            <div class="nav-links">
+            <!-- Nav desktop -->
+            <div class="nav-links nav-links-desktop">
                 <Link :href="route('oferta.index')" :class="['nav-link', navActive(['oferta.index']) ? 'active' : '']">Inicio</Link>
                 <Link :href="route('oferta.carreras')" :class="['nav-link', navActive(['oferta.carreras']) ? 'active' : '']">Carreras</Link>
                 <Link :href="route('oferta.malla')" :class="['nav-link', navActive(['oferta.malla', 'oferta.show']) ? 'active' : '']">Malla Curricular</Link>
             </div>
 
-            <Link :href="route('login')" class="nav-login">Iniciar sesión →</Link>
+            <div class="nav-right">
+                <Link :href="route('login')" class="nav-login">Iniciar sesión →</Link>
+                <!-- Hamburger -->
+                <button class="nav-hamburger" @click="showMobileNav = !showMobileNav" :aria-expanded="showMobileNav">
+                    <svg v-if="!showMobileNav" xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                    <svg v-else xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
         </nav>
+
+        <!-- ══ MENÚ MÓVIL ══ -->
+        <div v-if="showMobileNav" class="mobile-menu">
+            <Link :href="route('oferta.index')" :class="['mobile-link', navActive(['oferta.index']) ? 'active' : '']" @click="cerrarMobile">Inicio</Link>
+            <Link :href="route('oferta.carreras')" :class="['mobile-link', navActive(['oferta.carreras']) ? 'active' : '']" @click="cerrarMobile">Carreras</Link>
+            <Link :href="route('oferta.malla')" :class="['mobile-link', navActive(['oferta.malla', 'oferta.show']) ? 'active' : '']" @click="cerrarMobile">Malla Curricular</Link>
+            <Link :href="route('login')" class="mobile-link mobile-link-login" @click="cerrarMobile">Iniciar sesión →</Link>
+        </div>
 
         <!-- ══ CONTENIDO ══ -->
         <main>
@@ -155,60 +151,6 @@ const navActive = (names) => names.some(n => route().current(n));
     border-bottom: 1px solid var(--border-color);
     flex-wrap: wrap;
 }
-.acc-sep {
-    width: 1px; height: 1rem;
-    background: var(--border-color);
-}
-.age-group {
-    display: flex; align-items: center; gap: 0.15rem;
-    padding: 0.12rem;
-    border-radius: 0.5rem;
-    background: var(--bg-color);
-    border: 1px solid var(--border-color);
-}
-.age-btn {
-    font-size: 0.63rem; font-weight: 600;
-    padding: 0.2rem 0.6rem; border-radius: 0.35rem;
-    border: none; background: transparent;
-    color: var(--text-secondary);
-    cursor: pointer; transition: all 0.15s;
-    font-family: var(--font-family);
-}
-.age-btn.active {
-    background: var(--primary-color);
-    color: var(--primary-text);
-    font-weight: 700;
-}
-.font-group {
-    display: flex;
-    border: 1px solid var(--border-color);
-    border-radius: 0.4rem;
-    overflow: hidden;
-    background: var(--bg-color);
-}
-.font-btn {
-    font-size: 0.7rem; font-weight: 700;
-    padding: 0.28rem 0.58rem;
-    border: none; background: transparent;
-    color: var(--text-secondary);
-    cursor: pointer;
-    border-right: 1px solid var(--border-color);
-    font-family: var(--font-family);
-    transition: background 0.15s, color 0.15s;
-}
-.font-btn:last-child { border-right: none; }
-.font-btn:hover { background: color-mix(in srgb, var(--primary-color) 10%, transparent); color: var(--primary-color); }
-.day-night-btn {
-    width: 1.9rem; height: 1.9rem; border-radius: 50%;
-    border: 1px solid var(--border-color);
-    background: var(--bg-color);
-    color: var(--text-secondary);
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s;
-}
-.day-night-btn:hover { border-color: var(--primary-color); color: var(--primary-color); transform: rotate(15deg); }
-.day-night-icon { width: 1rem; height: 1rem; }
 
 /* ── Navbar ── */
 .navbar {
@@ -265,6 +207,7 @@ const navActive = (names) => names.some(n => route().current(n));
     font-weight: 600; margin-top: 0.2rem;
 }
 .nav-links { display: flex; gap: 0.25rem; }
+.nav-right { display: flex; align-items: center; gap: 0.75rem; }
 .nav-link {
     font-size: 0.8rem; font-weight: 600;
     color: var(--text-secondary); text-decoration: none;
@@ -285,6 +228,56 @@ const navActive = (names) => names.some(n => route().current(n));
     text-decoration: none; transition: all 0.15s;
 }
 .nav-login:hover { background: var(--primary-color); color: var(--primary-text); }
+
+/* ── Hamburger ── */
+.nav-hamburger {
+    display: none;
+    background: transparent; border: 1px solid var(--border-color);
+    border-radius: 0.4rem; padding: 0.3rem;
+    color: var(--text-color); cursor: pointer;
+    line-height: 0; transition: border-color 0.15s;
+}
+.nav-hamburger:hover { border-color: var(--primary-color); color: var(--primary-color); }
+
+/* ── Mobile menu ── */
+.mobile-menu {
+    display: none;
+    flex-direction: column;
+    background: var(--nav-bg);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0.5rem 1rem 0.75rem;
+    position: sticky; top: 4.5rem; z-index: 49;
+}
+.mobile-link {
+    display: block; padding: 0.65rem 0.75rem;
+    font-size: 0.85rem; font-weight: 600;
+    color: var(--text-secondary); text-decoration: none;
+    border-radius: 0.5rem; transition: all 0.15s;
+}
+.mobile-link:hover { color: var(--text-color); background: color-mix(in srgb, var(--primary-color) 8%, transparent); }
+.mobile-link.active { color: var(--primary-color); background: color-mix(in srgb, var(--primary-color) 10%, transparent); font-weight: 700; }
+.mobile-link-login {
+    margin-top: 0.4rem; color: var(--primary-color);
+    border: 1.5px solid var(--primary-color);
+    text-align: center;
+}
+.mobile-link-login:hover { background: var(--primary-color); color: var(--primary-text); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    .nav-links-desktop { display: none !important; }
+    .nav-login { display: none; }
+    .nav-hamburger { display: flex; }
+    .mobile-menu { display: flex; }
+    .access-bar { padding: 0.3rem 0.75rem; flex-wrap: wrap; }
+    .logo-texts { display: none; }
+    .logo-divider { display: none; }
+}
+@media (max-width: 480px) {
+    .navbar { padding: 0.4rem 0.75rem; min-height: 3.8rem; }
+    .logo-shield { width: 2.6rem; height: 2.6rem; }
+    .logo-shield img { width: 2.6rem; height: 2.6rem; }
+}
 
 /* ── Footer ── */
 .footer {

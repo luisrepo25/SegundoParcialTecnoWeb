@@ -428,6 +428,7 @@ function confirmarEliminarNivel() {
                             + Asignar Materia
                         </button>
                     </div>
+                    <div class="overflow-x-auto">
                     <table class="min-w-full">
                         <thead>
                             <tr style="border-bottom: 1px solid var(--border-color);">
@@ -483,6 +484,7 @@ function confirmarEliminarNivel() {
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                 </div>
 
                 <!-- Niveles -->
@@ -545,7 +547,8 @@ function confirmarEliminarNivel() {
                     </div>
 
                     <!-- Tabla materias del nivel -->
-                    <table v-else class="min-w-full">
+                    <div v-else class="overflow-x-auto">
+                    <table class="min-w-full">
                         <thead>
                             <tr style="border-bottom: 1px solid var(--border-color);">
                                 <th class="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap w-10" style="color: var(--text-secondary);">#</th>
@@ -605,6 +608,7 @@ function confirmarEliminarNivel() {
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                 </div>
 
                 <!-- Botón ir a gestionar materias -->

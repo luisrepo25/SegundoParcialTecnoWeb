@@ -68,6 +68,7 @@ const CARRERA_BADGE = {
 
         <!-- Tabla -->
         <div class="rounded-xl overflow-hidden" style="border:1px solid var(--border-color);">
+            <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
                     <tr style="background-color:color-mix(in srgb,var(--card-bg) 80%,var(--border-color));">
@@ -130,6 +131,7 @@ const CARRERA_BADGE = {
                     </tr>
                 </tbody>
             </table>
+            </div>
         </div>
 
     </AdminLayout>

@@ -203,6 +203,7 @@ function formatCosto(val) {
 
                 <!-- Tabla -->
                 <div class="overflow-hidden rounded-xl shadow" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                    <div class="overflow-x-auto">
                     <table class="min-w-full">
                         <thead>
                             <tr style="background-color: var(--bg-color);">
@@ -277,6 +278,7 @@ function formatCosto(val) {
                             </tr>
                         </tbody>
                     </table>
+                    </div>
 
                     <!-- Paginación -->
                     <div v-if="carreras.last_page > 1" class="flex items-center justify-between gap-2 px-4 py-3 border-t"
