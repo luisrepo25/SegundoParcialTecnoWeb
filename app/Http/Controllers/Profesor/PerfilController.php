@@ -39,13 +39,17 @@ class PerfilController extends Controller
         $userId = auth()->id();
 
         $request->validate([
-            'nombre'    => 'required|string|max:100',
-            'apellido'  => 'required|string|max:100',
-            'email'     => ['required', 'email', 'max:150', Rule::unique('usuarios', 'email')->ignore($userId, 'id_usuario')],
-            'telefono'  => 'nullable|string|max:20',
+            'nombre'    => ['required','string','max:100','regex:/^[\pL\s\'\-]+$/u'],
+            'apellido'  => ['required','string','max:100','regex:/^[\pL\s\'\-]+$/u'],
+            'email'     => ['required','email:rfc','max:150', Rule::unique('usuarios', 'email')->ignore($userId, 'id_usuario')],
+            'telefono'  => ['nullable','string','max:20','regex:/^[0-9+\-\s()]*$/'],
             'direccion' => 'nullable|string|max:255',
         ], [
-            'email.unique' => 'Este correo ya está en uso por otra cuenta.',
+            'nombre.regex'   => 'El nombre no debe contener números ni símbolos.',
+            'apellido.regex' => 'El apellido no debe contener números ni símbolos.',
+            'email.email'    => 'Ingrese un email válido (sin espacios ni @ dobles).',
+            'email.unique'   => 'Este correo ya está en uso por otra cuenta.',
+            'telefono.regex' => 'El teléfono solo debe contener números y símbolos (+, -).',
         ]);
 
         DB::table('usuarios')->where('id_usuario', $userId)->update([

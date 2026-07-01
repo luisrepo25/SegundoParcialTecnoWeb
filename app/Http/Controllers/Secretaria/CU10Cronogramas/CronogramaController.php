@@ -61,8 +61,14 @@ class CronogramaController extends Controller
             'fecha_fin'    => 'required|date|after_or_equal:fecha_inicio',
             'modalidad'    => 'nullable|in:mensual,semestral,anual,intensivo',
         ], [
-            'tipo_periodo.in' => 'El tipo de período no es válido.',
-            'modalidad.in'    => 'La modalidad seleccionada no es válida.',
+            'nombre.required'          => 'El nombre del cronograma es obligatorio.',
+            'tipo_periodo.in'          => 'El tipo de período no es válido.',
+            'fecha_inicio.required'    => 'La fecha de inicio es obligatoria.',
+            'fecha_inicio.date'        => 'La fecha de inicio no es válida.',
+            'fecha_fin.required'       => 'La fecha de fin es obligatoria.',
+            'fecha_fin.date'           => 'La fecha de fin no es válida.',
+            'fecha_fin.after_or_equal' => 'La fecha de fin no puede ser anterior a la de inicio.',
+            'modalidad.in'             => 'La modalidad seleccionada no es válida.',
         ]);
 
         DB::table('cronogramas')->insert([
@@ -90,8 +96,14 @@ class CronogramaController extends Controller
             'fecha_fin'    => 'required|date|after_or_equal:fecha_inicio',
             'modalidad'    => 'nullable|in:mensual,semestral,anual,intensivo',
         ], [
-            'tipo_periodo.in' => 'El tipo de período no es válido.',
-            'modalidad.in'    => 'La modalidad seleccionada no es válida.',
+            'nombre.required'          => 'El nombre del cronograma es obligatorio.',
+            'tipo_periodo.in'          => 'El tipo de período no es válido.',
+            'fecha_inicio.required'    => 'La fecha de inicio es obligatoria.',
+            'fecha_inicio.date'        => 'La fecha de inicio no es válida.',
+            'fecha_fin.required'       => 'La fecha de fin es obligatoria.',
+            'fecha_fin.date'           => 'La fecha de fin no es válida.',
+            'fecha_fin.after_or_equal' => 'La fecha de fin no puede ser anterior a la de inicio.',
+            'modalidad.in'             => 'La modalidad seleccionada no es válida.',
         ]);
 
         Cronograma::findOrFail($id);

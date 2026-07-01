@@ -2,6 +2,7 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
+import { errTexto, errEntero } from '@/utils/validacion.js';
 
 const canEdit = computed(() => ['propietario', 'director'].includes(usePage().props.auth?.user?.role));
 
@@ -64,9 +65,24 @@ function abrirEditar(a) {
     showModal.value   = true;
 }
 
-function cerrar() { showModal.value = false; form.reset(); form.clearErrors(); }
+const fe = ref({});
+
+function validarCampos() {
+    const e = {};
+    const en = errTexto(form.nombre, 'El nombre del aula');   if (en) e.nombre    = en;
+    const ec = errEntero(form.capacidad, 'La capacidad', 1);  if (ec) e.capacidad = ec;
+    fe.value = e;
+    return Object.keys(e).length === 0;
+}
+
+watch(() => [form.nombre, form.capacidad], () => {
+    if (Object.keys(fe.value).length) validarCampos();
+});
+
+function cerrar() { showModal.value = false; form.reset(); form.clearErrors(); fe.value = {}; }
 
 function guardar() {
+    if (!validarCampos()) return;
     if (modoEdicion.value) {
         form.put(route('propietario.aulas.update', editandoId.value), { onSuccess: cerrar });
     } else {
@@ -240,7 +256,7 @@ function tipoBadge(tipo) { return TIPO_BADGE[tipo] ?? { label: tipo, color: 'bad
                         <div>
                             <label class="field-label">Nombre *</label>
                             <input v-model="form.nombre" type="text" class="field-input" placeholder="Ej: Aula 101" />
-                            <p v-if="form.errors.nombre" class="field-error">{{ form.errors.nombre }}</p>
+                            <p v-if="fe.nombre || form.errors.nombre" class="field-error">{{ fe.nombre || form.errors.nombre }}</p>
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
@@ -256,7 +272,7 @@ function tipoBadge(tipo) { return TIPO_BADGE[tipo] ?? { label: tipo, color: 'bad
                             <div>
                                 <label class="field-label">Capacidad *</label>
                                 <input v-model="form.capacidad" type="number" min="1" class="field-input" placeholder="30" />
-                                <p v-if="form.errors.capacidad" class="field-error">{{ form.errors.capacidad }}</p>
+                                <p v-if="fe.capacidad || form.errors.capacidad" class="field-error">{{ fe.capacidad || form.errors.capacidad }}</p>
                             </div>
                         </div>
 

@@ -45,6 +45,12 @@ class AulaController extends Controller
             'capacidad' => 'required|integer|min:1',
             'ubicacion' => 'nullable|string|max:100',
             'tipo'      => 'required|string|in:aula,laboratorio,sala,auditorio',
+        ], [
+            'nombre.required'    => 'El nombre del aula es obligatorio.',
+            'nombre.unique'      => 'Ya existe un aula con ese nombre.',
+            'capacidad.required' => 'La capacidad es obligatoria.',
+            'capacidad.integer'  => 'La capacidad debe ser un número entero.',
+            'capacidad.min'      => 'La capacidad debe ser al menos 1.',
         ]);
 
         Aula::create([
@@ -67,6 +73,12 @@ class AulaController extends Controller
             'capacidad' => 'required|integer|min:1',
             'ubicacion' => 'nullable|string|max:100',
             'tipo'      => 'required|string|in:aula,laboratorio,sala,auditorio',
+        ], [
+            'nombre.required'    => 'El nombre del aula es obligatorio.',
+            'nombre.unique'      => 'Ya existe un aula con ese nombre.',
+            'capacidad.required' => 'La capacidad es obligatoria.',
+            'capacidad.integer'  => 'La capacidad debe ser un número entero.',
+            'capacidad.min'      => 'La capacidad debe ser al menos 1.',
         ]);
 
         $aula->update([

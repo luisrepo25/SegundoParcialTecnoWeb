@@ -137,6 +137,14 @@ class PeriodoController extends Controller
             'fecha_fin'                => 'required|date|after:fecha_inicio',
             'fecha_inicio_inscripcion' => 'nullable|date',
             'fecha_fin_inscripcion'    => 'nullable|date|after_or_equal:fecha_inicio_inscripcion',
+        ], [
+            'nombre.required'                   => 'El nombre del período es obligatorio.',
+            'fecha_inicio.required'             => 'La fecha de inicio es obligatoria.',
+            'fecha_inicio.date'                 => 'La fecha de inicio no es válida.',
+            'fecha_fin.required'                => 'La fecha de fin es obligatoria.',
+            'fecha_fin.date'                    => 'La fecha de fin no es válida.',
+            'fecha_fin.after'                   => 'La fecha de fin debe ser posterior a la fecha de inicio.',
+            'fecha_fin_inscripcion.after_or_equal' => 'La fecha de cierre de inscripciones no puede ser anterior a la de inicio.',
         ]);
 
         $yaExiste = DB::table('periodos_dictado')
@@ -180,6 +188,14 @@ class PeriodoController extends Controller
             'fecha_fin'                => 'required|date|after:fecha_inicio',
             'fecha_inicio_inscripcion' => 'nullable|date',
             'fecha_fin_inscripcion'    => 'nullable|date|after_or_equal:fecha_inicio_inscripcion',
+        ], [
+            'nombre.required'                   => 'El nombre del período es obligatorio.',
+            'fecha_inicio.required'             => 'La fecha de inicio es obligatoria.',
+            'fecha_inicio.date'                 => 'La fecha de inicio no es válida.',
+            'fecha_fin.required'                => 'La fecha de fin es obligatoria.',
+            'fecha_fin.date'                    => 'La fecha de fin no es válida.',
+            'fecha_fin.after'                   => 'La fecha de fin debe ser posterior a la fecha de inicio.',
+            'fecha_fin_inscripcion.after_or_equal' => 'La fecha de cierre de inscripciones no puede ser anterior a la de inicio.',
         ]);
 
         DB::table('periodos_dictado')->where('id_periodo', $id)->update([

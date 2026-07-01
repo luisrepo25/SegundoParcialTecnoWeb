@@ -2,6 +2,7 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
+import { errNombre, errDni, errEmail, errTelefono } from '@/utils/validacion.js';
 
 const page      = usePage();
 const canEdit   = computed(() => ['propietario', 'director', 'secretaria'].includes(page.props.auth?.user?.role));
@@ -91,6 +92,37 @@ const form = useForm({
     cargo: '', fecha_ingreso: '',
 });
 
+const fe = ref({});
+
+function validarCampos() {
+    const e = {};
+    const n = errNombre(form.nombre);                        if (n) e.nombre   = n;
+    const a = errNombre(form.apellido, 'El apellido');       if (a) e.apellido = a;
+    const d = errDni(form.dni);                             if (d) e.dni      = d;
+    const t = errTelefono(form.telefono);                   if (t) e.telefono = t;
+
+    if (!modoEdicion.value) {
+        const em = errEmail(form.email);                    if (em) e.email = em;
+        if (!form.id_rol) e.id_rol = 'Seleccione un rol.';
+        if (!form.password)
+            e.password = 'La contraseña es obligatoria.';
+        else if (form.password.length < 6)
+            e.password = 'Mínimo 6 caracteres.';
+        else if (form.password !== form.password_confirmation)
+            e.password_confirmation = 'Las contraseñas no coinciden.';
+    } else {
+        const em = errEmail(form.email);                    if (em) e.email = em;
+    }
+
+    fe.value = e;
+    return Object.keys(e).length === 0;
+}
+
+// Revalidar en tiempo real solo si ya se intentó enviar
+watch(() => [form.nombre, form.apellido, form.dni, form.telefono, form.email, form.id_rol, form.password, form.password_confirmation], () => {
+    if (Object.keys(fe.value).length) validarCampos();
+});
+
 function abrirCrear() {
     form.reset(); form.clearErrors();
     modoEdicion.value = false;
@@ -115,6 +147,7 @@ function abrirEditar(u) {
 function cerrarForm() { showFormModal.value = false; form.reset(); form.clearErrors(); }
 
 function guardar() {
+    if (!validarCampos()) return;
     if (modoEdicion.value) {
         form.put(route('propietario.usuarios.update', editandoId.value), { onSuccess: cerrarForm });
     } else {
@@ -362,30 +395,31 @@ function toggleActivo(u) {
                             <div>
                                 <label class="field-label">Nombre *</label>
                                 <input v-model="form.nombre" type="text" class="field-input" />
-                                <p v-if="form.errors.nombre" class="field-error">{{ form.errors.nombre }}</p>
+                                <p v-if="fe.nombre || form.errors.nombre" class="field-error">{{ fe.nombre || form.errors.nombre }}</p>
                             </div>
                             <div>
                                 <label class="field-label">Apellido *</label>
                                 <input v-model="form.apellido" type="text" class="field-input" />
-                                <p v-if="form.errors.apellido" class="field-error">{{ form.errors.apellido }}</p>
+                                <p v-if="fe.apellido || form.errors.apellido" class="field-error">{{ fe.apellido || form.errors.apellido }}</p>
                             </div>
                         </div>
 
                         <div>
                             <label class="field-label">Email *</label>
-                            <input v-model="form.email" type="email" class="field-input" />
-                            <p v-if="form.errors.email" class="field-error">{{ form.errors.email }}</p>
+                            <input v-model="form.email" type="text" class="field-input" />
+                            <p v-if="fe.email || form.errors.email" class="field-error">{{ fe.email || form.errors.email }}</p>
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="field-label">DNI *</label>
                                 <input v-model="form.dni" type="text" class="field-input" />
-                                <p v-if="form.errors.dni" class="field-error">{{ form.errors.dni }}</p>
+                                <p v-if="fe.dni || form.errors.dni" class="field-error">{{ fe.dni || form.errors.dni }}</p>
                             </div>
                             <div>
                                 <label class="field-label">Teléfono</label>
                                 <input v-model="form.telefono" type="text" class="field-input" />
+                                <p v-if="fe.telefono || form.errors.telefono" class="field-error">{{ fe.telefono || form.errors.telefono }}</p>
                             </div>
                         </div>
 
@@ -400,7 +434,7 @@ function toggleActivo(u) {
                                 <option value="">Seleccione un rol</option>
                                 <option v-for="r in rolesCreables" :key="r.id_rol" :value="r.id_rol">{{ r.nombre_rol }}</option>
                             </select>
-                            <p v-if="form.errors.id_rol" class="field-error">{{ form.errors.id_rol }}</p>
+                            <p v-if="fe.id_rol || form.errors.id_rol" class="field-error">{{ fe.id_rol || form.errors.id_rol }}</p>
                         </div>
 
                         <!-- Extra: Profesor -->
@@ -439,11 +473,12 @@ function toggleActivo(u) {
                                 <div>
                                     <label class="field-label">Contraseña *</label>
                                     <input v-model="form.password" type="password" class="field-input" />
-                                    <p v-if="form.errors.password" class="field-error">{{ form.errors.password }}</p>
+                                    <p v-if="fe.password || form.errors.password" class="field-error">{{ fe.password || form.errors.password }}</p>
                                 </div>
                                 <div>
                                     <label class="field-label">Confirmar *</label>
                                     <input v-model="form.password_confirmation" type="password" class="field-input" />
+                                    <p v-if="fe.password_confirmation" class="field-error">{{ fe.password_confirmation }}</p>
                                 </div>
                             </div>
                         </template>

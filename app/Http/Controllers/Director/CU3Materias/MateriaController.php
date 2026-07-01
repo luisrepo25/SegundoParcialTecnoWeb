@@ -41,12 +41,23 @@ class MateriaController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'codigo'               => 'required|string|max:20|unique:materias,codigo',
+            'codigo'               => ['required','string','max:20','unique:materias,codigo','regex:/^[a-zA-Z0-9\-_]+$/'],
             'nombre'               => 'required|string|max:150',
             'duracion_meses'       => 'required|integer|min:1',
             'costo_mensual'        => 'required|numeric|min:0',
             'creditos'             => 'nullable|integer|min:0',
             'id_materia_requisito' => 'nullable|integer|exists:materias,id_materia',
+        ], [
+            'codigo.required'         => 'El código es obligatorio.',
+            'codigo.unique'           => 'Ya existe una materia con ese código.',
+            'codigo.regex'            => 'El código solo debe contener letras, números, guiones y guiones bajos.',
+            'nombre.required'         => 'El nombre de la materia es obligatorio.',
+            'duracion_meses.required' => 'La duración en meses es obligatoria.',
+            'duracion_meses.integer'  => 'La duración debe ser un número entero.',
+            'duracion_meses.min'      => 'La duración debe ser al menos 1 mes.',
+            'costo_mensual.required'  => 'El costo mensual es obligatorio.',
+            'costo_mensual.numeric'   => 'El costo debe ser un número válido (ej: 500 o 500.50).',
+            'costo_mensual.min'       => 'El costo no puede ser negativo.',
         ]);
 
         Materia::create([
@@ -67,12 +78,23 @@ class MateriaController extends Controller
         $materia = Materia::findOrFail($id);
 
         $request->validate([
-            'codigo'               => ['required', 'string', 'max:20', Rule::unique('materias', 'codigo')->ignore($id, 'id_materia')],
+            'codigo'               => ['required','string','max:20',Rule::unique('materias','codigo')->ignore($id,'id_materia'),'regex:/^[a-zA-Z0-9\-_]+$/'],
             'nombre'               => 'required|string|max:150',
             'duracion_meses'       => 'required|integer|min:1',
             'costo_mensual'        => 'required|numeric|min:0',
             'creditos'             => 'nullable|integer|min:0',
             'id_materia_requisito' => ['nullable', 'integer', 'exists:materias,id_materia', Rule::notIn([$id])],
+        ], [
+            'codigo.required'         => 'El código es obligatorio.',
+            'codigo.unique'           => 'Ya existe una materia con ese código.',
+            'codigo.regex'            => 'El código solo debe contener letras, números, guiones y guiones bajos.',
+            'nombre.required'         => 'El nombre de la materia es obligatorio.',
+            'duracion_meses.required' => 'La duración en meses es obligatoria.',
+            'duracion_meses.integer'  => 'La duración debe ser un número entero.',
+            'duracion_meses.min'      => 'La duración debe ser al menos 1 mes.',
+            'costo_mensual.required'  => 'El costo mensual es obligatorio.',
+            'costo_mensual.numeric'   => 'El costo debe ser un número válido (ej: 500 o 500.50).',
+            'costo_mensual.min'       => 'El costo no puede ser negativo.',
         ]);
 
         $materia->update([

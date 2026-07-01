@@ -195,9 +195,15 @@ class GrupoController extends Controller
             'id_profesor'  => 'required|integer|exists:profesores,id_profesor',
             'id_horario'   => 'required|integer|exists:horarios,id_horario',
             'vacantes_max' => 'required|integer|min:1|max:500',
-            'codigo_grupo' => 'nullable|string|max:20',
+            'codigo_grupo' => ['nullable','string','max:20','regex:/^[a-zA-Z0-9\-_]*$/'],
             'dias_extra'   => 'nullable|array',
             'dias_extra.*' => 'integer|exists:horarios,id_horario',
+        ], [
+            'vacantes_max.required' => 'Las vacantes son obligatorias.',
+            'vacantes_max.integer'  => 'Las vacantes deben ser un número entero.',
+            'vacantes_max.min'      => 'Las vacantes deben ser al menos 1.',
+            'vacantes_max.max'      => 'Las vacantes no pueden superar 500.',
+            'codigo_grupo.regex'    => 'El código del grupo solo debe contener letras, números, guiones y guiones bajos.',
         ]);
 
         // Validar que vacantes_max no supere la capacidad del aula
@@ -319,13 +325,19 @@ class GrupoController extends Controller
     {
         $request->validate([
             'vacantes_max'    => 'required|integer|min:1|max:500',
-            'codigo_grupo'    => 'nullable|string|max:20',
+            'codigo_grupo'    => ['nullable','string','max:20','regex:/^[a-zA-Z0-9\-_]*$/'],
             'id_aula'         => 'required|integer|exists:aulas,id_aula',
             'id_profesor'     => 'required|integer|exists:profesores,id_profesor',
             'dias_mantener'   => 'nullable|array',
             'dias_mantener.*' => 'integer',
             'dias_agregar'    => 'nullable|array',
             'dias_agregar.*'  => 'integer|exists:horarios,id_horario',
+        ], [
+            'vacantes_max.required' => 'Las vacantes son obligatorias.',
+            'vacantes_max.integer'  => 'Las vacantes deben ser un número entero.',
+            'vacantes_max.min'      => 'Las vacantes deben ser al menos 1.',
+            'vacantes_max.max'      => 'Las vacantes no pueden superar 500.',
+            'codigo_grupo.regex'    => 'El código del grupo solo debe contener letras, números, guiones y guiones bajos.',
         ]);
 
         $grupo = DB::table('grupos')->where('id_oferta', $id)->first();

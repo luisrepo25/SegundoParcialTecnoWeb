@@ -25,15 +25,20 @@ class InscripcionController extends Controller
     public function storeManual(Request $request)
     {
         $request->validate([
-            'nombre'     => 'required|string|max:100',
-            'apellido'   => 'required|string|max:100',
-            'dni'        => 'required|string|max:20|unique:usuarios,dni',
-            'email'      => 'required|email|max:150|unique:usuarios,email',
-            'telefono'   => 'nullable|string|max:20',
+            'nombre'     => ['required','string','max:100','regex:/^[\pL\s\'\-]+$/u'],
+            'apellido'   => ['required','string','max:100','regex:/^[\pL\s\'\-]+$/u'],
+            'dni'        => ['required','string','max:20','unique:usuarios,dni','regex:/^[0-9]+$/'],
+            'email'      => ['required','email:rfc','max:150','unique:usuarios,email'],
+            'telefono'   => ['nullable','string','max:20','regex:/^[0-9+\-\s()]*$/'],
             'id_carrera' => 'required|exists:carreras,id_carrera',
         ], [
-            'dni.unique'   => 'Ya existe un usuario registrado con este nÃºmero de carnet (CI/DNI).',
-            'email.unique' => 'Ya existe una cuenta con este correo electrÃ³nico.',
+            'nombre.regex'   => 'El nombre no debe contener números ni símbolos.',
+            'apellido.regex' => 'El apellido no debe contener números ni símbolos.',
+            'dni.unique'     => 'Ya existe un usuario registrado con este número de carnet (CI/DNI).',
+            'dni.regex'      => 'El CI/DNI solo debe contener números.',
+            'email.email'    => 'Ingrese un email válido (sin espacios ni @ dobles).',
+            'email.unique'   => 'Ya existe una cuenta con este correo electrónico.',
+            'telefono.regex' => 'El teléfono solo debe contener números y símbolos (+, -).',
         ]);
 
         $carrera = Carrera::findOrFail($request->id_carrera);

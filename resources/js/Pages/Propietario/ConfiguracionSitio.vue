@@ -1,7 +1,8 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, useForm, usePage } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { errEmail, errTelefono } from '@/utils/validacion.js';
 
 const props = defineProps({ config: Object });
 
@@ -31,11 +32,27 @@ function onLogoChange(e) {
     logoPreview.value = URL.createObjectURL(file);
 }
 
+const fe = ref({});
+
+function validarCampos() {
+    const e = {};
+    const em = errEmail(form.email, false);        if (em) e.email      = em;
+    const t1 = errTelefono(form.telefono_1);       if (t1) e.telefono_1 = t1;
+    const t2 = errTelefono(form.telefono_2);       if (t2) e.telefono_2 = t2;
+    fe.value = e;
+    return Object.keys(e).length === 0;
+}
+
+watch(() => [form.email, form.telefono_1, form.telefono_2], () => {
+    if (Object.keys(fe.value).length) validarCampos();
+});
+
 function submit() {
+    if (!validarCampos()) return;
     form.post(route('propietario.configuracion.update'), {
         preserveScroll: true,
         forceFormData: true,
-        onSuccess: () => { form.logo = null; },
+        onSuccess: () => { form.logo = null; fe.value = {}; },
     });
 }
 </script>
@@ -88,8 +105,8 @@ function submit() {
                     <div class="field-row">
                         <div class="field">
                             <label>Correo electrónico</label>
-                            <input v-model="form.email" type="email" class="input" placeholder="info@institucion.edu.bo" />
-                            <p v-if="form.errors.email" class="error">{{ form.errors.email }}</p>
+                            <input v-model="form.email" type="text" class="input" placeholder="info@institucion.edu.bo" />
+                            <p v-if="fe.email || form.errors.email" class="error">{{ fe.email || form.errors.email }}</p>
                         </div>
                         <div class="field">
                             <label>Dirección</label>
@@ -100,10 +117,12 @@ function submit() {
                         <div class="field">
                             <label>Teléfono 1</label>
                             <input v-model="form.telefono_1" type="text" class="input" placeholder="+591 3 300-0000" />
+                            <p v-if="fe.telefono_1 || form.errors.telefono_1" class="error">{{ fe.telefono_1 || form.errors.telefono_1 }}</p>
                         </div>
                         <div class="field">
                             <label>Teléfono 2</label>
                             <input v-model="form.telefono_2" type="text" class="input" placeholder="+591 70 000-000" />
+                            <p v-if="fe.telefono_2 || form.errors.telefono_2" class="error">{{ fe.telefono_2 || form.errors.telefono_2 }}</p>
                         </div>
                     </div>
                 </section>

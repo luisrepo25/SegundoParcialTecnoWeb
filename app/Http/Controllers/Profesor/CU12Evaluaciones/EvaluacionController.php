@@ -27,6 +27,10 @@ class EvaluacionController extends Controller
             'evaluaciones.*.calificacion' => 'nullable|numeric|min:0|max:100',
             'evaluaciones.*.descripcion'  => 'nullable|string|max:150',
             'evaluaciones.*.fecha'        => 'nullable|date',
+        ], [
+            'evaluaciones.*.calificacion.numeric' => 'La nota debe ser un número (ej: 75 o 85.5).',
+            'evaluaciones.*.calificacion.min'     => 'La nota debe ser mayor o igual a 0.',
+            'evaluaciones.*.calificacion.max'     => 'La nota no puede superar 100.',
         ]);
 
         $profesor = $this->resolverProfesor(inscripcionId: $request->id_inscripcion);
@@ -91,6 +95,10 @@ class EvaluacionController extends Controller
             'notas.*.evaluaciones.*.tipo'             => 'required|in:parcial1,parcial2,final,otros',
             'notas.*.evaluaciones.*.calificacion'     => 'nullable|numeric|min:0|max:100',
             'notas.*.evaluaciones.*.fecha'            => 'nullable|date',
+        ], [
+            'notas.*.evaluaciones.*.calificacion.numeric' => 'La nota debe ser un número (ej: 75 o 85.5).',
+            'notas.*.evaluaciones.*.calificacion.min'     => 'La nota debe ser mayor o igual a 0.',
+            'notas.*.evaluaciones.*.calificacion.max'     => 'La nota no puede superar 100.',
         ]);
 
         $profesor = $this->resolverProfesor(ofertaId: $request->id_oferta);

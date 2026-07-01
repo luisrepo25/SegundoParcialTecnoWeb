@@ -35,14 +35,18 @@ class ConfiguracionSitioController extends Controller
         $data = $request->validate([
             'nombre_institucion' => 'required|string|max:150',
             'descripcion'        => 'nullable|string|max:500',
-            'email'              => 'nullable|email|max:150',
-            'telefono_1'         => 'nullable|string|max:30',
-            'telefono_2'         => 'nullable|string|max:30',
+            'email'              => ['nullable','email:rfc','max:150'],
+            'telefono_1'         => ['nullable','string','max:30','regex:/^[0-9+\-\s()]*$/'],
+            'telefono_2'         => ['nullable','string','max:30','regex:/^[0-9+\-\s()]*$/'],
             'direccion'          => 'nullable|string|max:200',
             'facebook_url'       => 'nullable|url|max:300',
             'instagram_url'      => 'nullable|url|max:300',
             'youtube_url'        => 'nullable|url|max:300',
             'logo'               => 'nullable|image|mimes:png,jpg,jpeg,webp|max:2048',
+        ], [
+            'email.email'        => 'Ingrese un email válido (sin espacios ni @ dobles).',
+            'telefono_1.regex'   => 'El teléfono solo debe contener números y símbolos (+, -).',
+            'telefono_2.regex'   => 'El teléfono solo debe contener números y símbolos (+, -).',
         ]);
 
         $config = ConfiguracionSitio::actual();

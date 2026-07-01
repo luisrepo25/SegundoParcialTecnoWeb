@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { Head, useForm, usePage, Link } from '@inertiajs/vue3';
 import EstudianteLayout from '@/Layouts/EstudianteLayout.vue';
+import { errNombre, errEmail, errTelefono } from '@/utils/validacion.js';
 
 const props = defineProps({
     perfil: { type: Object, required: true },
@@ -46,18 +47,36 @@ const formDatos = useForm({
     observaciones:  props.perfil.observaciones  ?? '',
 });
 
+const fep = ref({});
+
+function validarDatos() {
+    const e = {};
+    const n = errNombre(formDatos.nombre);                     if (n) e.nombre   = n;
+    const a = errNombre(formDatos.apellido, 'El apellido');    if (a) e.apellido = a;
+    const em = errEmail(formDatos.email);                      if (em) e.email   = em;
+    const t = errTelefono(formDatos.telefono);                 if (t) e.telefono = t;
+    fep.value = e;
+    return Object.keys(e).length === 0;
+}
+
+watch(() => [formDatos.nombre, formDatos.apellido, formDatos.email, formDatos.telefono], () => {
+    if (Object.keys(fep.value).length) validarDatos();
+});
+
 function toggleEditing() {
     if (isEditing.value) {
         formDatos.reset();
         formDatos.clearErrors();
+        fep.value = {};
     }
     isEditing.value = !isEditing.value;
 }
 
 function guardarDatos() {
+    if (!validarDatos()) return;
     formDatos.put(route('estudiante.perfil.update'), {
         preserveScroll: true,
-        onSuccess: () => { isEditing.value = false; },
+        onSuccess: () => { isEditing.value = false; fep.value = {}; },
     });
 }
 
@@ -234,15 +253,15 @@ const tipoLabel = (tipo) => ({ tecnico_superior: 'Técnico Superior', tecnico_me
                             <input v-else v-model="formDatos.nombre" type="text" required
                                    class="w-full rounded-lg px-3 py-2 text-sm"
                                    style="background-color: color-mix(in srgb, var(--text-color) 5%, transparent); border: 1px solid var(--border-color); color: var(--text-color);" />
-                            <p v-if="isEditing && errors.nombre" class="text-xs mt-1" style="color: #ef4444;">{{ errors.nombre }}</p>
+                            <p v-if="isEditing && (fep.nombre || errors.nombre)" class="text-xs mt-1" style="color: #ef4444;">{{ fep.nombre || errors.nombre }}</p>
                         </div>
                         <div>
                             <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Apellido</label>
                             <p v-if="!isEditing" class="text-sm py-2 font-medium" style="color: var(--text-color);">{{ formDatos.apellido || '—' }}</p>
-                            <input v-else v-model="formDatos.apellido" type="text" required
+                            <input v-else v-model="formDatos.apellido" type="text"
                                    class="w-full rounded-lg px-3 py-2 text-sm"
                                    style="background-color: color-mix(in srgb, var(--text-color) 5%, transparent); border: 1px solid var(--border-color); color: var(--text-color);" />
-                            <p v-if="isEditing && errors.apellido" class="text-xs mt-1" style="color: #ef4444;">{{ errors.apellido }}</p>
+                            <p v-if="isEditing && (fep.apellido || errors.apellido)" class="text-xs mt-1" style="color: #ef4444;">{{ fep.apellido || errors.apellido }}</p>
                         </div>
                     </div>
 
@@ -250,10 +269,10 @@ const tipoLabel = (tipo) => ({ tecnico_superior: 'Técnico Superior', tecnico_me
                     <div>
                         <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Correo electrónico</label>
                         <p v-if="!isEditing" class="text-sm py-2 font-medium" style="color: var(--text-color);">{{ formDatos.email || '—' }}</p>
-                        <input v-else v-model="formDatos.email" type="email" required
+                        <input v-else v-model="formDatos.email" type="text"
                                class="w-full rounded-lg px-3 py-2 text-sm"
                                style="background-color: color-mix(in srgb, var(--text-color) 5%, transparent); border: 1px solid var(--border-color); color: var(--text-color);" />
-                        <p v-if="isEditing && errors.email" class="text-xs mt-1" style="color: #ef4444;">{{ errors.email }}</p>
+                        <p v-if="isEditing && (fep.email || errors.email)" class="text-xs mt-1" style="color: #ef4444;">{{ fep.email || errors.email }}</p>
                     </div>
 
                     <!-- Teléfono + Dirección -->
@@ -264,6 +283,7 @@ const tipoLabel = (tipo) => ({ tecnico_superior: 'Técnico Superior', tecnico_me
                             <input v-else v-model="formDatos.telefono" type="text"
                                    class="w-full rounded-lg px-3 py-2 text-sm"
                                    style="background-color: color-mix(in srgb, var(--text-color) 5%, transparent); border: 1px solid var(--border-color); color: var(--text-color);" />
+                            <p v-if="isEditing && (fep.telefono || errors.telefono)" class="text-xs mt-1" style="color: #ef4444;">{{ fep.telefono || errors.telefono }}</p>
                         </div>
                         <div>
                             <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Dirección</label>

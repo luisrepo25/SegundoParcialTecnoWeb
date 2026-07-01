@@ -1,6 +1,8 @@
 <script setup>
+import { ref, watch } from 'vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
+import { errNombre, errDni, errEmail, errTelefono } from '@/utils/validacion.js';
 
 const props = defineProps({ carrera: Object });
 
@@ -12,7 +14,25 @@ const form = useForm({
     telefono: '',
 });
 
+const fe = ref({});
+
+function validarCampos() {
+    const e = {};
+    const n = errNombre(form.nombre);              if (n) e.nombre   = n;
+    const a = errNombre(form.apellido, 'El apellido'); if (a) e.apellido = a;
+    const d = errDni(form.dni);                    if (d) e.dni      = d;
+    const em = errEmail(form.email);               if (em) e.email   = em;
+    const t = errTelefono(form.telefono);          if (t) e.telefono = t;
+    fe.value = e;
+    return Object.keys(e).length === 0;
+}
+
+watch(() => [form.nombre, form.apellido, form.dni, form.email, form.telefono], () => {
+    if (Object.keys(fe.value).length) validarCampos();
+});
+
 const submit = () => {
+    if (!validarCampos()) return;
     form.post(route('oferta.registrar', props.carrera.id_carrera));
 };
 
@@ -76,12 +96,12 @@ const TIPO_LABEL = {
                             <div class="field">
                                 <label class="field-label">Nombre *</label>
                                 <input v-model="form.nombre" type="text" placeholder="Juan" class="field-input" />
-                                <p v-if="form.errors.nombre" class="field-error">{{ form.errors.nombre }}</p>
+                                <p v-if="fe.nombre || form.errors.nombre" class="field-error">{{ fe.nombre || form.errors.nombre }}</p>
                             </div>
                             <div class="field">
                                 <label class="field-label">Apellido *</label>
                                 <input v-model="form.apellido" type="text" placeholder="Pérez" class="field-input" />
-                                <p v-if="form.errors.apellido" class="field-error">{{ form.errors.apellido }}</p>
+                                <p v-if="fe.apellido || form.errors.apellido" class="field-error">{{ fe.apellido || form.errors.apellido }}</p>
                             </div>
                         </div>
 
@@ -89,18 +109,19 @@ const TIPO_LABEL = {
                             <div class="field">
                                 <label class="field-label">DNI / CI *</label>
                                 <input v-model="form.dni" type="text" placeholder="12345678" class="field-input" />
-                                <p v-if="form.errors.dni" class="field-error">{{ form.errors.dni }}</p>
+                                <p v-if="fe.dni || form.errors.dni" class="field-error">{{ fe.dni || form.errors.dni }}</p>
                             </div>
                             <div class="field">
                                 <label class="field-label">Teléfono</label>
                                 <input v-model="form.telefono" type="tel" placeholder="70000000" class="field-input" />
+                                <p v-if="fe.telefono || form.errors.telefono" class="field-error">{{ fe.telefono || form.errors.telefono }}</p>
                             </div>
                         </div>
 
                         <div class="field">
                             <label class="field-label">Correo electrónico *</label>
-                            <input v-model="form.email" type="email" placeholder="juan@correo.com" class="field-input" />
-                            <p v-if="form.errors.email" class="field-error">{{ form.errors.email }}</p>
+                            <input v-model="form.email" type="text" placeholder="juan@correo.com" class="field-input" />
+                            <p v-if="fe.email || form.errors.email" class="field-error">{{ fe.email || form.errors.email }}</p>
                             <p class="field-hint">Este correo será tu usuario de acceso al sistema.</p>
                         </div>
 

@@ -2,7 +2,8 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import ComboSelect from '@/Components/ComboSelect.vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
+import { errTexto, errFecha, errFechaFin } from '@/utils/validacion.js';
 
 const props = defineProps({
     carreras:               Array,
@@ -99,15 +100,38 @@ function abrirEditar(p) {
     modalOpen.value = true;
 }
 
+const fe = ref({});
+
+function validarCampos() {
+    const e = {};
+    const en = errTexto(form.nombre, 'El nombre');                                        if (en) e.nombre    = en;
+    const ei = errFecha(form.fecha_inicio, 'La fecha de inicio');                         if (ei) e.fecha_inicio = ei;
+    const ef = errFechaFin(form.fecha_fin, form.fecha_inicio, 'La fecha de fin de clases'); if (ef) e.fecha_fin = ef;
+    if (form.fecha_inicio_inscripcion) {
+        const eii = errFecha(form.fecha_inicio_inscripcion, 'La fecha de inicio de inscripciones'); if (eii) e.fecha_inicio_inscripcion = eii;
+    }
+    if (form.fecha_fin_inscripcion) {
+        const efi = errFechaFin(form.fecha_fin_inscripcion, form.fecha_inicio_inscripcion, 'La fecha de cierre de inscripciones'); if (efi) e.fecha_fin_inscripcion = efi;
+    }
+    fe.value = e;
+    return Object.keys(e).length === 0;
+}
+
+watch(() => [form.nombre, form.fecha_inicio, form.fecha_fin, form.fecha_inicio_inscripcion, form.fecha_fin_inscripcion], () => {
+    if (Object.keys(fe.value).length) validarCampos();
+});
+
 function cerrar() {
     modalOpen.value = false;
     cronogramaModal.value = null;
     cronogramaInscripcionModal.value = null;
     form.reset();
     editando.value = null;
+    fe.value = {};
 }
 
 function guardar() {
+    if (!validarCampos()) return;
     if (editando.value) {
         form.put(route('director.periodos.update', editando.value.id_periodo), {
             preserveScroll: true,
@@ -194,8 +218,31 @@ function modalidadATipo(tipo, modalidad) {
     return map[modalidad] ?? 'semestral';
 }
 
+const feLote = ref({});
+
+function validarLote() {
+    const e = {};
+    const en = errTexto(formLote.nombre, 'El nombre');                                       if (en) e.nombre        = en;
+    const ei = errFecha(formLote.fecha_inicio, 'La fecha de inicio');                        if (ei) e.fecha_inicio  = ei;
+    const ef = errFechaFin(formLote.fecha_fin, formLote.fecha_inicio, 'La fecha de fin'); if (ef) e.fecha_fin     = ef;
+    if (formLote.fecha_inicio_inscripcion) {
+        const eii = errFecha(formLote.fecha_inicio_inscripcion, 'La fecha de inicio de inscripciones'); if (eii) e.fecha_inicio_inscripcion = eii;
+    }
+    if (formLote.fecha_fin_inscripcion) {
+        const efi = errFechaFin(formLote.fecha_fin_inscripcion, formLote.fecha_inicio_inscripcion, 'La fecha de cierre de inscripciones'); if (efi) e.fecha_fin_inscripcion = efi;
+    }
+    if (formLote.id_carreras.length === 0) e.carreras = 'Seleccione al menos una carrera.';
+    feLote.value = e;
+    return Object.keys(e).length === 0;
+}
+
+watch(() => [formLote.nombre, formLote.fecha_inicio, formLote.fecha_fin, formLote.fecha_inicio_inscripcion, formLote.fecha_fin_inscripcion], () => {
+    if (Object.keys(feLote.value).length) validarLote();
+});
+
 function abrirLote() {
     formLote.reset();
+    feLote.value = {};
     plantillaSeleccionada.value = '';
     cronogramaLote.value = null;
     cronogramaInscripcionLote.value = null;
@@ -211,6 +258,7 @@ function abrirLote() {
 }
 
 function guardarLote() {
+    if (!validarLote()) return;
     const carreras = [];
     for (const c of props.carrerasSelect) {
         if (formLote.id_carreras.includes(c.id_carrera)) {
@@ -226,7 +274,7 @@ function guardarLote() {
     }
     formLote.carreras = carreras;
     formLote.post(route('director.periodos.lote'), {
-        onSuccess: () => { modalLote.value = false; formLote.reset(); },
+        onSuccess: () => { modalLote.value = false; formLote.reset(); feLote.value = {}; },
     });
 }
 
@@ -540,7 +588,7 @@ const carrerasFiltradas = computed(() => {
                         <input v-model="form.nombre" type="text"
                             placeholder="Ej: Semestre 1-2026"
                             class="input-field" maxlength="50" />
-                        <p v-if="form.errors.nombre" class="text-xs mt-1" style="color:#ef4444;">{{ form.errors.nombre }}</p>
+                        <p v-if="fe.nombre || form.errors.nombre" class="text-xs mt-1" style="color:#ef4444;">{{ fe.nombre || form.errors.nombre }}</p>
                     </div>
 
                     <!-- Tipo período -->
@@ -577,12 +625,12 @@ const carrerasFiltradas = computed(() => {
                             <div>
                                 <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Inicio clases *</label>
                                 <input v-model="form.fecha_inicio" type="date" class="input-field w-full" />
-                                <p v-if="form.errors.fecha_inicio" class="text-xs mt-1" style="color:#ef4444;">{{ form.errors.fecha_inicio }}</p>
+                                <p v-if="fe.fecha_inicio || form.errors.fecha_inicio" class="text-xs mt-1" style="color:#ef4444;">{{ fe.fecha_inicio || form.errors.fecha_inicio }}</p>
                             </div>
                             <div>
                                 <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Fin clases *</label>
                                 <input v-model="form.fecha_fin" type="date" class="input-field w-full" :min="form.fecha_inicio || ''" />
-                                <p v-if="form.errors.fecha_fin" class="text-xs mt-1" style="color:#ef4444;">{{ form.errors.fecha_fin }}</p>
+                                <p v-if="fe.fecha_fin || form.errors.fecha_fin" class="text-xs mt-1" style="color:#ef4444;">{{ fe.fecha_fin || form.errors.fecha_fin }}</p>
                             </div>
                         </div>
                         <p v-if="form.fecha_inicio && form.fecha_fin && duracionDias(form.fecha_inicio, form.fecha_fin)"
@@ -608,12 +656,12 @@ const carrerasFiltradas = computed(() => {
                             <div>
                                 <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Inicio inscripciones</label>
                                 <input v-model="form.fecha_inicio_inscripcion" type="date" class="input-field w-full" />
-                                <p v-if="form.errors.fecha_inicio_inscripcion" class="text-xs mt-1" style="color:#ef4444;">{{ form.errors.fecha_inicio_inscripcion }}</p>
+                                <p v-if="fe.fecha_inicio_inscripcion || form.errors.fecha_inicio_inscripcion" class="text-xs mt-1" style="color:#ef4444;">{{ fe.fecha_inicio_inscripcion || form.errors.fecha_inicio_inscripcion }}</p>
                             </div>
                             <div>
                                 <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Cierre inscripciones</label>
                                 <input v-model="form.fecha_fin_inscripcion" type="date" class="input-field w-full" :min="form.fecha_inicio_inscripcion || ''" />
-                                <p v-if="form.errors.fecha_fin_inscripcion" class="text-xs mt-1" style="color:#ef4444;">{{ form.errors.fecha_fin_inscripcion }}</p>
+                                <p v-if="fe.fecha_fin_inscripcion || form.errors.fecha_fin_inscripcion" class="text-xs mt-1" style="color:#ef4444;">{{ fe.fecha_fin_inscripcion || form.errors.fecha_fin_inscripcion }}</p>
                             </div>
                         </div>
                         <p v-if="form.fecha_inicio_inscripcion && form.fecha_fin_inscripcion && duracionDias(form.fecha_inicio_inscripcion, form.fecha_fin_inscripcion)"
@@ -681,7 +729,7 @@ const carrerasFiltradas = computed(() => {
                         <input v-model="formLote.nombre" type="text" maxlength="50"
                             placeholder="Ej: Semestre 1-2027"
                             class="input-field" />
-                        <p v-if="formLote.errors.nombre" class="text-xs mt-1" style="color:#ef4444;">{{ formLote.errors.nombre }}</p>
+                        <p v-if="feLote.nombre || formLote.errors.nombre" class="text-xs mt-1" style="color:#ef4444;">{{ feLote.nombre || formLote.errors.nombre }}</p>
                     </div>
 
                     <!-- Fechas de clases globales -->
@@ -702,12 +750,12 @@ const carrerasFiltradas = computed(() => {
                             <div>
                                 <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Inicio clases *</label>
                                 <input v-model="formLote.fecha_inicio" type="date" class="input-field" />
-                                <p v-if="formLote.errors.fecha_inicio" class="text-xs mt-1" style="color:#ef4444;">{{ formLote.errors.fecha_inicio }}</p>
+                                <p v-if="feLote.fecha_inicio || formLote.errors.fecha_inicio" class="text-xs mt-1" style="color:#ef4444;">{{ feLote.fecha_inicio || formLote.errors.fecha_inicio }}</p>
                             </div>
                             <div>
                                 <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Fin clases *</label>
                                 <input v-model="formLote.fecha_fin" type="date" class="input-field" :min="formLote.fecha_inicio || ''" />
-                                <p v-if="formLote.errors.fecha_fin" class="text-xs mt-1" style="color:#ef4444;">{{ formLote.errors.fecha_fin }}</p>
+                                <p v-if="feLote.fecha_fin || formLote.errors.fecha_fin" class="text-xs mt-1" style="color:#ef4444;">{{ feLote.fecha_fin || formLote.errors.fecha_fin }}</p>
                             </div>
                         </div>
                     </div>
@@ -729,10 +777,12 @@ const carrerasFiltradas = computed(() => {
                             <div>
                                 <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Inicio inscripciones</label>
                                 <input v-model="formLote.fecha_inicio_inscripcion" type="date" class="input-field" />
+                                <p v-if="feLote.fecha_inicio_inscripcion" class="text-xs mt-1" style="color:#ef4444;">{{ feLote.fecha_inicio_inscripcion }}</p>
                             </div>
                             <div>
                                 <label class="block text-xs font-medium mb-1" style="color: var(--text-secondary);">Cierre inscripciones</label>
                                 <input v-model="formLote.fecha_fin_inscripcion" type="date" class="input-field" :min="formLote.fecha_inicio_inscripcion || ''" />
+                                <p v-if="feLote.fecha_fin_inscripcion" class="text-xs mt-1" style="color:#ef4444;">{{ feLote.fecha_fin_inscripcion }}</p>
                             </div>
                         </div>
                         <p v-if="!formLote.fecha_inicio_inscripcion" class="text-[11px] mt-1.5 opacity-60" style="color: var(--text-secondary);">
@@ -752,7 +802,7 @@ const carrerasFiltradas = computed(() => {
                                 {{ todosSeleccionados ? 'Desmarcar todas' : 'Seleccionar todas' }}
                             </button>
                         </div>
-                        <p v-if="formLote.errors['carreras']" class="text-xs mb-2" style="color:#ef4444;">{{ formLote.errors['carreras'] }}</p>
+                        <p v-if="feLote.carreras || formLote.errors['carreras']" class="text-xs mb-2" style="color:#ef4444;">{{ feLote.carreras || formLote.errors['carreras'] }}</p>
 
                         <div class="space-y-1 rounded-lg border overflow-hidden" style="border-color: var(--border-color);">
                             <label v-for="c in carrerasSelect" :key="c.id_carrera"

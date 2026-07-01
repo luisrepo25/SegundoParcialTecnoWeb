@@ -49,6 +49,14 @@ class HorarioController extends Controller
             'dia_semana'  => 'required|string|in:' . implode(',', self::DIAS),
             'hora_inicio' => 'required|date_format:H:i',
             'hora_fin'    => 'required|date_format:H:i|after:hora_inicio',
+        ], [
+            'dia_semana.required'       => 'El día de la semana es obligatorio.',
+            'dia_semana.in'             => 'El día seleccionado no es válido.',
+            'hora_inicio.required'      => 'La hora de inicio es obligatoria.',
+            'hora_inicio.date_format'   => 'La hora de inicio debe tener formato HH:MM (ej: 08:00).',
+            'hora_fin.required'         => 'La hora de fin es obligatoria.',
+            'hora_fin.date_format'      => 'La hora de fin debe tener formato HH:MM (ej: 10:00).',
+            'hora_fin.after'            => 'La hora de fin debe ser posterior a la hora de inicio.',
         ]);
 
         // Evitar duplicados exactos
@@ -79,6 +87,14 @@ class HorarioController extends Controller
             'dia_semana'  => 'required|string|in:' . implode(',', self::DIAS),
             'hora_inicio' => 'required|date_format:H:i',
             'hora_fin'    => 'required|date_format:H:i|after:hora_inicio',
+        ], [
+            'dia_semana.required'       => 'El día de la semana es obligatorio.',
+            'dia_semana.in'             => 'El día seleccionado no es válido.',
+            'hora_inicio.required'      => 'La hora de inicio es obligatoria.',
+            'hora_inicio.date_format'   => 'La hora de inicio debe tener formato HH:MM (ej: 08:00).',
+            'hora_fin.required'         => 'La hora de fin es obligatoria.',
+            'hora_fin.date_format'      => 'La hora de fin debe tener formato HH:MM (ej: 10:00).',
+            'hora_fin.after'            => 'La hora de fin debe ser posterior a la hora de inicio.',
         ]);
 
         $horario->update([

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { useForm, router, usePage } from '@inertiajs/vue3';
+import { errEntero, errCodigo } from '@/utils/validacion.js';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import ComboSelect from '@/Components/ComboSelect.vue';
 
@@ -427,9 +428,26 @@ const abrirModal = (id_periodo = '') => {
     showModal.value = true;
 };
 
+const feNuevo = ref({});
+
+function validarNuevo() {
+    const e = {};
+    const ev = errEntero(formNuevo.vacantes_max, 'Las vacantes', 1, 500); if (ev) e.vacantes_max = ev;
+    if (formNuevo.codigo_grupo !== '' && formNuevo.codigo_grupo !== null) {
+        const ec = errCodigo(formNuevo.codigo_grupo, 'El código de grupo'); if (ec) e.codigo_grupo = ec;
+    }
+    feNuevo.value = e;
+    return Object.keys(e).length === 0;
+}
+
+watch(() => [formNuevo.vacantes_max, formNuevo.codigo_grupo], () => {
+    if (Object.keys(feNuevo.value).length) validarNuevo();
+});
+
 const guardarNuevo = () => {
+    if (!validarNuevo()) return;
     formNuevo.post(route('director.grupos.store'), {
-        onSuccess: () => { showModal.value = false; formNuevo.reset(); },
+        onSuccess: () => { showModal.value = false; formNuevo.reset(); feNuevo.value = {}; },
     });
 };
 
@@ -532,9 +550,26 @@ function toggleDiaAgregarEdit(idHorario) {
     else formEdit.dias_agregar.splice(idx, 1);
 }
 
+const feEdit = ref({});
+
+function validarEdit() {
+    const e = {};
+    const ev = errEntero(formEdit.vacantes_max, 'Las vacantes', 1, 500); if (ev) e.vacantes_max = ev;
+    if (formEdit.codigo_grupo !== '' && formEdit.codigo_grupo !== null) {
+        const ec = errCodigo(formEdit.codigo_grupo, 'El código de grupo'); if (ec) e.codigo_grupo = ec;
+    }
+    feEdit.value = e;
+    return Object.keys(e).length === 0;
+}
+
+watch(() => [formEdit.vacantes_max, formEdit.codigo_grupo], () => {
+    if (Object.keys(feEdit.value).length) validarEdit();
+});
+
 const guardarEdit = () => {
+    if (!validarEdit()) return;
     formEdit.put(route('director.grupos.update', grupoEdit.value.id_oferta), {
-        onSuccess: () => { showEdit.value = false; },
+        onSuccess: () => { showEdit.value = false; feEdit.value = {}; },
     });
 };
 
@@ -1277,7 +1312,7 @@ const fmtFecha = (f) => {
                                 <p v-if="formNuevo.vacantes_max > aulaCapacidad" class="text-xs mt-1" style="color:#ef4444;">
                                     Supera capacidad del aula ({{ aulaCapacidad }})
                                 </p>
-                                <p v-else-if="formNuevo.errors.vacantes_max" class="text-xs mt-1" style="color:#ef4444;">{{ formNuevo.errors.vacantes_max }}</p>
+                                <p v-else-if="feNuevo.vacantes_max || formNuevo.errors.vacantes_max" class="text-xs mt-1" style="color:#ef4444;">{{ feNuevo.vacantes_max || formNuevo.errors.vacantes_max }}</p>
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold mb-1" style="color: var(--text-secondary);">
@@ -1287,7 +1322,7 @@ const fmtFecha = (f) => {
                                     placeholder="Ej: PROG101-A"
                                     class="w-full rounded-lg border px-3 py-2 text-sm outline-none"
                                     style="background-color: var(--card-bg); border-color: var(--border-color); color: var(--text-color);" />
-                                <p v-if="formNuevo.errors.codigo_grupo" class="text-xs mt-1" style="color:#ef4444;">{{ formNuevo.errors.codigo_grupo }}</p>
+                                <p v-if="feNuevo.codigo_grupo || formNuevo.errors.codigo_grupo" class="text-xs mt-1" style="color:#ef4444;">{{ feNuevo.codigo_grupo || formNuevo.errors.codigo_grupo }}</p>
                                 <p v-else class="text-[11px] mt-0.5 opacity-50" style="color: var(--text-secondary);">Auto: G-{ID} si vacío</p>
                             </div>
                         </div>
@@ -1521,7 +1556,7 @@ const fmtFecha = (f) => {
                             <p v-if="formEdit.vacantes_max > aulaEditCapacidad" class="text-xs mt-1" style="color:#ef4444;">
                                 Supera la capacidad del aula ({{ aulaEditCapacidad }})
                             </p>
-                            <p v-if="formEdit.errors.vacantes_max" class="text-xs mt-1" style="color:#ef4444;">{{ formEdit.errors.vacantes_max }}</p>
+                            <p v-if="feEdit.vacantes_max || formEdit.errors.vacantes_max" class="text-xs mt-1" style="color:#ef4444;">{{ feEdit.vacantes_max || formEdit.errors.vacantes_max }}</p>
                         </div>
 
                         <!-- Código grupo -->
@@ -1537,6 +1572,7 @@ const fmtFecha = (f) => {
                             <input v-model="formEdit.codigo_grupo" type="text" maxlength="20"
                                 class="w-full rounded-lg border px-3 py-2 text-sm outline-none"
                                 style="background-color: var(--card-bg); border-color: var(--border-color); color: var(--text-color);" />
+                            <p v-if="feEdit.codigo_grupo || formEdit.errors.codigo_grupo" class="text-xs mt-1" style="color:#ef4444;">{{ feEdit.codigo_grupo || formEdit.errors.codigo_grupo }}</p>
                         </div>
                     </div>
                     <div class="flex justify-end gap-3 px-6 py-4 border-t shrink-0" style="border-color: var(--border-color);">

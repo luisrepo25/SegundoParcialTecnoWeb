@@ -1,7 +1,8 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, useForm, usePage } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
+import { errNombre, errDni, errEmail, errTelefono } from '@/utils/validacion.js';
 
 const props = defineProps({
     carreras: Array,
@@ -20,11 +21,31 @@ const form = useForm({
     id_carrera: '',
 });
 
+const fe = ref({});
+
+function validarCampos() {
+    const e = {};
+    const n = errNombre(form.nombre);                    if (n) e.nombre   = n;
+    const a = errNombre(form.apellido, 'El apellido');   if (a) e.apellido = a;
+    const d = errDni(form.dni);                         if (d) e.dni      = d;
+    const em = errEmail(form.email);                    if (em) e.email   = em;
+    const t = errTelefono(form.telefono);               if (t) e.telefono = t;
+    if (!form.id_carrera) e.id_carrera = 'Seleccione una carrera.';
+    fe.value = e;
+    return Object.keys(e).length === 0;
+}
+
+watch(() => [form.nombre, form.apellido, form.dni, form.email, form.telefono, form.id_carrera], () => {
+    if (Object.keys(fe.value).length) validarCampos();
+});
+
 function submitForm() {
+    if (!validarCampos()) return;
     form.post(route('secretaria.inscripciones.manual'), {
         preserveScroll: true,
         onSuccess: () => {
             form.reset();
+            fe.value = {};
         }
     });
 }
@@ -81,29 +102,29 @@ function submitForm() {
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-light text-[var(--text-muted)] mb-1">Nombre(s)</label>
-                            <input v-model="form.nombre" type="text" class="w-full bg-transparent border border-[var(--border-color)] rounded-sm px-4 py-2 text-[var(--text-color)] focus:outline-none focus:border-[var(--primary-color)] font-light" required>
-                            <div v-if="form.errors.nombre" class="text-rose-500 text-xs mt-1">{{ form.errors.nombre }}</div>
+                            <input v-model="form.nombre" type="text" class="w-full bg-transparent border border-[var(--border-color)] rounded-sm px-4 py-2 text-[var(--text-color)] focus:outline-none focus:border-[var(--primary-color)] font-light">
+                            <div v-if="fe.nombre || form.errors.nombre" class="text-rose-500 text-xs mt-1">{{ fe.nombre || form.errors.nombre }}</div>
                         </div>
                         <div>
                             <label class="block text-sm font-light text-[var(--text-muted)] mb-1">Apellido(s)</label>
-                            <input v-model="form.apellido" type="text" class="w-full bg-transparent border border-[var(--border-color)] rounded-sm px-4 py-2 text-[var(--text-color)] focus:outline-none focus:border-[var(--primary-color)] font-light" required>
-                            <div v-if="form.errors.apellido" class="text-rose-500 text-xs mt-1">{{ form.errors.apellido }}</div>
+                            <input v-model="form.apellido" type="text" class="w-full bg-transparent border border-[var(--border-color)] rounded-sm px-4 py-2 text-[var(--text-color)] focus:outline-none focus:border-[var(--primary-color)] font-light">
+                            <div v-if="fe.apellido || form.errors.apellido" class="text-rose-500 text-xs mt-1">{{ fe.apellido || form.errors.apellido }}</div>
                         </div>
                         <div>
                             <label class="block text-sm font-light text-[var(--text-muted)] mb-1">Cédula de Identidad (DNI)</label>
-                            <input v-model="form.dni" type="text" class="w-full bg-transparent border border-[var(--border-color)] rounded-sm px-4 py-2 text-[var(--text-color)] focus:outline-none focus:border-[var(--primary-color)] font-light" required>
+                            <input v-model="form.dni" type="text" class="w-full bg-transparent border border-[var(--border-color)] rounded-sm px-4 py-2 text-[var(--text-color)] focus:outline-none focus:border-[var(--primary-color)] font-light">
                             <p class="text-[11px] text-[var(--text-muted)] mt-1 font-light opacity-60">Se usará como contraseña inicial.</p>
-                            <div v-if="form.errors.dni" class="text-rose-500 text-xs mt-1">{{ form.errors.dni }}</div>
+                            <div v-if="fe.dni || form.errors.dni" class="text-rose-500 text-xs mt-1">{{ fe.dni || form.errors.dni }}</div>
                         </div>
                         <div>
                             <label class="block text-sm font-light text-[var(--text-muted)] mb-1">Teléfono (Opcional)</label>
                             <input v-model="form.telefono" type="text" class="w-full bg-transparent border border-[var(--border-color)] rounded-sm px-4 py-2 text-[var(--text-color)] focus:outline-none focus:border-[var(--primary-color)] font-light">
-                            <div v-if="form.errors.telefono" class="text-rose-500 text-xs mt-1">{{ form.errors.telefono }}</div>
+                            <div v-if="fe.telefono || form.errors.telefono" class="text-rose-500 text-xs mt-1">{{ fe.telefono || form.errors.telefono }}</div>
                         </div>
                         <div class="md:col-span-2">
                             <label class="block text-sm font-light text-[var(--text-muted)] mb-1">Correo Electrónico</label>
-                            <input v-model="form.email" type="email" class="w-full bg-transparent border border-[var(--border-color)] rounded-sm px-4 py-2 text-[var(--text-color)] focus:outline-none focus:border-[var(--primary-color)] font-light" required>
-                            <div v-if="form.errors.email" class="text-rose-500 text-xs mt-1">{{ form.errors.email }}</div>
+                            <input v-model="form.email" type="text" class="w-full bg-transparent border border-[var(--border-color)] rounded-sm px-4 py-2 text-[var(--text-color)] focus:outline-none focus:border-[var(--primary-color)] font-light">
+                            <div v-if="fe.email || form.errors.email" class="text-rose-500 text-xs mt-1">{{ fe.email || form.errors.email }}</div>
                         </div>
                     </div>
 
@@ -119,7 +140,7 @@ function submitForm() {
                                 {{ c.nombre }} ({{ c.duracion_niveles }} semestres)
                             </option>
                         </select>
-                        <div v-if="form.errors.id_carrera" class="text-rose-500 text-xs mt-1">{{ form.errors.id_carrera }}</div>
+                        <div v-if="fe.id_carrera || form.errors.id_carrera" class="text-rose-500 text-xs mt-1">{{ fe.id_carrera || form.errors.id_carrera }}</div>
                     </div>
 
                     <div class="bg-[var(--bg-color)] border border-[var(--border-color)] rounded-sm p-4 flex items-center justify-between">

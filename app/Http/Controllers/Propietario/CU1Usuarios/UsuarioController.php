@@ -64,13 +64,13 @@ class UsuarioController extends Controller
         $permitidos = $this->rolesPermitidos();
 
         $request->validate([
-            'nombre'      => 'required|string|max:100',
-            'apellido'    => 'required|string|max:100',
-            'email'       => 'required|email|unique:usuarios,email',
-            'dni'         => 'required|string|max:20|unique:usuarios,dni',
+            'nombre'      => ['required','string','max:100','regex:/^[\pL\s\'\-]+$/u'],
+            'apellido'    => ['required','string','max:100','regex:/^[\pL\s\'\-]+$/u'],
+            'email'       => 'required|email:rfc|unique:usuarios,email',
+            'dni'         => ['required','string','max:20','unique:usuarios,dni','regex:/^[0-9]+$/'],
             'password'    => 'required|string|min:6|confirmed',
             'id_rol'      => ['required', 'integer', Rule::in($permitidos)],
-            'telefono'    => 'nullable|string|max:20',
+            'telefono'    => ['nullable','string','max:20','regex:/^[0-9+\-\s()]*$/'],
             'direccion'   => 'nullable|string',
             // Campos de profesor
             'especialidad'       => 'required_if:id_rol,4|nullable|string|max:100',
@@ -112,11 +112,11 @@ class UsuarioController extends Controller
         $usuario = Usuario::findOrFail($id);
 
         $request->validate([
-            'nombre'    => 'required|string|max:100',
-            'apellido'  => 'required|string|max:100',
-            'email'     => ['required', 'email', Rule::unique('usuarios', 'email')->ignore($id, 'id_usuario')],
-            'dni'       => ['required', 'string', 'max:20', Rule::unique('usuarios', 'dni')->ignore($id, 'id_usuario')],
-            'telefono'  => 'nullable|string|max:20',
+            'nombre'    => ['required','string','max:100','regex:/^[\pL\s\'\-]+$/u'],
+            'apellido'  => ['required','string','max:100','regex:/^[\pL\s\'\-]+$/u'],
+            'email'     => ['required', 'email:rfc', Rule::unique('usuarios', 'email')->ignore($id, 'id_usuario')],
+            'dni'       => ['required','string','max:20','regex:/^[0-9]+$/',Rule::unique('usuarios','dni')->ignore($id,'id_usuario')],
+            'telefono'  => ['nullable','string','max:20','regex:/^[0-9+\-\s()]*$/'],
             'direccion' => 'nullable|string',
         ]);
 

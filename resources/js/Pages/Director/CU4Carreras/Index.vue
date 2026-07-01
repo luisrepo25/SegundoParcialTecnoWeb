@@ -2,6 +2,7 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
+import { errCodigo, errTexto, errEntero, errDecimal } from '@/utils/validacion.js';
 
 const canEdit = computed(() => ['propietario', 'director'].includes(usePage().props.auth?.user?.role));
 
@@ -99,9 +100,30 @@ function abrirEditar(c) {
     showModal.value   = true;
 }
 
-function cerrar() { showModal.value = false; form.reset(); form.clearErrors(); }
+const fe = ref({});
+
+function validarCampos() {
+    const e = {};
+    const ec = errCodigo(form.codigo, 'El código');                                         if (ec) e.codigo    = ec;
+    const en = errTexto(form.nombre, 'El nombre');                                          if (en) e.nombre    = en;
+    const ed = errEntero(form.duracion_niveles, 'La duración', 1, esCursoLibre.value ? 60 : 20); if (ed) e.duracion_niveles = ed;
+    const em = errEntero(form.max_materias, 'Las materias por período', 1, 30);             if (em) e.max_materias = em;
+    if (!esCursoLibre.value && !form.modalidad) e.modalidad = 'La modalidad es obligatoria.';
+    if (form.costo_carrera_completa !== '' && form.costo_carrera_completa !== null) {
+        const ep = errDecimal(form.costo_carrera_completa, 'El costo total');               if (ep) e.costo_carrera_completa = ep;
+    }
+    fe.value = e;
+    return Object.keys(e).length === 0;
+}
+
+watch(() => [form.codigo, form.nombre, form.duracion_niveles, form.max_materias, form.costo_carrera_completa, form.modalidad], () => {
+    if (Object.keys(fe.value).length) validarCampos();
+});
+
+function cerrar() { showModal.value = false; form.reset(); form.clearErrors(); fe.value = {}; }
 
 function guardar() {
+    if (!validarCampos()) return;
     if (modoEdicion.value) {
         form.put(route('director.carreras.update', editandoId.value), { onSuccess: cerrar });
     } else {
@@ -294,7 +316,7 @@ function formatCosto(val) {
                             <div>
                                 <label class="field-label">Código *</label>
                                 <input v-model="form.codigo" type="text" class="field-input" placeholder="Ej: ING-SIS" />
-                                <p v-if="form.errors.codigo" class="field-error">{{ form.errors.codigo }}</p>
+                                <p v-if="fe.codigo || form.errors.codigo" class="field-error">{{ fe.codigo || form.errors.codigo }}</p>
                             </div>
                             <div>
                                 <label class="field-label">Tipo *</label>
@@ -326,7 +348,7 @@ function formatCosto(val) {
                             <p class="text-[11px] mt-1" style="color: var(--text-secondary);">
                                 Define cuántos períodos se crean por año para esta carrera.
                             </p>
-                            <p v-if="form.errors.modalidad" class="field-error">{{ form.errors.modalidad }}</p>
+                            <p v-if="fe.modalidad || form.errors.modalidad" class="field-error">{{ fe.modalidad || form.errors.modalidad }}</p>
                         </div>
 
                         <!-- Cursos libres: info de lanzamiento manual -->
@@ -340,7 +362,7 @@ function formatCosto(val) {
                         <div>
                             <label class="field-label">Nombre *</label>
                             <input v-model="form.nombre" type="text" class="field-input" placeholder="Ej: Ingeniería de Sistemas" />
-                            <p v-if="form.errors.nombre" class="field-error">{{ form.errors.nombre }}</p>
+                            <p v-if="fe.nombre || form.errors.nombre" class="field-error">{{ fe.nombre || form.errors.nombre }}</p>
                         </div>
 
                         <div>
@@ -361,7 +383,7 @@ function formatCosto(val) {
                                     <template v-if="esCursoLibre">duración de un lanzamiento</template>
                                     <template v-else>años de la carrera</template>
                                 </p>
-                                <p v-if="form.errors.duracion_niveles" class="field-error">{{ form.errors.duracion_niveles }}</p>
+                                <p v-if="fe.duracion_niveles || form.errors.duracion_niveles" class="field-error">{{ fe.duracion_niveles || form.errors.duracion_niveles }}</p>
                             </div>
                             <div>
                                 <label class="field-label">Materias por período *</label>
@@ -373,12 +395,12 @@ function formatCosto(val) {
                                         = {{ form.max_materias * (form.modalidad === 'semestral' ? 2 : form.modalidad === 'mensual' ? 12 : 1) }} mat/año por nivel
                                     </template>
                                 </p>
-                                <p v-if="form.errors.max_materias" class="field-error">{{ form.errors.max_materias }}</p>
+                                <p v-if="fe.max_materias || form.errors.max_materias" class="field-error">{{ fe.max_materias || form.errors.max_materias }}</p>
                             </div>
                             <div>
                                 <label class="field-label">Costo Total (Bs)</label>
                                 <input v-model="form.costo_carrera_completa" type="number" min="0" step="0.01" class="field-input" placeholder="Ej: 15000.00" />
-                                <p v-if="form.errors.costo_carrera_completa" class="field-error">{{ form.errors.costo_carrera_completa }}</p>
+                                <p v-if="fe.costo_carrera_completa || form.errors.costo_carrera_completa" class="field-error">{{ fe.costo_carrera_completa || form.errors.costo_carrera_completa }}</p>
                             </div>
                         </div>
 

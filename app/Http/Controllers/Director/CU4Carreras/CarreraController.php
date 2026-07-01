@@ -43,7 +43,7 @@ class CarreraController extends Controller
         $esCurso = $request->tipo === 'curso_libre';
 
         $request->validate([
-            'codigo'                 => 'required|string|max:20|unique:carreras,codigo',
+            'codigo'                 => ['required','string','max:20','unique:carreras,codigo','regex:/^[a-zA-Z0-9\-_]+$/'],
             'nombre'                 => 'required|string|max:150',
             'descripcion'            => 'nullable|string',
             'tipo'                   => 'required|string|in:tecnico,tecnico_superior,curso_libre',
@@ -52,6 +52,20 @@ class CarreraController extends Controller
             'max_materias'           => 'required|integer|min:1|max:30',
             'duracion_niveles'       => 'required|integer|min:1|max:' . ($esCurso ? '60' : '20'),
             'costo_carrera_completa' => 'nullable|numeric|min:0',
+        ], [
+            'codigo.required'              => 'El código es obligatorio.',
+            'codigo.unique'                => 'Ya existe una carrera con ese código.',
+            'codigo.regex'                 => 'El código solo debe contener letras, números, guiones y guiones bajos.',
+            'nombre.required'              => 'El nombre de la carrera es obligatorio.',
+            'modalidad.required'           => 'La modalidad es obligatoria.',
+            'max_materias.required'        => 'Las materias por período son obligatorias.',
+            'max_materias.min'             => 'Debe haber al menos 1 materia por período.',
+            'max_materias.max'             => 'No puede superar 30 materias por período.',
+            'duracion_niveles.required'    => 'La duración es obligatoria.',
+            'duracion_niveles.integer'     => 'La duración debe ser un número entero.',
+            'duracion_niveles.min'         => 'La duración debe ser al menos 1.',
+            'costo_carrera_completa.numeric' => 'El costo debe ser un número válido (ej: 15000 o 15000.50).',
+            'costo_carrera_completa.min'     => 'El costo no puede ser negativo.',
         ]);
 
         Carrera::create([
@@ -76,7 +90,7 @@ class CarreraController extends Controller
         $esCurso  = $request->tipo === 'curso_libre';
 
         $request->validate([
-            'codigo'                 => ['required', 'string', 'max:20', Rule::unique('carreras', 'codigo')->ignore($id, 'id_carrera')],
+            'codigo'                 => ['required','string','max:20',Rule::unique('carreras','codigo')->ignore($id,'id_carrera'),'regex:/^[a-zA-Z0-9\-_]+$/'],
             'nombre'                 => 'required|string|max:150',
             'descripcion'            => 'nullable|string',
             'tipo'                   => 'required|string|in:tecnico,tecnico_superior,curso_libre',
@@ -85,6 +99,20 @@ class CarreraController extends Controller
             'max_materias'           => 'required|integer|min:1|max:30',
             'duracion_niveles'       => 'required|integer|min:1|max:' . ($esCurso ? '60' : '20'),
             'costo_carrera_completa' => 'nullable|numeric|min:0',
+        ], [
+            'codigo.required'              => 'El código es obligatorio.',
+            'codigo.unique'                => 'Ya existe una carrera con ese código.',
+            'codigo.regex'                 => 'El código solo debe contener letras, números, guiones y guiones bajos.',
+            'nombre.required'              => 'El nombre de la carrera es obligatorio.',
+            'modalidad.required'           => 'La modalidad es obligatoria.',
+            'max_materias.required'        => 'Las materias por período son obligatorias.',
+            'max_materias.min'             => 'Debe haber al menos 1 materia por período.',
+            'max_materias.max'             => 'No puede superar 30 materias por período.',
+            'duracion_niveles.required'    => 'La duración es obligatoria.',
+            'duracion_niveles.integer'     => 'La duración debe ser un número entero.',
+            'duracion_niveles.min'         => 'La duración debe ser al menos 1.',
+            'costo_carrera_completa.numeric' => 'El costo debe ser un número válido (ej: 15000 o 15000.50).',
+            'costo_carrera_completa.min'     => 'El costo no puede ser negativo.',
         ]);
 
         $carrera->update([

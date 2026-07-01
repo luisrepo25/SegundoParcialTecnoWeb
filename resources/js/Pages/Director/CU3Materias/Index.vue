@@ -3,6 +3,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 import ComboSelect from '@/Components/ComboSelect.vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
+import { errCodigo, errTexto, errEntero, errDecimal } from '@/utils/validacion.js';
 
 const canEdit = computed(() => ['propietario', 'director'].includes(usePage().props.auth?.user?.role));
 
@@ -57,9 +58,29 @@ function abrirEditar(m) {
     showModal.value   = true;
 }
 
-function cerrar() { showModal.value = false; form.reset(); form.clearErrors(); }
+const fe = ref({});
+
+function validarCampos() {
+    const e = {};
+    const ec = errCodigo(form.codigo, 'El código');                    if (ec) e.codigo         = ec;
+    const en = errTexto(form.nombre, 'El nombre');                     if (en) e.nombre         = en;
+    const ed = errEntero(form.duracion_meses, 'La duración en meses'); if (ed) e.duracion_meses = ed;
+    const ep = errDecimal(form.costo_mensual, 'El costo mensual');     if (ep) e.costo_mensual  = ep;
+    if (form.creditos !== '' && form.creditos !== null) {
+        const ecr = errEntero(form.creditos, 'Los créditos', 0);       if (ecr) e.creditos = ecr;
+    }
+    fe.value = e;
+    return Object.keys(e).length === 0;
+}
+
+watch(() => [form.codigo, form.nombre, form.duracion_meses, form.costo_mensual, form.creditos], () => {
+    if (Object.keys(fe.value).length) validarCampos();
+});
+
+function cerrar() { showModal.value = false; form.reset(); form.clearErrors(); fe.value = {}; }
 
 function guardar() {
+    if (!validarCampos()) return;
     if (modoEdicion.value) {
         form.put(route('director.materias.update', editandoId.value), { onSuccess: cerrar });
     } else {
@@ -226,32 +247,32 @@ function formatCosto(val) {
                             <div>
                                 <label class="field-label">Código *</label>
                                 <input v-model="form.codigo" type="text" class="field-input" placeholder="Ej: MAT-001" />
-                                <p v-if="form.errors.codigo" class="field-error">{{ form.errors.codigo }}</p>
+                                <p v-if="fe.codigo || form.errors.codigo" class="field-error">{{ fe.codigo || form.errors.codigo }}</p>
                             </div>
                             <div>
                                 <label class="field-label">Créditos</label>
                                 <input v-model="form.creditos" type="number" min="0" class="field-input" placeholder="Ej: 4" />
-                                <p v-if="form.errors.creditos" class="field-error">{{ form.errors.creditos }}</p>
+                                <p v-if="fe.creditos || form.errors.creditos" class="field-error">{{ fe.creditos || form.errors.creditos }}</p>
                             </div>
                         </div>
 
                         <div>
                             <label class="field-label">Nombre *</label>
                             <input v-model="form.nombre" type="text" class="field-input" placeholder="Ej: Matemáticas I" />
-                            <p v-if="form.errors.nombre" class="field-error">{{ form.errors.nombre }}</p>
+                            <p v-if="fe.nombre || form.errors.nombre" class="field-error">{{ fe.nombre || form.errors.nombre }}</p>
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="field-label">Duración (meses) *</label>
                                 <input v-model="form.duracion_meses" type="number" min="1" class="field-input" placeholder="Ej: 3" />
-                                <p v-if="form.errors.duracion_meses" class="field-error">{{ form.errors.duracion_meses }}</p>
+                                <p v-if="fe.duracion_meses || form.errors.duracion_meses" class="field-error">{{ fe.duracion_meses || form.errors.duracion_meses }}</p>
                             </div>
                             <div>
                                 <label class="field-label">Precio sugerido (Bs) *</label>
                                 <input v-model="form.costo_mensual" type="number" min="0" step="0.01" class="field-input" placeholder="Ej: 500.00" />
                                 <p class="text-xs mt-1" style="color: var(--text-secondary);">Solo para materia suelta. En carrera, el sistema calcula el costo automáticamente.</p>
-                                <p v-if="form.errors.costo_mensual" class="field-error">{{ form.errors.costo_mensual }}</p>
+                                <p v-if="fe.costo_mensual || form.errors.costo_mensual" class="field-error">{{ fe.costo_mensual || form.errors.costo_mensual }}</p>
                             </div>
                         </div>
 

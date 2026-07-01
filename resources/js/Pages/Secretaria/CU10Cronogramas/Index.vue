@@ -2,6 +2,7 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, router, usePage } from '@inertiajs/vue3';
 import { ref, computed, watch } from 'vue';
+import { errTexto, errFecha, errFechaFin } from '@/utils/validacion.js';
 
 const canEdit = computed(() => ['propietario', 'director'].includes(usePage().props.auth?.user?.role));
 
@@ -104,8 +105,18 @@ function abrirCrear() {
     showCrear.value = true;
 }
 
+function validarCrear() {
+    const e = {};
+    const en = errTexto(formCrear.value.nombre, 'El nombre');                              if (en) e.nombre        = en;
+    const ei = errFecha(formCrear.value.fecha_inicio, 'La fecha de inicio');               if (ei) e.fecha_inicio  = ei;
+    const ef = errFechaFin(formCrear.value.fecha_fin, formCrear.value.fecha_inicio, 'La fecha de fin'); if (ef) e.fecha_fin = ef;
+    formCrear.value.errors = e;
+    return Object.keys(e).length === 0;
+}
+
 function submitCrear() {
     if (loadingCrear.value) return;
+    if (!validarCrear()) return;
     loadingCrear.value = true;
     const data = {
         nombre:       formCrear.value.nombre,
@@ -149,8 +160,18 @@ function abrirEditar(c) {
     showEditar.value = true;
 }
 
+function validarEditar() {
+    const e = {};
+    const en = errTexto(formEditar.value.nombre, 'El nombre');                                if (en) e.nombre        = en;
+    const ei = errFecha(formEditar.value.fecha_inicio, 'La fecha de inicio');                 if (ei) e.fecha_inicio  = ei;
+    const ef = errFechaFin(formEditar.value.fecha_fin, formEditar.value.fecha_inicio, 'La fecha de fin'); if (ef) e.fecha_fin = ef;
+    formEditar.value.errors = e;
+    return Object.keys(e).length === 0;
+}
+
 function submitEditar() {
     if (loadingEditar.value) return;
+    if (!validarEditar()) return;
     loadingEditar.value = true;
     const data = {
         nombre:       formEditar.value.nombre,

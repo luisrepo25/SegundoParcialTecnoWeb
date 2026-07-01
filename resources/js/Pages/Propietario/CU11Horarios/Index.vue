@@ -2,6 +2,7 @@
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref, watch, computed } from 'vue';
+import { errHora, errHoraFin } from '@/utils/validacion.js';
 
 const canEdit = computed(() => ['propietario', 'director'].includes(usePage().props.auth?.user?.role));
 
@@ -57,9 +58,25 @@ function abrirEditar(h) {
     showModal.value   = true;
 }
 
-function cerrar() { showModal.value = false; form.reset(); form.clearErrors(); }
+const fe = ref({});
+
+function validarCampos() {
+    const e = {};
+    if (!form.dia_semana) e.dia_semana = 'El día de la semana es obligatorio.';
+    const ei = errHora(form.hora_inicio, 'La hora de inicio');  if (ei) e.hora_inicio = ei;
+    const ef = errHoraFin(form.hora_fin, form.hora_inicio);     if (ef) e.hora_fin    = ef;
+    fe.value = e;
+    return Object.keys(e).length === 0;
+}
+
+watch(() => [form.dia_semana, form.hora_inicio, form.hora_fin], () => {
+    if (Object.keys(fe.value).length) validarCampos();
+});
+
+function cerrar() { showModal.value = false; form.reset(); form.clearErrors(); fe.value = {}; }
 
 function guardar() {
+    if (!validarCampos()) return;
     if (modoEdicion.value) {
         form.put(route('propietario.horarios.update', editandoId.value), { onSuccess: cerrar });
     } else {
@@ -242,19 +259,19 @@ function formatHora(t) { return t ? t.substring(0, 5) : '—'; }
                                 <option value="">Seleccione un día</option>
                                 <option v-for="d in dias" :key="d" :value="d">{{ DIA_LABEL[d] ?? d }}</option>
                             </select>
-                            <p v-if="form.errors.dia_semana" class="field-error">{{ form.errors.dia_semana }}</p>
+                            <p v-if="fe.dia_semana || form.errors.dia_semana" class="field-error">{{ fe.dia_semana || form.errors.dia_semana }}</p>
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
                             <div>
                                 <label class="field-label">Hora inicio *</label>
                                 <input v-model="form.hora_inicio" type="time" class="field-input" />
-                                <p v-if="form.errors.hora_inicio" class="field-error">{{ form.errors.hora_inicio }}</p>
+                                <p v-if="fe.hora_inicio || form.errors.hora_inicio" class="field-error">{{ fe.hora_inicio || form.errors.hora_inicio }}</p>
                             </div>
                             <div>
                                 <label class="field-label">Hora fin *</label>
                                 <input v-model="form.hora_fin" type="time" class="field-input" />
-                                <p v-if="form.errors.hora_fin" class="field-error">{{ form.errors.hora_fin }}</p>
+                                <p v-if="fe.hora_fin || form.errors.hora_fin" class="field-error">{{ fe.hora_fin || form.errors.hora_fin }}</p>
                             </div>
                         </div>
 

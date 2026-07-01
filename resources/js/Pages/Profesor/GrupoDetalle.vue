@@ -2,6 +2,7 @@
 import { ref, computed, watch, nextTick } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import DocenteLayout from '@/Layouts/DocenteLayout.vue';
+import { errNota } from '@/utils/validacion.js';
 
 const props = defineProps({
     grupo:       { type: Object,  required: true },
@@ -72,6 +73,7 @@ const totalReprobados = computed(() =>
 // ── Modal individual ──────────────────────────────────────────────────────────
 const modalEst   = ref(null);
 const loadingInd = ref(false);
+const feInd      = ref({});
 
 function abrirModal(est) {
     modalEst.value = {
@@ -88,8 +90,19 @@ function abrirModal(est) {
     };
 }
 
+function validarIndividual() {
+    const e = {};
+    (modalEst.value?.evals ?? []).forEach(ev => {
+        const err = errNota(ev.calificacion);
+        if (err) e[ev.tipo] = err;
+    });
+    feInd.value = e;
+    return Object.keys(e).length === 0;
+}
+
 function submitIndividual() {
     if (loadingInd.value) return;
+    if (!validarIndividual()) return;
     loadingInd.value = true;
 
     router.post(route('profesor.evaluaciones.store'), {
@@ -102,7 +115,7 @@ function submitIndividual() {
         })),
     }, {
         preserveScroll: true,
-        onSuccess: () => { modalEst.value = null; },
+        onSuccess: () => { modalEst.value = null; feInd.value = {}; },
         onFinish:  () => { loadingInd.value = false; },
     });
 }
@@ -111,6 +124,7 @@ function submitIndividual() {
 const showMasivo   = ref(false);
 const loadingMas   = ref(false);
 const notasMasivas = ref({});
+const feMas        = ref([]);
 
 function abrirMasivo() {
     const n = {};
@@ -122,11 +136,28 @@ function abrirMasivo() {
         }
     }
     notasMasivas.value = n;
+    feMas.value = [];
     showMasivo.value = true;
+}
+
+function validarMasivo() {
+    const errores = [];
+    for (const est of props.estudiantes) {
+        for (const t of TIPOS) {
+            const val = notasMasivas.value[est.id_inscripcion]?.[t.key];
+            if (val !== '' && val !== null && val !== undefined) {
+                const err = errNota(val);
+                if (err) errores.push(`${est.apellido}, ${est.nombre} — ${tipoLabel(t)}: ${err}`);
+            }
+        }
+    }
+    feMas.value = errores;
+    return errores.length === 0;
 }
 
 function submitMasivo() {
     if (loadingMas.value) return;
+    if (!validarMasivo()) return;
     loadingMas.value = true;
 
     const notas = props.estudiantes.map(est => ({
@@ -146,7 +177,7 @@ function submitMasivo() {
         notas,
     }, {
         preserveScroll: true,
-        onSuccess: () => { showMasivo.value = false; },
+        onSuccess: () => { showMasivo.value = false; feMas.value = []; },
         onFinish:  () => { loadingMas.value = false; },
     });
 }
@@ -367,11 +398,14 @@ function submitMasivo() {
                                 {{ tipoLabel(TIPOS[i]) }}
                                 <span class="font-normal opacity-60 ml-1">{{ TIPOS[i].porcentaje }}%</span>
                             </span>
-                            <input v-model="ev.calificacion"
-                                type="number" min="0" max="100" step="0.5"
-                                placeholder="0–100"
-                                class="rounded border px-2 py-1 text-sm outline-none text-center"
-                                style="background-color:var(--card-bg);border-color:var(--border-color);color:var(--text-color);width:70px;" />
+                            <div class="flex flex-col gap-0.5">
+                                <input v-model="ev.calificacion"
+                                    type="number" min="0" max="100" step="0.5"
+                                    placeholder="0–100"
+                                    class="rounded border px-2 py-1 text-sm outline-none text-center"
+                                    style="background-color:var(--card-bg);border-color:var(--border-color);color:var(--text-color);width:70px;" />
+                                <p v-if="feInd[ev.tipo]" class="text-[10px]" style="color:#ef4444;">{{ feInd[ev.tipo] }}</p>
+                            </div>
                             <input v-model="ev.fecha" type="date"
                                 class="flex-1 rounded border px-2 py-1 text-xs outline-none"
                                 style="background-color:var(--card-bg);border-color:var(--border-color);color:var(--text-color);" />
@@ -452,22 +486,30 @@ function submitMasivo() {
                 </div>
 
                 <!-- Footer -->
-                <div class="flex items-center justify-between px-6 py-4 border-t shrink-0" style="border-color:var(--border-color);">
-                    <p class="text-xs" style="color:var(--text-secondary);">
-                        Las celdas vacías se omiten · Fecha automática: hoy
-                    </p>
-                    <div class="flex gap-3">
-                        <button @click="showMasivo = false"
-                            class="px-4 py-2 rounded-lg text-sm font-medium border"
-                            style="border-color:var(--border-color);color:var(--text-secondary);">
-                            Cancelar
-                        </button>
-                        <button @click="submitMasivo" :disabled="loadingMas"
-                            class="px-5 py-2 rounded-lg text-sm font-semibold transition"
-                            :style="loadingMas ? 'opacity:0.6;' : ''"
-                            style="background-color:var(--primary-color);color:var(--primary-text);">
-                            {{ loadingMas ? 'Guardando…' : 'Guardar Todo' }}
-                        </button>
+                <div class="px-6 py-4 border-t shrink-0 space-y-3" style="border-color:var(--border-color);">
+                    <!-- Errores de validación masiva -->
+                    <div v-if="feMas.length" class="rounded-lg border px-3 py-2 space-y-1"
+                         style="border-color:#fca5a5;background-color:color-mix(in srgb,#ef4444 6%,transparent);">
+                        <p class="text-xs font-semibold" style="color:#ef4444;">Corregí los siguientes valores antes de guardar:</p>
+                        <p v-for="err in feMas" :key="err" class="text-xs" style="color:#ef4444;">• {{ err }}</p>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <p class="text-xs" style="color:var(--text-secondary);">
+                            Las celdas vacías se omiten · Fecha automática: hoy
+                        </p>
+                        <div class="flex gap-3">
+                            <button @click="showMasivo = false"
+                                class="px-4 py-2 rounded-lg text-sm font-medium border"
+                                style="border-color:var(--border-color);color:var(--text-secondary);">
+                                Cancelar
+                            </button>
+                            <button @click="submitMasivo" :disabled="loadingMas"
+                                class="px-5 py-2 rounded-lg text-sm font-semibold transition"
+                                :style="loadingMas ? 'opacity:0.6;' : ''"
+                                style="background-color:var(--primary-color);color:var(--primary-text);">
+                                {{ loadingMas ? 'Guardando…' : 'Guardar Todo' }}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
