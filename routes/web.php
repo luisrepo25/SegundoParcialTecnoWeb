@@ -108,6 +108,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('role:propietario,director')
         ->name('propietario.reportes.index');
 
+    // CU15 — Bitácora del Sistema (solo propietario)
+    Route::get('/propietario/bitacora', [\App\Http\Controllers\Propietario\CU15Bitacora\BitacoraController::class, 'index'])
+        ->middleware('role:propietario')
+        ->name('propietario.bitacora.index');
+
     // CU2 y CU11 — lectura para todos los roles admin
     Route::middleware('role:propietario,director,secretaria')->prefix('propietario')->name('propietario.')->group(function () {
         Route::get('/aulas',    [AulaController::class,    'index'])->name('aulas.index');

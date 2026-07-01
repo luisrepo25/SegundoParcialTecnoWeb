@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Services\BitacoraService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -32,7 +33,14 @@ class AuthenticatedSessionController extends Controller
     public function store(LoginRequest $request): RedirectResponse
     {
         $token = $request->authenticate();
-        $user = JWTAuth::setToken($token)->authenticate();
+        $user  = JWTAuth::setToken($token)->authenticate();
+
+        // ── Bitácora: LOGIN exitoso ────────────────────────────────────────────
+        BitacoraService::registrar(
+            'LOGIN',
+            "Inicio de sesión · {$user->nombre} {$user->apellido} ({$user->email}) · Rol: {$user->role}",
+            $user->id_usuario,
+        );
 
         return $this->withJwtCookie(
             redirect($this->redirectToRoleDashboard($user?->role)),
@@ -47,11 +55,20 @@ class AuthenticatedSessionController extends Controller
     {
         $token = $request->cookie('jwt_token');
 
+        // ── Bitácora: LOGOUT — capturar usuario ANTES de invalidar el token ───
         if ($token) {
             try {
+                $user = JWTAuth::setToken($token)->authenticate();
+                if ($user) {
+                    BitacoraService::registrar(
+                        'LOGOUT',
+                        "Cierre de sesión · {$user->nombre} {$user->apellido} ({$user->email})",
+                        $user->id_usuario,
+                    );
+                }
                 JWTAuth::setToken($token)->invalidate();
             } catch (\Throwable) {
-                // If the token is already invalid, the cookie is still cleared below.
+                // Si el token ya expiró o es inválido, se ignora.
             }
         }
 
@@ -86,3 +103,4 @@ class AuthenticatedSessionController extends Controller
         );
     }
 }
+

@@ -62,10 +62,11 @@ const todasSecciones = [
         key: 'administrativo',
         label: 'Administrativo',
         items: [
-            { name: 'Gestión de Usuarios', route: 'propietario.usuarios.index', activeUrls: ['/propietario/usuarios'], roles: null },
-            { name: 'Gestión de Aulas',    route: 'propietario.aulas.index',    activeUrls: ['/propietario/aulas'],    roles: null },
-            { name: 'Gestión de Horarios', route: 'propietario.horarios.index', activeUrls: ['/propietario/horarios'], roles: null },
+            { name: 'Gestión de Usuarios', route: 'propietario.usuarios.index', activeUrls: ['/propietario/usuarios'],    roles: null },
+            { name: 'Gestión de Aulas',    route: 'propietario.aulas.index',    activeUrls: ['/propietario/aulas'],       roles: null },
+            { name: 'Gestión de Horarios', route: 'propietario.horarios.index', activeUrls: ['/propietario/horarios'],    roles: null },
             { name: 'Configuración del Sitio', route: 'propietario.configuracion.index', activeUrls: ['/propietario/configuracion'], roles: ['propietario', 'director'] },
+            { name: 'Bitácora del Sistema', route: 'propietario.bitacora.index',  activeUrls: ['/propietario/bitacora'],   roles: ['propietario'] },
         ],
     },
 ];
@@ -83,7 +84,7 @@ const reportesItem = { name: 'Reportes y Estadísticas', route: 'propietario.rep
 function detectActiveSection(url) {
     if (url.startsWith('/director/') || url.startsWith('/secretaria/cronogramas') || url.startsWith('/propietario/seguimiento')) return 'academico';
     if (url.startsWith('/secretaria/inscripciones') || url.startsWith('/secretaria/pagos')) return 'financiero';
-    if (url.startsWith('/propietario/usuarios') || url.startsWith('/propietario/aulas') || url.startsWith('/propietario/horarios')) return 'administrativo';
+    if (url.startsWith('/propietario/usuarios') || url.startsWith('/propietario/aulas') || url.startsWith('/propietario/horarios') || url.startsWith('/propietario/bitacora') || url.startsWith('/propietario/configuracion')) return 'administrativo';
     return null;
 }
 

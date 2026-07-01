@@ -8,6 +8,7 @@ use App\Models\PersonalAdministrativo;
 use App\Models\Profesor;
 use App\Models\Rol;
 use App\Models\Usuario;
+use App\Services\BitacoraService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -99,6 +100,11 @@ class UsuarioController extends Controller
 
         $this->crearPerfilRol($usuario, $request);
 
+        BitacoraService::registrar(
+            'CREAR_USUARIO',
+            "Usuario creado: {$usuario->nombre} {$usuario->apellido} (ID: {$usuario->id_usuario}, Rol: {$request->id_rol})",
+        );
+
         return redirect()->back()->with('success', 'Usuario creado correctamente.');
     }
 
@@ -124,6 +130,11 @@ class UsuarioController extends Controller
             'direccion' => $request->direccion,
         ]);
 
+        BitacoraService::registrar(
+            'EDITAR_USUARIO',
+            "Usuario actualizado: {$usuario->nombre} {$usuario->apellido} (ID: {$usuario->id_usuario})",
+        );
+
         return redirect()->back()->with('success', 'Usuario actualizado correctamente.');
     }
 
@@ -138,6 +149,12 @@ class UsuarioController extends Controller
         $usuario->update(['activo' => !$usuario->activo]);
 
         $estado = $usuario->activo ? 'activado' : 'desactivado';
+
+        BitacoraService::registrar(
+            'TOGGLE_USUARIO',
+            "Usuario {$estado}: {$usuario->nombre} {$usuario->apellido} (ID: {$usuario->id_usuario})",
+        );
+
         return redirect()->back()->with('success', "Usuario $estado correctamente.");
     }
 
@@ -149,6 +166,11 @@ class UsuarioController extends Controller
 
         $usuario = Usuario::findOrFail($id);
         $usuario->update(['password_hash' => Hash::make($request->password)]);
+
+        BitacoraService::registrar(
+            'CAMBIAR_PASSWORD',
+            "Contraseña actualizada para: {$usuario->nombre} {$usuario->apellido} (ID: {$usuario->id_usuario})",
+        );
 
         return redirect()->back()->with('success', 'Contraseña actualizada correctamente.');
     }
