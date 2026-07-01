@@ -1,0 +1,403 @@
+-- ============================================================
+-- ESQUEMA REAL DE PRODUCCION (Supabase / PostgreSQL)
+-- Host:    aws-1-sa-east-1.pooler.supabase.com:6543
+-- Base:    postgres
+-- Fecha:   2026-06-30
+-- Tablas:  35 (incluyendo tablas internas de Laravel)
+-- ============================================================
+
+-- ============================================================
+-- TABLAS DEL DOMINIO
+-- ============================================================
+
+CREATE TABLE afiliaciones_estudiante (
+    id_afiliacion             integer                      NOT NULL   DEFAULT nextval('afiliaciones_estudiante_id_afiliacion_seq'::regclass),
+    id_estudiante             integer                      NOT NULL,
+    id_carrera                integer                      NULL,
+    tipo_programa             character varying(20)        NOT NULL,
+    fecha_inicio              date                         NOT NULL,
+    fecha_fin                 date                         NULL,
+    estado                    character varying(15)        NULL       DEFAULT 'activo'::character varying,
+    observaciones             text                         NULL
+);
+
+CREATE TABLE aulas (
+    id_aula                   integer                      NOT NULL   DEFAULT nextval('aulas_id_aula_seq'::regclass),
+    nombre                    character varying(50)        NOT NULL,
+    capacidad                 integer                      NOT NULL,
+    ubicacion                 character varying(100)       NULL,
+    tipo                      character varying(20)        NULL       DEFAULT 'aula'::character varying,
+    activo                    boolean                      NULL       DEFAULT true
+);
+
+CREATE TABLE carreras (
+    id_carrera                integer                      NOT NULL   DEFAULT nextval('carreras_id_carrera_seq'::regclass),
+    codigo                    character varying(20)        NOT NULL,
+    nombre                    character varying(150)       NOT NULL,
+    descripcion               text                         NULL,
+    tipo                      character varying(20)        NULL       DEFAULT 'tecnico_superior'::character varying,
+    duracion_niveles          integer                      NOT NULL,
+    costo_carrera_completa    numeric(10,2)                NULL,
+    activo                    boolean                      NULL       DEFAULT true,
+    modalidad                 character varying(20)        NULL,
+    max_materias              integer                      NOT NULL   DEFAULT 5,
+    duracion_unidad           character varying(5)         NOT NULL   DEFAULT 'anos'::character varying
+);
+
+CREATE TABLE configuracion_sitio (
+    id                        bigint                       NOT NULL   DEFAULT nextval('configuracion_sitio_id_seq'::regclass),
+    nombre_institucion        character varying(255)       NOT NULL   DEFAULT 'Instituto San Pablo'::character varying,
+    descripcion               text                         NULL,
+    email                     character varying(255)       NULL,
+    telefono_1                character varying(255)       NULL,
+    telefono_2                character varying(255)       NULL,
+    direccion                 character varying(255)       NULL,
+    facebook_url              character varying(255)       NULL,
+    instagram_url             character varying(255)       NULL,
+    youtube_url               character varying(255)       NULL,
+    logo_path                 character varying(255)       NULL,
+    created_at                timestamp without time zone  NULL,
+    updated_at                timestamp without time zone  NULL
+);
+
+CREATE TABLE consumo_materias_carrera (
+    id_consumo                integer                      NOT NULL   DEFAULT nextval('consumo_materias_carrera_id_consumo_seq'::regclass),
+    id_pago_carrera           integer                      NOT NULL,
+    id_materia                integer                      NOT NULL,
+    id_inscripcion            integer                      NOT NULL,
+    intento_numero            integer                      NULL       DEFAULT 1,
+    pagado_adicional          boolean                      NULL       DEFAULT false,
+    fecha_consumo             date                         NULL       DEFAULT CURRENT_DATE
+);
+
+CREATE TABLE cronogramas (
+    id_cronograma             integer                      NOT NULL   DEFAULT nextval('cronogramas_id_cronograma_seq'::regclass),
+    id_periodo                integer                      NULL,
+    nombre                    character varying(50)        NOT NULL,
+    tipo_periodo              character varying(20)        NOT NULL,  -- 'inscripcion' | 'clases' | 'examenes' | 'receso'
+    fecha_inicio              date                         NOT NULL,
+    fecha_fin                 date                         NOT NULL,
+    activo                    boolean                      NULL       DEFAULT true,
+    modalidad                 character varying(20)        NULL       -- NULL = GLOBAL
+);
+
+CREATE TABLE cuotas_carrera (
+    id_cuota                  integer                      NOT NULL   DEFAULT nextval('cuotas_carrera_id_cuota_seq'::regclass),
+    id_pago_carrera           integer                      NOT NULL,
+    numero_cuota              integer                      NOT NULL,
+    monto                     numeric(10,2)                NOT NULL,
+    fecha_vencimiento         date                         NOT NULL,
+    fecha_pago                date                         NULL,
+    estado                    character varying(10)        NULL       DEFAULT 'pendiente'::character varying
+);
+
+CREATE TABLE estudiantes (
+    id_estudiante             integer                      NOT NULL   DEFAULT nextval('estudiantes_id_estudiante_seq'::regclass),
+    id_usuario                integer                      NOT NULL,
+    legajo                    character varying(20)        NOT NULL,
+    fecha_inscripcion_inicial date                         NOT NULL,
+    tutor_nombre              character varying(100)       NULL,
+    tutor_telefono            character varying(20)        NULL,
+    observaciones             text                         NULL,
+    id_carrera_actual         integer                      NULL
+);
+
+CREATE TABLE evaluaciones (
+    id_evaluacion             integer                      NOT NULL   DEFAULT nextval('evaluaciones_id_evaluacion_seq'::regclass),
+    id_inscripcion            integer                      NOT NULL,
+    id_profesor               integer                      NOT NULL,
+    tipo                      character varying(15)        NOT NULL,
+    descripcion               character varying(150)       NULL,
+    calificacion              numeric(5,2)                 NOT NULL,
+    porcentaje                numeric(5,2)                 NOT NULL,
+    fecha                     date                         NOT NULL
+);
+
+CREATE TABLE grupos (
+    id_oferta                 integer                      NOT NULL   DEFAULT nextval('oferta_academica_id_oferta_seq'::regclass),
+    id_materia                integer                      NOT NULL,
+    id_aula                   integer                      NOT NULL,
+    id_periodo                integer                      NOT NULL,
+    id_profesor               integer                      NOT NULL,
+    id_horario                integer                      NOT NULL,
+    vacantes_max              integer                      NOT NULL,
+    vacantes_ocupadas         integer                      NULL       DEFAULT 0,
+    activo                    boolean                      NULL       DEFAULT true,
+    codigo_grupo              character varying(20)        NULL
+);
+
+CREATE TABLE horarios (
+    id_horario                integer                      NOT NULL   DEFAULT nextval('horarios_id_horario_seq'::regclass),
+    dia_semana                character varying(15)        NOT NULL,
+    hora_inicio               time without time zone       NOT NULL,
+    hora_fin                  time without time zone       NOT NULL,
+    activo                    boolean                      NULL       DEFAULT true
+);
+
+CREATE TABLE inscripciones (
+    id_inscripcion            integer                      NOT NULL   DEFAULT nextval('inscripciones_id_inscripcion_seq'::regclass),
+    id_estudiante             integer                      NOT NULL,
+    id_oferta                 integer                      NOT NULL,
+    fecha_inscripcion         timestamp without time zone  NULL       DEFAULT CURRENT_TIMESTAMP,
+    estado                    character varying(30)        NULL       DEFAULT 'pendiente_matricula'::character varying,
+    calificacion_final        numeric(5,2)                 NULL,
+    aprobado                  boolean                      NULL,
+    observaciones             text                         NULL,
+    fecha_aprobacion          date                         NULL
+);
+
+CREATE TABLE malla_curricular (
+    id_malla                  integer                      NOT NULL   DEFAULT nextval('malla_curricular_id_malla_seq'::regclass),
+    id_carrera                integer                      NOT NULL,
+    id_nivel                  integer                      NULL,
+    id_materia                integer                      NOT NULL,
+    orden_en_nivel            integer                      NULL       DEFAULT 0,
+    obligatoria               boolean                      NULL       DEFAULT true
+);
+
+CREATE TABLE materias (
+    id_materia                integer                      NOT NULL   DEFAULT nextval('materias_id_materia_seq'::regclass),
+    codigo                    character varying(20)        NOT NULL,
+    nombre                    character varying(150)       NOT NULL,
+    duracion_meses            integer                      NULL       DEFAULT 1,
+    costo_mensual             numeric(10,2)                NOT NULL,
+    creditos                  integer                      NULL       DEFAULT 0,
+    activo                    boolean                      NULL       DEFAULT true,
+    id_materia_requisito      integer                      NULL
+);
+
+CREATE TABLE matricula_unica (
+    id_matricula              integer                      NOT NULL   DEFAULT nextval('matricula_unica_id_matricula_seq'::regclass),
+    id_estudiante             integer                      NOT NULL,
+    fecha_pago                date                         NOT NULL   DEFAULT CURRENT_DATE,
+    monto_pagado              numeric(10,2)                NOT NULL,
+    comprobante               character varying(255)       NULL,
+    estado                    character varying(10)        NULL       DEFAULT 'pagado'::character varying
+);
+
+CREATE TABLE niveles_carrera (
+    id_nivel                  integer                      NOT NULL   DEFAULT nextval('niveles_carrera_id_nivel_seq'::regclass),
+    id_carrera                integer                      NOT NULL,
+    numero_nivel              integer                      NOT NULL,
+    nombre                    character varying(50)        NULL,
+    descripcion               text                         NULL
+);
+
+CREATE TABLE pago_carrera_completa (
+    id_pago_carrera           integer                      NOT NULL   DEFAULT nextval('pago_carrera_completa_id_pago_carrera_seq'::regclass),
+    id_estudiante             integer                      NOT NULL,
+    id_carrera                integer                      NOT NULL,
+    monto_total               numeric(10,2)                NOT NULL,
+    forma_pago                character varying(10)        NULL,
+    cuotas_total              integer                      NULL       DEFAULT 1,
+    estado                    character varying(15)        NULL       DEFAULT 'pendiente'::character varying,
+    fecha_contrato            date                         NOT NULL,
+    materias_cubiertas        integer                      NULL       DEFAULT 0,
+    monto_pagado              numeric(10,2)                NULL       DEFAULT 0
+);
+
+CREATE TABLE pago_materia_suelta (
+    id_pago_materia           integer                      NOT NULL   DEFAULT nextval('pago_materia_suelta_id_pago_materia_seq'::regclass),
+    id_inscripcion            integer                      NOT NULL,
+    monto_pagado              numeric(10,2)                NOT NULL,
+    fecha_pago                date                         NOT NULL   DEFAULT CURRENT_DATE,
+    estado                    character varying(10)        NULL       DEFAULT 'pagado'::character varying
+);
+
+CREATE TABLE pagofacil_transacciones (
+    id_transaccion_pf         integer                      NOT NULL   DEFAULT nextval('pagofacil_transacciones_id_transaccion_pf_seq'::regclass),
+    transaction_id_api        bigint                       NOT NULL,
+    payment_number            character varying(50)        NOT NULL,
+    id_estudiante             integer                      NOT NULL,
+    monto                     numeric(10,2)                NOT NULL,
+    concepto                  character varying(20)        NOT NULL,
+    codigo_grupo              character varying(20)        NULL,
+    id_inscripcion            integer                      NULL,
+    estado                    character varying(20)        NULL       DEFAULT 'pendiente'::character varying,
+    fecha_generacion          timestamp without time zone  NULL       DEFAULT CURRENT_TIMESTAMP,
+    fecha_pago                timestamp without time zone  NULL
+);
+
+CREATE TABLE periodos_dictado (
+    id_periodo                integer                      NOT NULL   DEFAULT nextval('periodos_dictado_id_periodo_seq'::regclass),
+    nombre                    character varying(50)        NOT NULL,
+    tipo_periodo              character varying(20)        NULL       DEFAULT 'semestral'::character varying,
+    fecha_inicio              date                         NOT NULL,
+    fecha_fin                 date                         NOT NULL,
+    id_nivel                  integer                      NULL,
+    activo                    boolean                      NULL       DEFAULT true,
+    max_materias              integer                      NULL       DEFAULT 5,
+    id_carrera                integer                      NULL,      -- FK → carreras (para cursos libres)
+    fecha_inicio_inscripcion  date                         NULL,
+    fecha_fin_inscripcion     date                         NULL
+);
+
+CREATE TABLE personal_administrativo (
+    id_personal               integer                      NOT NULL   DEFAULT nextval('personal_administrativo_id_personal_seq'::regclass),
+    id_usuario                integer                      NOT NULL,
+    legajo_personal           character varying(20)        NOT NULL,
+    cargo                     character varying(100)       NOT NULL,
+    fecha_ingreso             date                         NOT NULL,
+    oficina                   character varying(50)        NULL,
+    sueldo_base               numeric(10,2)                NULL,
+    observaciones             text                         NULL
+);
+
+CREATE TABLE profesores (
+    id_profesor               integer                      NOT NULL   DEFAULT nextval('profesores_id_profesor_seq'::regclass),
+    id_usuario                integer                      NOT NULL,
+    legajo_profesor           character varying(20)        NOT NULL,
+    especialidad              character varying(100)       NOT NULL,
+    titulo_maximo             character varying(150)       NULL,
+    fecha_contratacion        date                         NOT NULL,
+    sueldo_base               numeric(10,2)                NULL,
+    observaciones             text                         NULL,
+    archivo_cv                character varying(255)       NULL       -- NUEVO campo en producción
+);
+
+CREATE TABLE roles (
+    id_rol                    integer                      NOT NULL   DEFAULT nextval('roles_id_rol_seq'::regclass),
+    nombre_rol                character varying(50)        NOT NULL,
+    descripcion               character varying(255)       NULL,
+    activo                    boolean                      NULL       DEFAULT true
+);
+
+CREATE TABLE seguimiento_estudiante (
+    id_seguimiento            integer                      NOT NULL   DEFAULT nextval('seguimiento_estudiante_id_seguimiento_seq'::regclass),
+    id_inscripcion            integer                      NOT NULL,
+    calificacion_final        numeric(5,2)                 NULL,
+    estado_actual             character varying(20)        NULL       DEFAULT 'en_curso'::character varying,
+    observaciones             text                         NULL,
+    fecha_aprobacion          date                         NULL,
+    created_at                timestamp without time zone  NULL       DEFAULT CURRENT_TIMESTAMP,
+    updated_at                timestamp without time zone  NULL       DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE seguimiento_log (
+    id_log                    integer                      NOT NULL   DEFAULT nextval('seguimiento_log_id_log_seq'::regclass),
+    id_usuario                integer                      NOT NULL,
+    accion                    character varying(100)       NOT NULL,
+    descripcion               text                         NULL,
+    ip_origen                 character varying(45)        NULL,
+    fecha_hora                timestamp without time zone  NULL       DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE usuarios (
+    id_usuario                integer                      NOT NULL   DEFAULT nextval('usuarios_id_usuario_seq'::regclass),
+    nombre                    character varying(100)       NOT NULL,
+    apellido                  character varying(100)       NOT NULL,
+    email                     character varying(150)       NOT NULL,
+    password_hash             character varying(255)       NOT NULL,
+    dni                       character varying(20)        NOT NULL,
+    telefono                  character varying(20)        NULL,
+    direccion                 text                         NULL,
+    id_rol                    integer                      NOT NULL,
+    foto_perfil               character varying(255)       NULL,
+    activo                    boolean                      NULL       DEFAULT true,
+    bloqueado                 boolean                      NULL       DEFAULT false,
+    fecha_registro            timestamp without time zone  NULL       DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
+-- TABLAS INTERNAS DE LARAVEL (no modelar en diagrama UML)
+-- ============================================================
+
+CREATE TABLE cache (
+    key                       character varying(255)       NOT NULL,
+    value                     text                         NOT NULL,
+    expiration                integer                      NOT NULL
+);
+
+CREATE TABLE cache_locks (
+    key                       character varying(255)       NOT NULL,
+    owner                     character varying(255)       NOT NULL,
+    expiration                integer                      NOT NULL
+);
+
+CREATE TABLE failed_jobs (
+    id                        bigint                       NOT NULL   DEFAULT nextval('failed_jobs_id_seq'::regclass),
+    uuid                      character varying(255)       NOT NULL,
+    connection                text                         NOT NULL,
+    queue                     text                         NOT NULL,
+    payload                   text                         NOT NULL,
+    exception                 text                         NOT NULL,
+    failed_at                 timestamp without time zone  NOT NULL   DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE job_batches (
+    id                        character varying(255)       NOT NULL,
+    name                      character varying(255)       NOT NULL,
+    total_jobs                integer                      NOT NULL,
+    pending_jobs              integer                      NOT NULL,
+    failed_jobs               integer                      NOT NULL,
+    failed_job_ids            text                         NOT NULL,
+    options                   text                         NULL,
+    cancelled_at              integer                      NULL,
+    created_at                integer                      NOT NULL,
+    finished_at               integer                      NULL
+);
+
+CREATE TABLE jobs (
+    id                        bigint                       NOT NULL   DEFAULT nextval('jobs_id_seq'::regclass),
+    queue                     character varying(255)       NOT NULL,
+    payload                   text                         NOT NULL,
+    attempts                  smallint                     NOT NULL,
+    reserved_at               integer                      NULL,
+    available_at              integer                      NOT NULL,
+    created_at                integer                      NOT NULL
+);
+
+CREATE TABLE migrations (
+    id                        integer                      NOT NULL   DEFAULT nextval('migrations_id_seq'::regclass),
+    migration                 character varying(255)       NOT NULL,
+    batch                     integer                      NOT NULL
+);
+
+CREATE TABLE password_reset_tokens (
+    email                     character varying(255)       NOT NULL,
+    token                     character varying(255)       NOT NULL,
+    created_at                timestamp without time zone  NULL
+);
+
+CREATE TABLE sessions (
+    id                        character varying(255)       NOT NULL,
+    user_id                   bigint                       NULL,
+    ip_address                character varying(45)        NULL,
+    user_agent                text                         NULL,
+    payload                   text                         NOT NULL,
+    last_activity             integer                      NOT NULL
+);
+
+-- NOTA: tabla 'users' es la tabla auth de Laravel (diferente de 'usuarios')
+CREATE TABLE users (
+    id                        bigint                       NOT NULL   DEFAULT nextval('users_id_seq'::regclass),
+    name                      character varying(255)       NOT NULL,
+    email                     character varying(255)       NOT NULL,
+    email_verified_at         timestamp without time zone  NULL,
+    password                  character varying(255)       NOT NULL,
+    remember_token            character varying(100)       NULL,
+    created_at                timestamp without time zone  NULL,
+    updated_at                timestamp without time zone  NULL,
+    role                      character varying(20)        NOT NULL   DEFAULT 'student'::character varying
+);
+
+-- ============================================================
+-- DIFERENCIAS vs schema_pgsql_tablas.txt (versión anterior)
+-- ============================================================
+-- NUEVAS tablas en producción (no estaban documentadas):
+--   + configuracion_sitio     (config institucional)
+--   + failed_jobs             (Laravel Queue)
+--   + job_batches             (Laravel Queue)
+--   + jobs                    (Laravel Queue)
+--   + users                   (auth Laravel alternativa)
+--
+-- COLUMNAS NUEVAS en producción:
+--   + profesores.archivo_cv               (varchar 255)
+--   + carreras: orden correcto de campos  (modalidad, max_materias, duracion_unidad)
+--   + grupos.vacantes_ocupadas DEFAULT 0  (antes sin default)
+--   + malla_curricular.orden_en_nivel DEFAULT 0 (antes sin default)
+--   + materias.creditos DEFAULT 0         (antes sin default)
+--
+-- COLUMNAS que ya NO aparecen (o cambiaron):
+--   - schema anterior tenia 'numeric' sin precisión, ahora es numeric(10,2) o numeric(5,2)
+-- ============================================================
