@@ -43,7 +43,9 @@ const gruposPorPeriodo = computed(() => {
             map[g.periodo_nombre] = { gruposMap: new Map(), esActual: esPeriodoActual(g), inicio: g.periodo_inicio };
         }
         const periodo  = map[g.periodo_nombre];
-        const grupoKey = g.codigo_grupo ?? ('_' + g.id_oferta);
+        // Incluir hora_inicio en la clave para separar grupos que comparten código
+        // pero tienen horario distinto (mismo código_grupo en diferentes sesiones).
+        const grupoKey = (g.codigo_grupo ?? ('_' + g.id_oferta)) + '|' + g.hora_inicio + '|' + g.hora_fin;
         if (!periodo.gruposMap.has(grupoKey)) {
             periodo.gruposMap.set(grupoKey, {
                 id_oferta:         g.id_oferta,
@@ -127,7 +129,9 @@ const ofertaAgrupada = computed(() => {
             });
         }
         const materia  = nivel.materias.get(row.id_materia);
-        const grupoKey = row.codigo_grupo ?? ('_' + row.id_oferta);
+        // Incluir hora_inicio en la clave para separar grupos que comparten código
+        // pero tienen horario distinto (mismo código_grupo en diferentes sesiones).
+        const grupoKey = (row.codigo_grupo ?? ('_' + row.id_oferta)) + '|' + row.hora_inicio + '|' + row.hora_fin;
         if (!materia.grupos.has(grupoKey)) {
             materia.grupos.set(grupoKey, {
                 id_oferta:        row.id_oferta,
