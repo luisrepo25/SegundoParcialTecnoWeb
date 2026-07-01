@@ -23,6 +23,8 @@ class ReporteController extends Controller
             'activo_horarios' => $request->input('activo_horarios', 'todos'),
             'nombre_periodo'  => $request->input('nombre_periodo')  ?: null,
             'id_carrera'      => $request->input('id_carrera') ? (int) $request->input('id_carrera') : null,
+            'fecha_desde'     => $request->input('fecha_desde') ?: null,
+            'fecha_hasta'     => $request->input('fecha_hasta') ?: null,
         ];
 
         // Períodos con su carrera (para filtrado vinculado en frontend).
@@ -208,6 +210,73 @@ class ReporteController extends Controller
             ->reverse()
             ->values();
 
+        // ── TENDENCIAS DE INSCRIPCIÓN ─────────────────────────────────────────
+
+        // Tendencia mensual — estudiantes únicos por mes, últimos 24 meses
+        $qTend = DB::table('inscripciones as i')
+            ->join('estudiantes as e', 'i.id_estudiante', '=', 'e.id_estudiante')
+            ->where('i.estado', '!=', 'retirado')
+            ->whereRaw("i.fecha_inscripcion >= date_trunc('month', CURRENT_DATE) - INTERVAL '23 months'");
+        if ($filtros['id_carrera']) $qTend->where('e.id_carrera_actual', $filtros['id_carrera']);
+        if ($filtros['fecha_desde']) $qTend->whereRaw("i.fecha_inscripcion::date >= ?", [$filtros['fecha_desde']]);
+        if ($filtros['fecha_hasta']) $qTend->whereRaw("i.fecha_inscripcion::date <= ?", [$filtros['fecha_hasta']]);
+        $tendenciaMensual = $qTend
+            ->selectRaw("TO_CHAR(i.fecha_inscripcion, 'YYYY-MM') as mes, COUNT(DISTINCT i.id_estudiante) as valor")
+            ->groupBy('mes')
+            ->orderBy('mes')
+            ->get()
+            ->map(fn($r) => ['label' => $r->mes, 'valor' => (int) $r->valor])
+            ->values();
+
+        // Resumen anual — año actual vs anterior
+        $anoActual   = now()->year;
+        $anoAnterior = $anoActual - 1;
+        $resAnual = DB::table('inscripciones as i')
+            ->join('estudiantes as e', 'i.id_estudiante', '=', 'e.id_estudiante')
+            ->where('i.estado', '!=', 'retirado')
+            ->whereRaw("EXTRACT(YEAR FROM i.fecha_inscripcion)::int IN (?, ?)", [$anoActual, $anoAnterior])
+            ->when($filtros['id_carrera'], fn($q) => $q->where('e.id_carrera_actual', $filtros['id_carrera']))
+            ->selectRaw("EXTRACT(YEAR FROM i.fecha_inscripcion)::int as anio, COUNT(DISTINCT i.id_estudiante) as total")
+            ->groupBy('anio')
+            ->get()
+            ->keyBy('anio');
+        $totalEsteAnio     = (int) ($resAnual->get($anoActual)?->total  ?? 0);
+        $totalAnioAnterior = (int) ($resAnual->get($anoAnterior)?->total ?? 0);
+        $crecimiento = $totalAnioAnterior > 0
+            ? round(($totalEsteAnio - $totalAnioAnterior) / $totalAnioAnterior * 100, 1)
+            : null;
+
+        // Distribución top 5 carreras × mes (últimos 12 meses) — solo sin filtro de carrera
+        $topCarreras       = [];
+        $inscPorCarreraMes = collect();
+        if (!$filtros['id_carrera']) {
+            $topCarreras = DB::table('inscripciones as i')
+                ->join('estudiantes as e', 'i.id_estudiante', '=', 'e.id_estudiante')
+                ->join('carreras as c', 'e.id_carrera_actual', '=', 'c.id_carrera')
+                ->where('i.estado', '!=', 'retirado')
+                ->whereRaw("i.fecha_inscripcion >= date_trunc('month', CURRENT_DATE) - INTERVAL '11 months'")
+                ->selectRaw("c.nombre, COUNT(DISTINCT i.id_estudiante) as total")
+                ->groupBy('c.id_carrera', 'c.nombre')
+                ->orderByRaw('COUNT(DISTINCT i.id_estudiante) DESC')
+                ->limit(5)
+                ->pluck('nombre')
+                ->toArray();
+
+            if ($topCarreras) {
+                $inscPorCarreraMes = DB::table('inscripciones as i')
+                    ->join('estudiantes as e', 'i.id_estudiante', '=', 'e.id_estudiante')
+                    ->join('carreras as c', 'e.id_carrera_actual', '=', 'c.id_carrera')
+                    ->where('i.estado', '!=', 'retirado')
+                    ->whereRaw("i.fecha_inscripcion >= date_trunc('month', CURRENT_DATE) - INTERVAL '11 months'")
+                    ->whereIn('c.nombre', $topCarreras)
+                    ->selectRaw("TO_CHAR(i.fecha_inscripcion, 'YYYY-MM') as mes, c.nombre as carrera, COUNT(DISTINCT i.id_estudiante) as cantidad")
+                    ->groupBy('mes', 'c.id_carrera', 'c.nombre')
+                    ->orderBy('mes')
+                    ->get()
+                    ->values();
+            }
+        }
+
         // ── FINANCIERO ────────────────────────────────────────────────────────
 
         // Ingresos por matrículas — últimos 12 meses (via pagofacil_transacciones)
@@ -287,6 +356,16 @@ class ReporteController extends Controller
                 'ingresosMaterias'   => $ingresosMaterias,
                 'cuotasPendientes'   => $cuotasPendientes,
                 'proyeccion'         => $proyeccion,
+            ],
+            'tendencias' => [
+                'mensual'       => $tendenciaMensual,
+                'esteAnio'      => $totalEsteAnio,
+                'anioAnterior'  => $totalAnioAnterior,
+                'anoActual'     => $anoActual,
+                'anoAnterior'   => $anoAnterior,
+                'crecimiento'   => $crecimiento,
+                'topCarreras'   => $topCarreras,
+                'porCarreraMes' => $inscPorCarreraMes,
             ],
         ]);
     }

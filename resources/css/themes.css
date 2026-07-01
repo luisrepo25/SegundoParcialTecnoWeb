@@ -48,6 +48,37 @@ html[data-theme="kids"] {
     --border-width: 2px;
 }
 
+/* ── MODO OSCURO — Adultos ────────────────────────────────────────────── */
+html[data-theme="adults"][data-darkmode="on"] {
+    --bg-color: #0f1f16;
+    --card-bg: #1a2f22;
+    --text-color: #d4eddd;
+    --text-secondary: #7aab8a;
+    --nav-bg: #0a150e;
+    --border-color: #2a4433;
+    --primary-color: #1e7a40;
+    --primary-hover: #165f31;
+    --primary-text: #ffffff;
+}
+
+/* ── MODO OSCURO — Niños ──────────────────────────────────────────────── */
+html[data-theme="kids"][data-darkmode="on"] {
+    --bg-color: #081a12;
+    --card-bg: #102a1c;
+    --text-color: #b8f5d4;
+    --text-secondary: #4ade80;
+    --nav-bg: #05110c;
+    --border-color: #1a4a2e;
+    --primary-color: #10b981;
+    --primary-hover: #059669;
+    --primary-text: #ffffff;
+    --font-family: 'Comic Neue', 'Comic Sans MS', cursive, sans-serif;
+    --border-radius: 1.2rem;
+    --border-width: 2px;
+}
+
+/* youth ya es oscuro — data-darkmode="on" no cambia nada */
+
 /* Alto contraste — Verde oscuro, menos agresivo */
 html[data-contrast="high"] {
     --bg-color: #071510 !important;

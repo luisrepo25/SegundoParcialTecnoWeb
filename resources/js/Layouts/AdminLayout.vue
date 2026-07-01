@@ -276,8 +276,8 @@ const showUserMenu   = ref(false);
             </header>
 
             <!-- Contenido scrolleable -->
-            <main class="flex-1 overflow-y-auto px-6 py-8">
-                <div class="mx-auto max-w-6xl">
+            <main class="flex-1 overflow-y-auto flex flex-col">
+                <div class="flex-1 mx-auto max-w-6xl w-full px-6 py-8">
                     <slot />
                 </div>
                 <PageFooter />

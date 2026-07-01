@@ -69,7 +69,7 @@ class BitacoraController extends Controller
 
         $logs = $query
             ->orderByDesc('sl.fecha_hora')
-            ->paginate(25)
+            ->paginate(10)
             ->withQueryString();
 
         try {

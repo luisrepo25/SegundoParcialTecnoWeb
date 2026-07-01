@@ -12,7 +12,7 @@ const props = defineProps({
     compact: { type: Boolean, default: false },
 });
 
-const { theme, contrast, setTheme, toggleContrast, changeFontScale } = useTheme();
+const { theme, contrast, isDark, setTheme, toggleDarkMode, toggleContrast, changeFontScale } = useTheme();
 
 const themes = [
     { value: 'adults', label: 'Adultos' },
@@ -58,6 +58,24 @@ const themes = [
                 class="px-2 py-1.5 text-sm font-bold transition-opacity hover:opacity-70"
                 style="color: var(--text-secondary);">A+</button>
         </div>
+
+        <!-- Modo oscuro (día / noche) -->
+        <button
+            @click="toggleDarkMode"
+            :title="isDark ? 'Cambiar a modo día' : 'Cambiar a modo noche'"
+            class="flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200"
+            :style="isDark
+                ? `background-color: ${activeColor}; color: ${activeTextColor};`
+                : 'background-color: var(--bg-color); color: var(--text-secondary); border: 1px solid var(--border-color);'">
+            <svg v-if="isDark" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 3v1m0 16v1m8.66-9h-1M4.34 12h-1m15.07-6.07l-.71.71M5.64 18.36l-.71.71m12.02 0l-.71-.71M5.64 5.64l-.71-.71M12 7a5 5 0 100 10A5 5 0 0012 7z"/>
+            </svg>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+            </svg>
+        </button>
 
         <!-- Alto contraste -->
         <button v-if="showContrastToggle"

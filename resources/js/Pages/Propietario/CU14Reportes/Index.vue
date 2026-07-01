@@ -18,14 +18,17 @@ const props = defineProps({
     administrativo: Object,
     academico:      Object,
     financiero:     Object,
+    tendencias:     Object,
 });
 
 // ── Filtros reactivos ─────────────────────────────────────────────────────────
-const fUsuarios = ref(props.filtros.activo_usuarios);
-const fAulas    = ref(props.filtros.activo_aulas);
-const fHorarios = ref(props.filtros.activo_horarios);
-const fPeriodo  = ref(props.filtros.nombre_periodo ?? '');
-const fCarrera  = ref(props.filtros.id_carrera     ?? '');
+const fUsuarios   = ref(props.filtros.activo_usuarios);
+const fAulas      = ref(props.filtros.activo_aulas);
+const fHorarios   = ref(props.filtros.activo_horarios);
+const fPeriodo    = ref(props.filtros.nombre_periodo ?? '');
+const fCarrera    = ref(props.filtros.id_carrera     ?? '');
+const fFechaDesde = ref(props.filtros.fecha_desde    ?? '');
+const fFechaHasta = ref(props.filtros.fecha_hasta    ?? '');
 
 const dashboardRoute = computed(() => {
     const role = usePage().props.auth?.user?.role;
@@ -41,6 +44,8 @@ function aplicarFiltros() {
         activo_horarios: fHorarios.value !== 'todos' ? fHorarios.value : undefined,
         nombre_periodo:  fPeriodo.value  || undefined,
         id_carrera:      fCarrera.value  || undefined,
+        fecha_desde:     fFechaDesde.value || undefined,
+        fecha_hasta:     fFechaHasta.value || undefined,
     }, { preserveState: true, preserveScroll: true, replace: true });
 }
 
@@ -54,7 +59,7 @@ watch(fCarrera, (nuevaCarrera) => {
     }
 });
 
-watch([fUsuarios, fAulas, fHorarios, fPeriodo, fCarrera], aplicarFiltros);
+watch([fUsuarios, fAulas, fHorarios, fPeriodo, fCarrera, fFechaDesde, fFechaHasta], aplicarFiltros);
 
 // Períodos filtrados según carrera seleccionada (deduplica nombres cuando es "Todas")
 const periodosDisponibles = computed(() => {
@@ -77,6 +82,7 @@ const carreraSeleccionada = computed(() =>
 );
 
 const hayFiltroActivo = computed(() => !!(fPeriodo.value || fCarrera.value));
+const hayFiltroFecha  = computed(() => !!(fFechaDesde.value || fFechaHasta.value));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function mesLabel(yyyymm) {
@@ -155,6 +161,32 @@ const optsLine = {
     scales: {
         x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 } }, border: { display: false } },
         y: { grid: { color: 'rgba(156,163,175,0.12)' }, ticks: { color: '#9ca3af', font: { size: 10 }, callback: v => 'Bs ' + v.toLocaleString() }, border: { display: false } },
+    },
+};
+
+const optsLineTend = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y} estudiantes` } },
+    },
+    scales: {
+        x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 } }, border: { display: false } },
+        y: { grid: { color: 'rgba(156,163,175,0.12)' }, ticks: { color: '#9ca3af', font: { size: 10 }, stepSize: 1 }, border: { display: false } },
+    },
+};
+
+const optsBarCarreras = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: { display: true, position: 'bottom', labels: { color: '#9ca3af', padding: 10, font: { size: 10 }, boxWidth: 10 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}` } },
+    },
+    scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 } }, border: { display: false } },
+        y: { stacked: true, grid: { color: 'rgba(156,163,175,0.12)' }, ticks: { color: '#9ca3af', font: { size: 10 }, stepSize: 1 }, border: { display: false } },
     },
 };
 
@@ -261,6 +293,50 @@ const totalMaterias       = computed(() => props.academico.materiasActivas  + pr
 const totalHorarios       = computed(() => props.academico.horariosPorDia.reduce((s, i) => s + i.valor, 0));
 const totalRiesgo         = computed(() => props.academico.estudiantesEnRiesgo.reduce((s, i) => s + i.valor, 0));
 const totalInscripciones  = computed(() => props.administrativo.inscripcionesPorCarrera.reduce((s, i) => s + i.valor, 0));
+
+// ── Datasets — Tendencias ─────────────────────────────────────────────────────
+const PALETA_CARRERAS = ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#3b82f6'];
+
+const dataTendencia = computed(() => ({
+    labels: (props.tendencias?.mensual ?? []).map(r => mesLabel(r.label)),
+    datasets: [{
+        label: 'Estudiantes',
+        data: (props.tendencias?.mensual ?? []).map(r => r.valor),
+        borderColor: '#6366f1',
+        backgroundColor: 'rgba(99,102,241,0.10)',
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#6366f1',
+        pointBorderColor: '#6366f1',
+        pointRadius: 3,
+        pointHoverRadius: 5,
+    }],
+}));
+
+const dataCarreraMes = computed(() => {
+    const raw      = props.tendencias?.porCarreraMes ?? [];
+    const carreras = props.tendencias?.topCarreras   ?? [];
+    if (!raw.length || !carreras.length) return { labels: [], datasets: [] };
+    const meses = [...new Set(raw.map(r => r.mes))].sort();
+    return {
+        labels: meses.map(m => mesLabel(m)),
+        datasets: carreras.map((carrera, i) => ({
+            label: carrera,
+            data: meses.map(mes => {
+                const found = raw.find(r => r.mes === mes && r.carrera === carrera);
+                return found ? found.cantidad : 0;
+            }),
+            backgroundColor: PALETA_CARRERAS[i % PALETA_CARRERAS.length],
+            borderWidth: 0,
+        })),
+    };
+});
+
+const promedioMensual = computed(() => {
+    const data = props.tendencias?.mensual ?? [];
+    if (!data.length) return 0;
+    return Math.round(data.reduce((s, r) => s + r.valor, 0) / data.length);
+});
 </script>
 
 <template>
@@ -308,6 +384,22 @@ const totalInscripciones  = computed(() => props.administrativo.inscripcionesPor
                 </select>
             </div>
 
+            <div class="w-px self-stretch" style="background-color: var(--border-color);"></div>
+
+            <!-- Rango de fechas — afecta tendencias -->
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-semibold shrink-0" style="color: var(--text-secondary);">Desde</span>
+                <input v-model="fFechaDesde" type="date"
+                       class="text-xs rounded-lg px-3 py-1.5 focus:outline-none"
+                       style="background-color: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color);" />
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-semibold shrink-0" style="color: var(--text-secondary);">Hasta</span>
+                <input v-model="fFechaHasta" type="date"
+                       class="text-xs rounded-lg px-3 py-1.5 focus:outline-none"
+                       style="background-color: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color);" />
+            </div>
+
             <!-- Chips activos -->
             <div class="flex flex-wrap gap-1.5 ml-1">
                 <span v-if="fPeriodo"
@@ -322,10 +414,22 @@ const totalInscripciones  = computed(() => props.administrativo.inscripcionesPor
                     {{ carreraSeleccionada.nombre }}
                     <button @click="fCarrera = ''" class="opacity-60 hover:opacity-100 leading-none">✕</button>
                 </span>
+                <span v-if="fFechaDesde"
+                      class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium"
+                      style="background-color: color-mix(in srgb, #f59e0b 15%, transparent); color: #f59e0b;">
+                    Desde {{ fFechaDesde }}
+                    <button @click="fFechaDesde = ''" class="opacity-60 hover:opacity-100 leading-none">✕</button>
+                </span>
+                <span v-if="fFechaHasta"
+                      class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium"
+                      style="background-color: color-mix(in srgb, #f59e0b 15%, transparent); color: #f59e0b;">
+                    Hasta {{ fFechaHasta }}
+                    <button @click="fFechaHasta = ''" class="opacity-60 hover:opacity-100 leading-none">✕</button>
+                </span>
             </div>
 
             <span class="text-[11px] ml-auto shrink-0" style="color: var(--text-secondary);">
-                Afecta: aprobación · riesgo · inscripciones · carga horaria
+                Período/Carrera: aprobación · riesgo · inscripciones · Fechas: tendencias
             </span>
         </div>
 
@@ -338,6 +442,93 @@ const totalInscripciones  = computed(() => props.administrativo.inscripcionesPor
         </div>
 
         <div class="space-y-10">
+
+            <!-- ══ TENDENCIAS DE INSCRIPCIÓN ════════════════════════════════════ -->
+            <section>
+                <p class="text-[11px] font-semibold uppercase tracking-widest mb-5"
+                   style="color: var(--text-secondary);">Tendencias de Inscripción</p>
+
+                <!-- KPI cards -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+
+                    <div class="rounded-xl p-5" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                        <p class="text-[11px] font-medium mb-1" style="color: var(--text-secondary);">
+                            Este año ({{ tendencias?.anoActual }})
+                        </p>
+                        <p class="text-2xl font-bold" style="color: var(--text-color);">{{ tendencias?.esteAnio ?? 0 }}</p>
+                        <p class="text-[11px] mt-1" style="color: var(--text-secondary);">estudiantes únicos</p>
+                    </div>
+
+                    <div class="rounded-xl p-5" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                        <p class="text-[11px] font-medium mb-1" style="color: var(--text-secondary);">
+                            Año anterior ({{ tendencias?.anoAnterior }})
+                        </p>
+                        <p class="text-2xl font-bold" style="color: var(--text-color);">{{ tendencias?.anioAnterior ?? 0 }}</p>
+                        <p class="text-[11px] mt-1" style="color: var(--text-secondary);">estudiantes únicos</p>
+                    </div>
+
+                    <div class="rounded-xl p-5" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                        <p class="text-[11px] font-medium mb-1" style="color: var(--text-secondary);">Crecimiento anual</p>
+                        <p class="text-2xl font-bold"
+                           :style="tendencias?.crecimiento == null
+                               ? 'color: var(--text-secondary)'
+                               : tendencias.crecimiento >= 0 ? 'color: #34d399' : 'color: #f87171'">
+                            {{ tendencias?.crecimiento == null
+                               ? 'N/A'
+                               : (tendencias.crecimiento >= 0 ? '+' : '') + tendencias.crecimiento + '%' }}
+                        </p>
+                        <p class="text-[11px] mt-1" style="color: var(--text-secondary);">vs año anterior</p>
+                    </div>
+
+                    <div class="rounded-xl p-5" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                        <p class="text-[11px] font-medium mb-1" style="color: var(--text-secondary);">Promedio mensual</p>
+                        <p class="text-2xl font-bold" style="color: var(--text-color);">{{ promedioMensual }}</p>
+                        <p class="text-[11px] mt-1" style="color: var(--text-secondary);">estudiantes / mes</p>
+                    </div>
+
+                </div>
+
+                <!-- Line chart: inscripciones por mes (24 meses) -->
+                <div class="rounded-xl p-6 mb-6" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="text-sm font-semibold" style="color: var(--text-color);">Inscripciones por mes</h3>
+                            <p class="text-[11px] mt-0.5" style="color: var(--text-secondary);">
+                                Últimos 24 meses · estudiantes únicos
+                                <span v-if="carreraSeleccionada"> — {{ carreraSeleccionada.nombre }}</span>
+                                <span v-if="hayFiltroFecha"> · rango personalizado</span>
+                            </p>
+                        </div>
+                        <span class="text-[11px] px-2 py-0.5 rounded-full font-medium"
+                              style="background-color: rgba(99,102,241,0.15); color: #6366f1;">
+                            {{ (tendencias?.mensual ?? []).reduce((s, r) => s + r.valor, 0) }} total
+                        </span>
+                    </div>
+                    <div v-if="tendencias?.mensual?.length" style="height: 260px;">
+                        <Line :data="dataTendencia" :options="optsLineTend" />
+                    </div>
+                    <div v-else class="flex items-center justify-center" style="height: 200px;">
+                        <p class="text-sm" style="color: var(--text-secondary);">Sin inscripciones en el período seleccionado</p>
+                    </div>
+                </div>
+
+                <!-- Stacked bar: top 5 carreras × mes (solo sin filtro de carrera) -->
+                <div v-if="!fCarrera" class="rounded-xl p-6" style="background-color: var(--card-bg); border: 1px solid var(--border-color);">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="text-sm font-semibold" style="color: var(--text-color);">Distribución por carrera</h3>
+                            <p class="text-[11px] mt-0.5" style="color: var(--text-secondary);">Top 5 carreras · últimos 12 meses · estudiantes únicos</p>
+                        </div>
+                    </div>
+                    <div v-if="tendencias?.topCarreras?.length" style="height: 280px;">
+                        <Bar :data="dataCarreraMes" :options="optsBarCarreras" />
+                    </div>
+                    <div v-else class="flex items-center justify-center" style="height: 200px;">
+                        <p class="text-sm" style="color: var(--text-secondary);">Sin datos de carreras registrados</p>
+                    </div>
+                </div>
+
+            </section>
 
             <!-- ══ ADMINISTRATIVO ════════════════════════════════════════ -->
             <section v-if="!hayFiltroActivo">

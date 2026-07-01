@@ -1,63 +1,63 @@
 // resources/js/Composables/useTheme.js
-import { ref, watch, onMounted } from 'vue';
+import { ref } from 'vue';
 
 const theme = ref('adults');
 const contrast = ref('normal');
 const fontScale = ref(1.0);
+const isDark = ref(false);
 const isInitialized = ref(false);
 
 export function useTheme() {
-    
-    // Apply state to DOM
+
     const applyToDOM = () => {
         if (typeof document === 'undefined') return;
-        
         const html = document.documentElement;
         html.setAttribute('data-theme', theme.value);
         html.setAttribute('data-contrast', contrast.value);
+        html.setAttribute('data-darkmode', isDark.value ? 'on' : 'off');
         html.style.setProperty('--font-scale', fontScale.value);
     };
 
-    // Detección automática de Día/Noche según horario
-    const checkAutoDayNight = () => {
+    const isNightTime = () => {
         const hour = new Date().getHours();
-        // Noche: de 7:00 PM a 6:00 AM.
-        // Si es de noche, por defecto asignamos "youth" (tema oscuro), si es de día asignamos "adults".
-        if (hour >= 19 || hour < 6) {
-            return 'youth';
-        }
-        return 'adults';
+        return hour >= 19 || hour < 6;
     };
 
     const initialize = () => {
         if (isInitialized.value || typeof window === 'undefined') return;
 
-        // Cargar preferencias guardadas, o aplicar tema automático por horario
         const savedTheme = localStorage.getItem('isp-theme');
-        if (savedTheme) {
-            theme.value = savedTheme;
+        theme.value = savedTheme ?? 'adults';
+
+        const savedDark = localStorage.getItem('isp-darkmode');
+        if (savedDark !== null) {
+            isDark.value = savedDark === 'on';
         } else {
-            theme.value = checkAutoDayNight();
+            // Auto: noche → dark mode ON, día → dark mode OFF
+            isDark.value = isNightTime();
+            // Si era de noche y no hay tema guardado, arrancar con youth por compatibilidad
+            if (!savedTheme && isDark.value) theme.value = 'youth';
         }
 
         const savedContrast = localStorage.getItem('isp-contrast');
-        if (savedContrast) {
-            contrast.value = savedContrast;
-        }
+        if (savedContrast) contrast.value = savedContrast;
 
         const savedFontScale = localStorage.getItem('isp-fontScale');
-        if (savedFontScale) {
-            fontScale.value = parseFloat(savedFontScale);
-        }
+        if (savedFontScale) fontScale.value = parseFloat(savedFontScale);
 
         applyToDOM();
         isInitialized.value = true;
     };
 
-    // Actions
     const setTheme = (newTheme) => {
         theme.value = newTheme;
         localStorage.setItem('isp-theme', newTheme);
+        applyToDOM();
+    };
+
+    const toggleDarkMode = () => {
+        isDark.value = !isDark.value;
+        localStorage.setItem('isp-darkmode', isDark.value ? 'on' : 'off');
         applyToDOM();
     };
 
@@ -69,19 +69,14 @@ export function useTheme() {
 
     const changeFontScale = (direction) => {
         let newScale = fontScale.value;
-        if (direction === 'increase') {
-            newScale = Math.min(newScale + 0.1, 2.0); // Máximo 200%
-        } else if (direction === 'decrease') {
-            newScale = Math.max(newScale - 0.1, 0.8); // Mínimo 80%
-        } else {
-            newScale = 1.0; // Reset
-        }
+        if (direction === 'increase') newScale = Math.min(newScale + 0.1, 2.0);
+        else if (direction === 'decrease') newScale = Math.max(newScale - 0.1, 0.8);
+        else newScale = 1.0;
         fontScale.value = parseFloat(newScale.toFixed(1));
         localStorage.setItem('isp-fontScale', fontScale.value);
         applyToDOM();
     };
 
-    // Auto init on import if in browser, or onMounted
     if (typeof window !== 'undefined') {
         initialize();
     }
@@ -90,9 +85,10 @@ export function useTheme() {
         theme,
         contrast,
         fontScale,
+        isDark,
         setTheme,
+        toggleDarkMode,
         toggleContrast,
         changeFontScale,
-        checkAutoDayNight
     };
 }

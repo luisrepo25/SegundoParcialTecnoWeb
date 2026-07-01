@@ -50,6 +50,29 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // ── Panel Propietario ──────────────────────────────────────────────────────
     Route::get('/panel/propietario', function () {
+        // Inscripciones por mes — últimos 12 meses (para sparkline)
+        $inscMensual = \Illuminate\Support\Facades\DB::table('inscripciones as i')
+            ->join('estudiantes as e', 'i.id_estudiante', '=', 'e.id_estudiante')
+            ->where('i.estado', '!=', 'retirado')
+            ->whereRaw("i.fecha_inscripcion >= date_trunc('month', CURRENT_DATE) - INTERVAL '11 months'")
+            ->selectRaw("TO_CHAR(i.fecha_inscripcion, 'YYYY-MM') as mes, COUNT(DISTINCT i.id_estudiante) as valor")
+            ->groupBy('mes')
+            ->orderBy('mes')
+            ->get()
+            ->map(fn($r) => ['label' => $r->mes, 'valor' => (int) $r->valor])
+            ->values();
+
+        // Ingresos por mes — últimos 6 meses (para sparkline financiero)
+        $ingresosMensual = \Illuminate\Support\Facades\DB::table('pagofacil_transacciones')
+            ->where('estado', 'pagado')
+            ->whereRaw("fecha_generacion >= date_trunc('month', CURRENT_DATE) - INTERVAL '5 months'")
+            ->selectRaw("TO_CHAR(fecha_generacion, 'YYYY-MM') as mes, SUM(monto) as valor")
+            ->groupBy('mes')
+            ->orderBy('mes')
+            ->get()
+            ->map(fn($r) => ['label' => $r->mes, 'valor' => (float) $r->valor])
+            ->values();
+
         return Inertia::render('Dashboard/Propietario', [
             'nombre' => auth()->user()->nombre ?? '',
             'stats'  => [
@@ -65,6 +88,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'grupos_activos'       => \Illuminate\Support\Facades\DB::table('grupos')->whereRaw('activo IS TRUE')->count(),
                 'periodos_activos'     => \Illuminate\Support\Facades\DB::table('periodos_dictado')->whereRaw('activo IS TRUE')->count(),
                 'cuotas_pendientes'    => \Illuminate\Support\Facades\DB::table('cuotas_carrera')->where('estado', 'pendiente')->count(),
+            ],
+            'sparklines' => [
+                'inscripciones' => $inscMensual,
+                'ingresos'      => $ingresosMensual,
             ],
         ]);
     })->middleware('role:propietario')->name('dashboard.propietario');
@@ -135,10 +162,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // ── Panel Director ─────────────────────────────────────────────────────────
     Route::get('/panel/director', function () {
+        $inscMensual = \Illuminate\Support\Facades\DB::table('inscripciones as i')
+            ->join('estudiantes as e', 'i.id_estudiante', '=', 'e.id_estudiante')
+            ->where('i.estado', '!=', 'retirado')
+            ->whereRaw("i.fecha_inscripcion >= date_trunc('month', CURRENT_DATE) - INTERVAL '11 months'")
+            ->selectRaw("TO_CHAR(i.fecha_inscripcion, 'YYYY-MM') as mes, COUNT(DISTINCT i.id_estudiante) as valor")
+            ->groupBy('mes')
+            ->orderBy('mes')
+            ->get()
+            ->map(fn($r) => ['label' => $r->mes, 'valor' => (int) $r->valor])
+            ->values();
+
         return Inertia::render('Dashboard/Director', [
+            'nombre'          => auth()->user()->nombre ?? '',
             'totalCarreras'   => \App\Models\Carrera::count(),
             'carrerasActivas' => \App\Models\Carrera::whereRaw('activo IS TRUE')->count(),
             'totalMaterias'   => \App\Models\Materia::count(),
+            'totalGrupos'     => \Illuminate\Support\Facades\DB::table('grupos')->whereRaw('activo IS TRUE')->count(),
+            'totalEstudiantes'=> \App\Models\Usuario::where('id_rol', 5)->count(),
+            'totalProfesores' => \App\Models\Usuario::where('id_rol', 4)->count(),
+            'sparklines'      => ['inscripciones' => $inscMensual],
         ]);
     })->middleware('role:director')->name('dashboard.director');
 
@@ -204,7 +247,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ── Panel Secretaria ───────────────────────────────────────────────────────
     Route::middleware('role:propietario,director,secretaria')->prefix('secretaria')->name('secretaria.')->group(function () {
         Route::get('/panel', function () {
-            return Inertia::render('Dashboard/Secretaria');
+            $pagosMensual = \Illuminate\Support\Facades\DB::table('pagofacil_transacciones')
+                ->where('estado', 'pagado')
+                ->whereRaw("fecha_generacion >= date_trunc('month', CURRENT_DATE) - INTERVAL '5 months'")
+                ->selectRaw("TO_CHAR(fecha_generacion, 'YYYY-MM') as mes, SUM(monto) as valor")
+                ->groupBy('mes')
+                ->orderBy('mes')
+                ->get()
+                ->map(fn($r) => ['label' => $r->mes, 'valor' => (float) $r->valor])
+                ->values();
+
+            return Inertia::render('Dashboard/Secretaria', [
+                'nombre'  => auth()->user()->nombre ?? '',
+                'stats'   => [
+                    'estudiantes_activos'   => \App\Models\Usuario::where('id_rol', 5)->whereRaw('activo IS TRUE')->count(),
+                    'inscripciones_activas' => \Illuminate\Support\Facades\DB::table('inscripciones')->where('estado', 'activo')->count(),
+                    'cuotas_pendientes'     => \Illuminate\Support\Facades\DB::table('cuotas_carrera')->where('estado', 'pendiente')->count(),
+                    'pagos_hoy'             => \Illuminate\Support\Facades\DB::table('pagofacil_transacciones')->where('estado', 'pagado')->whereRaw("fecha_generacion::date = CURRENT_DATE")->count(),
+                ],
+                'sparklines' => ['pagos' => $pagosMensual],
+            ]);
         })->name('dashboard');
 
         // Cronogramas (CU10) — solo lectura para secretaria
