@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Estudiante;
 
 use App\Http\Controllers\Controller;
+use App\Services\BitacoraService;
 use App\Services\PagoFacilService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -647,6 +648,7 @@ class PanelController extends Controller
                 'fecha_inicio'  => now()->toDateString(),
                 'estado'        => 'activo',
             ]);
+            BitacoraService::registrar('plan_carrera', "Plan elegido: materia (pago por materia), estudiante #{$est->id_estudiante}");
             return redirect()->route('estudiante.materias')->with('success', '¡Plan activado! Ya puedes inscribirte en materias. Pagas cada materia al inscribirte.');
         }
 
@@ -967,6 +969,7 @@ class PanelController extends Controller
                     'estado'           => 'activo',
                     'fecha_inscripcion' => now(),
                 ]);
+                BitacoraService::registrar('inscripcion', "Inscripción directa (contado) en {$grupo->materia_nombre} ({$grupo->codigo_grupo}), estudiante #{$est->id_estudiante}");
                 return redirect()->route('estudiante.materias')->with('success', '¡Inscripción exitosa en ' . $grupo->materia_nombre . '!');
             } catch (\Throwable $e) {
                 return back()->withErrors(['general' => 'Error al inscribirse: ' . $e->getMessage()]);

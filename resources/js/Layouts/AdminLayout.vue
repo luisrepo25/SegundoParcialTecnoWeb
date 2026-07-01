@@ -79,7 +79,7 @@ const secciones = computed(() => {
     })).filter(sec => sec.items.length > 0);
 });
 
-const reportesItem = { name: 'Reportes y Estadísticas', route: 'propietario.reportes.index', activeUrls: ['/propietario/reportes'] };
+const reportesItem  = { name: 'Reportes y Estadísticas', route: 'propietario.reportes.index', activeUrls: ['/propietario/reportes'] };
 
 function detectActiveSection(url) {
     if (url.startsWith('/director/') || url.startsWith('/secretaria/cronogramas') || url.startsWith('/propietario/seguimiento')) return 'academico';

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Carrera;
 use App\Models\Estudiante;
 use App\Models\Usuario;
+use App\Services\BitacoraService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -173,6 +174,7 @@ class SeguimientoController extends Controller
         $prev = $estudiante->observaciones ? $estudiante->observaciones . "\n" : '';
         $estudiante->update(['observaciones' => $prev . $nota]);
 
+        BitacoraService::registrar('abandono_carrera', "Abandono registrado para estudiante #{$estudiante->id_estudiante}. Motivo: {$request->motivo}");
         return back()->with('success', 'Abandono de carrera registrado.');
     }
 

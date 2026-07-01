@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Profesor\CU12Evaluaciones;
 
 use App\Http\Controllers\Controller;
+use App\Services\BitacoraService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -74,6 +75,7 @@ class EvaluacionController extends Controller
 
         $this->recalcularFinal($request->id_inscripcion);
 
+        BitacoraService::registrar('evaluacion', "Evaluación cargada para inscripción #{$request->id_inscripcion}");
         return back()->with('success', 'Calificaciones guardadas.');
     }
 
@@ -159,6 +161,7 @@ class EvaluacionController extends Controller
             $this->recalcularFinal($nota['id_inscripcion']);
         }
 
+        BitacoraService::registrar('nota_masiva', "Carga masiva de notas para grupo #{$request->id_oferta} (" . count($request->notas) . " estudiantes)");
         return back()->with('success', 'Notas guardadas para todo el grupo.');
     }
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Director\CU9Grupos;
 
 use App\Http\Controllers\Controller;
+use App\Services\BitacoraService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -310,6 +311,7 @@ class GrupoController extends Controller
         if ($extraCreados > 0) $msg = ($extraCreados + 1) . ' grupos creados (' . $extraCreados . ' día(s) adicional(es)).';
         if ($extraOmitidos > 0) $msg .= " {$extraOmitidos} día(s) omitido(s) por conflicto.";
 
+        BitacoraService::registrar('grupo_creado', "Grupo creado: código {$request->codigo_grupo}, materia #{$request->id_materia}, período #{$request->id_periodo}");
         return redirect()->route('director.grupos.index')->with('success', $msg);
     }
 
@@ -471,6 +473,7 @@ class GrupoController extends Controller
         if ($extraCreados  > 0)     $msg .= " {$extraCreados} día(s) agregado(s).";
         if ($extraOmitidos > 0)     $msg .= " {$extraOmitidos} día(s) con conflicto omitido(s).";
 
+        BitacoraService::registrar('grupo_editado', "Grupo actualizado: código {$request->codigo_grupo}, período #{$grupo->id_periodo}");
         return redirect()->route('director.grupos.index')->with('success', $msg);
     }
 

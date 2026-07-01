@@ -11,6 +11,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Confiar en todos los proxies para que request()->ip() devuelva la IP real del cliente
+        $middleware->trustProxies(at: '*');
+
         $middleware->web(append: [
             \App\Http\Middleware\AuthenticateWithJwtCookie::class,
             \App\Http\Middleware\HandleInertiaRequests::class,

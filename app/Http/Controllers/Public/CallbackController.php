@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;
+use App\Services\BitacoraService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -62,6 +63,10 @@ class CallbackController extends Controller
 
                 }
             }
+        }
+
+        if ($afectadas > 0) {
+            BitacoraService::registrar('pago_confirmado', "Pago confirmado: transacción #{$transactionId}, concepto: {$trans?->concepto}, estudiante #{$trans?->id_estudiante}", $trans?->id_estudiante ?? 0);
         }
 
         return response()->json(['ok' => true], 200);

@@ -50,7 +50,11 @@ function rolInfo(id) { return ROLES_MAP[id] ?? { label: 'Desconocido', badge: 'b
 
 function formatFecha(ts) {
     if (!ts) return '—';
-    return new Date(ts).toLocaleString('es-BO', {
+    // Los timestamps vienen de PostgreSQL como UTC (sin indicador de zona).
+    // Agregamos 'Z' para que JS los interprete como UTC y luego convierte a Bolivia (UTC-4).
+    const iso = ts.includes('T') || ts.endsWith('Z') ? ts : ts.replace(' ', 'T') + 'Z';
+    return new Date(iso).toLocaleString('es-BO', {
+        timeZone: 'America/La_Paz',
         day: '2-digit', month: '2-digit', year: 'numeric',
         hour: '2-digit', minute: '2-digit', second: '2-digit',
     });

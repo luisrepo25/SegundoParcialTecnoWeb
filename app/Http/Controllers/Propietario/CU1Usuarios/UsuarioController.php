@@ -104,7 +104,6 @@ class UsuarioController extends Controller
             'CREAR_USUARIO',
             "Usuario creado: {$usuario->nombre} {$usuario->apellido} (ID: {$usuario->id_usuario}, Rol: {$request->id_rol})",
         );
-
         return redirect()->back()->with('success', 'Usuario creado correctamente.');
     }
 
@@ -134,7 +133,6 @@ class UsuarioController extends Controller
             'EDITAR_USUARIO',
             "Usuario actualizado: {$usuario->nombre} {$usuario->apellido} (ID: {$usuario->id_usuario})",
         );
-
         return redirect()->back()->with('success', 'Usuario actualizado correctamente.');
     }
 
@@ -154,7 +152,6 @@ class UsuarioController extends Controller
             'TOGGLE_USUARIO',
             "Usuario {$estado}: {$usuario->nombre} {$usuario->apellido} (ID: {$usuario->id_usuario})",
         );
-
         return redirect()->back()->with('success', "Usuario $estado correctamente.");
     }
 
