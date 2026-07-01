@@ -72,10 +72,14 @@ class BitacoraController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        $recursosAccedidos = DB::table('page_views')
-            ->orderByDesc('visitas')
-            ->limit(10)
-            ->get(['pagina', 'visitas']);
+        try {
+            $recursosAccedidos = DB::table('page_views')
+                ->orderByDesc('visitas')
+                ->limit(10)
+                ->get(['pagina', 'visitas']);
+        } catch (\Throwable) {
+            $recursosAccedidos = collect();
+        }
 
         return Inertia::render('Propietario/CU15Bitacora/Index', [
             'logs'              => $logs,
