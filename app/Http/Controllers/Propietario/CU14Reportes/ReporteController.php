@@ -25,12 +25,14 @@ class ReporteController extends Controller
             'id_carrera'      => $request->input('id_carrera') ? (int) $request->input('id_carrera') : null,
         ];
 
-        // Períodos únicos por nombre (una fila por carrera, se deduplican por nombre)
+        // Períodos con su carrera (para filtrado vinculado en frontend).
+        // Se incluye id_carrera para que el selector de período se filtre
+        // dinámicamente cuando el usuario elige una carrera específica.
         $periodos = DB::table('periodos_dictado')
-            ->selectRaw('nombre, MAX(fecha_inicio) as max_fecha')
-            ->groupBy('nombre')
+            ->select('nombre', 'id_carrera', DB::raw('MAX(fecha_inicio) as max_fecha'))
+            ->groupBy('nombre', 'id_carrera')
             ->orderByRaw('MAX(fecha_inicio) DESC NULLS LAST')
-            ->get(['nombre', 'max_fecha']);
+            ->get();
 
         // Carreras activas para el selector
         $carreras = DB::table('carreras')

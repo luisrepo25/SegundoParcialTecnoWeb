@@ -3,7 +3,11 @@
     "allow": [
       "Bash(find \"/c/Users/USUARIO/.claude\" -iname \"landing-final.html\" 2>/dev/null)",
       "Read(//c/Users/USUARIO/.claude/**)",
-      "Read(//c/Users/USUARIO/**)"
+      "Read(//c/Users/USUARIO/**)",
+      "Bash(python nav_diagram_gen.py secretaria_data.json \"Secretaria\" \"C:/Users/USUARIO/Documents/UNIVERSIDAD/Tecnologia_Web/2do_Parcial/Diagrama/diagramaNavegacion/Secretaria_DiagramaNavegacion.xml\" \"C:/Users/USUARIO/Documents/UNIVERSIDAD/Tecnologia_Web/2do_Parcial/Diagrama/diagramaNavegacion/Secretaria_DiagramaNavegacion.png\")",
+      "Bash(python nav_diagram_gen.py profesor_data.json \"Profesor\" \"C:/Users/USUARIO/Documents/UNIVERSIDAD/Tecnologia_Web/2do_Parcial/Diagrama/diagramaNavegacion/Profesor_DiagramaNavegacion.xml\" \"C:/Users/USUARIO/Documents/UNIVERSIDAD/Tecnologia_Web/2do_Parcial/Diagrama/diagramaNavegacion/Profesor_DiagramaNavegacion.png\")",
+      "Bash(python nav_diagram_gen.py estudiante_data.json \"Estudiante\" \"C:/Users/USUARIO/Documents/UNIVERSIDAD/Tecnologia_Web/2do_Parcial/Diagrama/diagramaNavegacion/Estudiante_DiagramaNavegacion.xml\" \"C:/Users/USUARIO/Documents/UNIVERSIDAD/Tecnologia_Web/2do_Parcial/Diagrama/diagramaNavegacion/Estudiante_DiagramaNavegacion.png\")",
+      "Bash(python -c ' *)"
     ]
   }
 }
