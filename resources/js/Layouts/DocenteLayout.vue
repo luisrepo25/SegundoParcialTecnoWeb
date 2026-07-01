@@ -27,7 +27,7 @@ const showUserMenu = ref(false);
         <!-- Mobile Sidebar Overlay -->
         <div v-if="showMobileMenu" 
              @click="showMobileMenu = false"
-             class="fixed inset-0 z-40 bg-black bg-opacity-30 lg:hidden transition-opacity">
+             class="fixed inset-0 z-40 lg:hidden">
         </div>
 
         <!-- SIDEBAR (Menú Lateral Minimalista) -->

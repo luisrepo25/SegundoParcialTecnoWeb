@@ -49,7 +49,7 @@ const showUserMenu   = ref(false);
         <!-- Mobile overlay -->
         <div v-if="showMobileMenu"
              @click="showMobileMenu = false"
-             class="fixed inset-0 z-40 bg-black bg-opacity-30 lg:hidden">
+             class="fixed inset-0 z-40 lg:hidden">
         </div>
 
         <!-- SIDEBAR -->
