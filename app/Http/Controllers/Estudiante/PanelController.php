@@ -967,7 +967,50 @@ class PanelController extends Controller
             }
         }
 
-        // Plan CRÉDITO o MATERIA → requiere QR por materia
+        // Plan CRÉDITO: si quedan materias cubiertas por el adelanto y NO es reintento → inscripción directa
+        $pagoCredito = DB::table('pago_carrera_completa')
+            ->where('id_estudiante', $est->id_estudiante)
+            ->where('forma_pago', 'credito')
+            ->whereIn('estado', ['parcial', 'pagado'])
+            ->first();
+
+        if ($pagoCredito) {
+            $idMateria = DB::table('grupos')->where('id_oferta', $idOferta)->value('id_materia');
+
+            // Si ya cursó esta materia antes (aprobó o reprobó) → siempre paga el reintento
+            $esReintento = DB::table('consumo_materias_carrera')
+                ->where('id_pago_carrera', $pagoCredito->id_pago_carrera)
+                ->where('id_materia', $idMateria)
+                ->exists();
+
+            if (!$esReintento) {
+                // Materias DISTINTAS ya consumidas (cada materia cuenta una sola vez)
+                $materiasDistintasUsadas = DB::table('consumo_materias_carrera')
+                    ->where('id_pago_carrera', $pagoCredito->id_pago_carrera)
+                    ->distinct()
+                    ->count('id_materia');
+
+                if ($materiasDistintasUsadas < (int) $pagoCredito->materias_cubiertas) {
+                    // Todavía cubierta por el adelanto → inscripción directa sin QR
+                    try {
+                        DB::table('inscripciones')->insert([
+                            'id_estudiante'    => $est->id_estudiante,
+                            'id_oferta'        => $idOferta,
+                            'estado'           => 'activo',
+                            'fecha_inscripcion' => now(),
+                        ]);
+                        $restantes = (int) $pagoCredito->materias_cubiertas - $materiasDistintasUsadas - 1;
+                        $msg = '¡Inscripción exitosa en ' . $grupo->materia_nombre . '! (cubierta por tu adelanto'
+                            . ($restantes > 0 ? ", te quedan $restantes materia(s) sin costo adicional" : '') . ')';
+                        return redirect()->route('estudiante.materias')->with('success', $msg);
+                    } catch (\Throwable $e) {
+                        return back()->withErrors(['general' => 'Error al inscribirse: ' . $e->getMessage()]);
+                    }
+                }
+            }
+        }
+
+        // Plan CRÉDITO (slots agotados o reintento) o MATERIA → requiere QR por materia
         $carrera    = DB::table('carreras')->where('id_carrera', $est->id_carrera_actual)->first();
         $costoTotal = (float) ($carrera?->costo_carrera_completa ?? 0);
         $totalMaterias = max(DB::table('malla_curricular')->where('id_carrera', $est->id_carrera_actual)->count(), 1);

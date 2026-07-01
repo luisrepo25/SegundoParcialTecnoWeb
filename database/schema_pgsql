@@ -635,6 +635,7 @@ DECLARE
     materia_actual      INT;
     carrera_estudiante  INT;
     intentos_previos    INT;
+    intentos_credito    INT;
     pago_carrera_id     INT;
     costo_materia       DECIMAL(10,2);
     costo_total_carrera DECIMAL(10,2);
@@ -661,26 +662,22 @@ BEGIN
         IF pago_carrera_id IS NOT NULL THEN
 
             -- -------------------------------------------------------
-            -- CREDITO: primeras N materias gratis, desde N+1 se cobra
+            -- CREDITO: primeras N materias DISTINTAS gratis, reintentos siempre pagan
             -- -------------------------------------------------------
             IF forma_pago_actual = 'credito' THEN
-
-                SELECT COUNT(*) INTO consumos_actuales
-                FROM consumo_materias_carrera
-                WHERE id_pago_carrera = pago_carrera_id;
 
                 SELECT materias_cubiertas INTO mat_cubiertas
                 FROM pago_carrera_completa
                 WHERE id_pago_carrera = pago_carrera_id;
 
-                IF consumos_actuales < mat_cubiertas THEN
-                    -- GRATIS: cubierta por el adelanto
-                    INSERT INTO consumo_materias_carrera
-                        (id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional)
-                    VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, 1, FALSE);
+                -- ¿Ya intentó esta materia antes? (aprobó o reprobó)
+                SELECT COUNT(*) INTO intentos_credito
+                FROM consumo_materias_carrera
+                WHERE id_pago_carrera = pago_carrera_id
+                  AND id_materia = materia_actual;
 
-                ELSE
-                    -- A PARTIR DE AQUI SE COBRA: buscar proxima cuota pendiente
+                IF intentos_credito > 0 THEN
+                    -- REINTENTO (reprobó y vuelve a inscribirse): siempre cobra
                     SELECT monto INTO costo_materia
                     FROM cuotas_carrera
                     WHERE id_pago_carrera = pago_carrera_id AND estado = 'pendiente'
@@ -693,12 +690,47 @@ BEGIN
 
                         INSERT INTO consumo_materias_carrera
                             (id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional)
-                        VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, 1, TRUE);
+                        VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, intentos_credito + 1, TRUE);
                     ELSE
-                        -- Sin cuotas pendientes: carrera completamente saldada → gratis
+                        -- Carrera saldada → reintento gratis
+                        INSERT INTO consumo_materias_carrera
+                            (id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional)
+                        VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, intentos_credito + 1, FALSE);
+                    END IF;
+
+                ELSE
+                    -- NUEVA materia: verificar slots libres (contar materias DISTINTAS ya usadas)
+                    SELECT COUNT(DISTINCT id_materia) INTO consumos_actuales
+                    FROM consumo_materias_carrera
+                    WHERE id_pago_carrera = pago_carrera_id;
+
+                    IF consumos_actuales < mat_cubiertas THEN
+                        -- GRATIS: cubierta por el adelanto
                         INSERT INTO consumo_materias_carrera
                             (id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional)
                         VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, 1, FALSE);
+
+                    ELSE
+                        -- Slots agotados: buscar proxima cuota pendiente
+                        SELECT monto INTO costo_materia
+                        FROM cuotas_carrera
+                        WHERE id_pago_carrera = pago_carrera_id AND estado = 'pendiente'
+                        ORDER BY numero_cuota ASC LIMIT 1;
+
+                        IF costo_materia IS NOT NULL THEN
+                            INSERT INTO pago_materia_suelta
+                                (id_inscripcion, monto_pagado, fecha_pago, estado)
+                            VALUES (NEW.id_inscripcion, costo_materia, CURRENT_DATE, 'pendiente');
+
+                            INSERT INTO consumo_materias_carrera
+                                (id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional)
+                            VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, 1, TRUE);
+                        ELSE
+                            -- Sin cuotas pendientes: carrera completamente saldada → gratis
+                            INSERT INTO consumo_materias_carrera
+                                (id_pago_carrera, id_materia, id_inscripcion, intento_numero, pagado_adicional)
+                            VALUES (pago_carrera_id, materia_actual, NEW.id_inscripcion, 1, FALSE);
+                        END IF;
                     END IF;
                 END IF;
 
