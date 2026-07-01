@@ -79,7 +79,7 @@ class BusquedaController extends Controller
                     'tipo'     => 'Estudiante',
                     'texto'    => $e->apellido . ', ' . $e->nombre,
                     'subtexto' => $e->legajo,
-                    'url'      => route('propietario.usuarios.index', ['buscar' => $e->legajo]),
+                    'url'      => route('propietario.usuarios.index', ['buscar' => $e->apellido]),
                 ];
             }
         }

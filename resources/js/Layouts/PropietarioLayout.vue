@@ -168,17 +168,28 @@ const showUserMenu   = ref(false);
         <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
 
             <!-- Top bar -->
-            <header class="h-16 flex items-center justify-between px-6 shrink-0 z-10 border-b shadow-sm"
+            <header class="h-16 flex items-center justify-between px-3 lg:px-6 shrink-0 z-10 border-b shadow-sm"
                     style="background-color: var(--card-bg); border-color: var(--border-color);">
-                <div class="flex items-center gap-3 flex-1 min-w-0">
-                    <button @click="showMobileMenu = true" class="lg:hidden text-sm font-medium tracking-wide shrink-0" style="color: var(--text-secondary);">MENÚ</button>
+                <div class="flex items-center gap-2 lg:gap-3 flex-1 min-w-0">
+                    <button @click="showMobileMenu = true" class="lg:hidden shrink-0 p-1.5 rounded-md border" style="color: var(--text-secondary); border-color: var(--border-color);">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
                     <div class="hidden lg:block shrink-0 min-w-0 max-w-[180px] truncate">
                         <slot name="header" />
                     </div>
                     <HeaderSearch />
                 </div>
-                <div class="flex items-center gap-4 pl-4 border-l shrink-0" style="border-color: var(--border-color);">
-                    <ThemeBar />
+                <div class="flex items-center gap-2 lg:gap-4 pl-2 lg:pl-4 border-l shrink-0" style="border-color: var(--border-color);">
+                    <!-- Desktop: ThemeBar completo -->
+                    <div class="hidden lg:block">
+                        <ThemeBar />
+                    </div>
+                    <!-- Móvil: solo tema (Adultos/Jóvenes/Niños) + modo oscuro -->
+                    <div class="block lg:hidden">
+                        <ThemeBar :showFontControls="false" :showContrastToggle="false" />
+                    </div>
                 </div>
             </header>
 
