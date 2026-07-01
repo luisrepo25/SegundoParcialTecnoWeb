@@ -13,6 +13,12 @@ const errors   = computed(() => page.props.errors ?? {});
 const seccion  = ref('datos');
 const user     = computed(() => page.props.auth.user);
 const assetUrl = computed(() => page.props.asset_url || '');
+const dashboardRoute = computed(() => {
+    const role = user.value?.role;
+    if (role === 'director') return 'dashboard.director';
+    if (role === 'secretaria') return 'secretaria.dashboard';
+    return 'dashboard.propietario';
+});
 
 // ── Foto de perfil ───────────────────────────────────────────────────────────
 const fileInput = ref(null);
@@ -78,7 +84,7 @@ function cambiarPassword() {
     <AdminLayout>
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('dashboard.propietario')"
+                <Link :href="route(dashboardRoute)"
                       class="flex items-center justify-center w-8 h-8 rounded-lg transition-colors"
                       style="color: var(--text-secondary); background-color: color-mix(in srgb, var(--text-color) 8%, transparent);"
                       title="Volver al panel">

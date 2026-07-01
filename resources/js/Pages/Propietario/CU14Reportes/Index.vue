@@ -1,6 +1,6 @@
 <script setup>
 import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import { Bar, Doughnut, Line } from 'vue-chartjs';
 import {
@@ -26,6 +26,13 @@ const fAulas    = ref(props.filtros.activo_aulas);
 const fHorarios = ref(props.filtros.activo_horarios);
 const fPeriodo  = ref(props.filtros.nombre_periodo ?? '');
 const fCarrera  = ref(props.filtros.id_carrera     ?? '');
+
+const dashboardRoute = computed(() => {
+    const role = usePage().props.auth?.user?.role;
+    if (role === 'director') return 'dashboard.director';
+    if (role === 'secretaria') return 'secretaria.dashboard';
+    return 'dashboard.propietario';
+});
 
 function aplicarFiltros() {
     router.get(route('propietario.reportes.index'), {
@@ -266,7 +273,7 @@ const totalInscripciones  = computed(() => props.administrativo.inscripcionesPor
 
         <!-- Volver -->
         <div class="mb-4">
-            <Link :href="route('dashboard.propietario')"
+            <Link :href="route(dashboardRoute)"
                 class="inline-flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-70"
                 style="color: var(--text-secondary);">
                 ← Volver al Dashboard

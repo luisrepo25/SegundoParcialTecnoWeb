@@ -7,6 +7,13 @@ const page      = usePage();
 const canEdit   = computed(() => ['propietario', 'director', 'secretaria'].includes(page.props.auth?.user?.role));
 const canToggle = computed(() => ['propietario', 'director'].includes(page.props.auth?.user?.role));
 
+const dashboardRoute = computed(() => {
+    const role = page.props.auth?.user?.role;
+    if (role === 'director') return 'dashboard.director';
+    if (role === 'secretaria') return 'secretaria.dashboard';
+    return 'dashboard.propietario';
+});
+
 const props = defineProps({
     usuarios: Object,
     roles: Array,
@@ -142,7 +149,7 @@ function toggleActivo(u) {
 
                 <!-- Volver -->
                 <div class="mb-5">
-                    <Link :href="route('dashboard.propietario')"
+                    <Link :href="route(dashboardRoute)"
                         class="inline-flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-70"
                         style="color: var(--text-secondary);">
                         ← Volver al Dashboard

@@ -5,6 +5,13 @@ import { ref, watch, computed } from 'vue';
 
 const canEdit = computed(() => ['propietario', 'director'].includes(usePage().props.auth?.user?.role));
 
+const dashboardRoute = computed(() => {
+    const role = usePage().props.auth?.user?.role;
+    if (role === 'director') return 'dashboard.director';
+    if (role === 'secretaria') return 'secretaria.dashboard';
+    return 'dashboard.propietario';
+});
+
 const props = defineProps({
     horarios: Object,
     dias:     Array,
@@ -99,7 +106,7 @@ function formatHora(t) { return t ? t.substring(0, 5) : '—'; }
 
                 <!-- Volver -->
                 <div class="mb-5">
-                    <Link :href="route('dashboard.propietario')"
+                    <Link :href="route(dashboardRoute)"
                         class="inline-flex items-center gap-1.5 text-sm font-medium transition-opacity hover:opacity-70"
                         style="color: var(--text-secondary);">
                         ← Volver al Dashboard
