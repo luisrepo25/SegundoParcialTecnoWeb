@@ -11,10 +11,13 @@ const inputRef = ref(null);
 let debounceTimer = null;
 
 const colores = {
-    'Carrera':    { bg: 'var(--primary-color)',  text: 'var(--primary-text)' },
-    'Materia':    { bg: '#0d9488',               text: '#fff' },
-    'Estudiante': { bg: '#7c3aed',               text: '#fff' },
-    'Profesor':   { bg: '#b45309',               text: '#fff' },
+    'Carrera':     { bg: 'var(--primary-color)', text: 'var(--primary-text)' },
+    'Materia':     { bg: '#0d9488',              text: '#fff' },
+    'Estudiante':  { bg: '#7c3aed',              text: '#fff' },
+    'Profesor':    { bg: '#b45309',              text: '#fff' },
+    'Propietario': { bg: '#dc2626',              text: '#fff' },
+    'Director':    { bg: '#1d4ed8',              text: '#fff' },
+    'Secretaria':  { bg: '#16a34a',              text: '#fff' },
 };
 
 function onInput() {

@@ -70,7 +70,7 @@ class BusquedaController extends Controller
                           ->orWhereRaw('LOWER(CONCAT(usuarios.nombre, \' \', usuarios.apellido)) LIKE ?', [$like])
                           ->orWhereRaw('LOWER(estudiantes.legajo) LIKE ?', [$like]);
                 })
-                ->select('usuarios.nombre', 'usuarios.apellido', 'estudiantes.legajo')
+                ->select('usuarios.nombre', 'usuarios.apellido', 'usuarios.email', 'estudiantes.legajo')
                 ->limit(5)
                 ->get();
 
@@ -79,7 +79,7 @@ class BusquedaController extends Controller
                     'tipo'     => 'Estudiante',
                     'texto'    => $e->apellido . ', ' . $e->nombre,
                     'subtexto' => $e->legajo,
-                    'url'      => route('propietario.usuarios.index', ['buscar' => $e->apellido]),
+                    'url'      => route('propietario.usuarios.index', ['buscar' => $e->email]),
                 ];
             }
         }
@@ -103,6 +103,32 @@ class BusquedaController extends Controller
                     'texto'    => $p->apellido . ', ' . $p->nombre,
                     'subtexto' => $p->email,
                     'url'      => route('propietario.usuarios.index', ['buscar' => $p->email]),
+                ];
+            }
+        }
+
+        // Usuarios admin (propietario, director, secretaria) — no están en las tablas anteriores
+        if (in_array($role, ['propietario', 'director', 'secretaria'])) {
+            $rolLabels = [1 => 'Propietario', 2 => 'Director', 3 => 'Secretaria'];
+
+            $adminUsers = DB::table('usuarios')
+                ->whereIn('id_rol', [1, 2, 3])
+                ->where(function ($query) use ($like) {
+                    $query->whereRaw('LOWER(nombre) LIKE ?', [$like])
+                          ->orWhereRaw('LOWER(apellido) LIKE ?', [$like])
+                          ->orWhereRaw('LOWER(CONCAT(nombre, \' \', apellido)) LIKE ?', [$like])
+                          ->orWhereRaw('LOWER(email) LIKE ?', [$like]);
+                })
+                ->select('nombre', 'apellido', 'email', 'id_rol')
+                ->limit(4)
+                ->get();
+
+            foreach ($adminUsers as $u) {
+                $resultados[] = [
+                    'tipo'     => $rolLabels[$u->id_rol] ?? 'Usuario',
+                    'texto'    => $u->apellido . ', ' . $u->nombre,
+                    'subtexto' => $u->email,
+                    'url'      => route('propietario.usuarios.index', ['buscar' => $u->email]),
                 ];
             }
         }
