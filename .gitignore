@@ -1,4 +1,6 @@
 *.log
+*.xml
+.gitkeep
 .DS_Store
 .env
 .env.example
