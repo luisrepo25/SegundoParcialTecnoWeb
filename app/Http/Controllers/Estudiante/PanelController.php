@@ -219,7 +219,7 @@ class PanelController extends Controller
                     DB::raw("u.nombre || ' ' || u.apellido as profesor_nombre"),
                     DB::raw("p.archivo_cv /* v2 */ as profesor_cv")
                 )
-                ->orderBy('h.dia_semana')
+                ->orderByRaw("CASE h.dia_semana WHEN 'lunes' THEN 1 WHEN 'martes' THEN 2 WHEN 'miercoles' THEN 3 WHEN 'jueves' THEN 4 WHEN 'viernes' THEN 5 WHEN 'sabado' THEN 6 WHEN 'domingo' THEN 7 ELSE 8 END")
                 ->orderBy('h.hora_inicio')
                 ->get()
                 ->map(fn($r) => (array) $r)
@@ -262,7 +262,7 @@ class PanelController extends Controller
                 ->orderByRaw('COALESCE(mc.orden_en_nivel, 0)')
                 ->orderBy('m.nombre')
                 ->orderBy('g.codigo_grupo')
-                ->orderBy('h.dia_semana')
+                ->orderByRaw("CASE h.dia_semana WHEN 'lunes' THEN 1 WHEN 'martes' THEN 2 WHEN 'miercoles' THEN 3 WHEN 'jueves' THEN 4 WHEN 'viernes' THEN 5 WHEN 'sabado' THEN 6 WHEN 'domingo' THEN 7 ELSE 8 END")
                 ->get()
                 ->map(fn($r) => (array) $r)
                 ->toArray();

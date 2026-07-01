@@ -30,6 +30,9 @@ const tabActiva = ref(props.afiliacion ? 'disponibles' : 'plan');
 const hoy = new Date().toISOString().split('T')[0];
 const esPeriodoActual = (g) => g.periodo_inicio <= hoy && hoy <= g.periodo_fin;
 
+const DIA_ORD = { lunes:1, martes:2, miercoles:3, jueves:4, viernes:5, sabado:6, domingo:7 };
+const sortHorarios = (arr) => [...arr].sort((a, b) => (DIA_ORD[a.dia_semana] ?? 9) - (DIA_ORD[b.dia_semana] ?? 9) || a.hora_inicio.localeCompare(b.hora_inicio));
+
 // Agrupar grupos disponibles por período y por código de grupo (un grupo puede
 // tener una fila por cada día de la semana — se fusionan en una sola tarjeta
 // con todos sus horarios, igual que en "Oferta del Semestre")
@@ -63,7 +66,10 @@ const gruposPorPeriodo = computed(() => {
     }
     // Ordenar: actual primero, luego por fecha desc
     return Object.entries(map)
-        .map(([periodo, data]) => [periodo, { grupos: Array.from(data.gruposMap.values()), esActual: data.esActual, inicio: data.inicio }])
+        .map(([periodo, data]) => [periodo, {
+            grupos: Array.from(data.gruposMap.values()).map(g => ({ ...g, horarios: sortHorarios(g.horarios) })),
+            esActual: data.esActual, inicio: data.inicio,
+        }])
         .sort(([, a], [, b]) => {
             if (a.esActual && !b.esActual) return -1;
             if (!a.esActual && b.esActual) return 1;
@@ -146,7 +152,7 @@ const ofertaAgrupada = computed(() => {
             ...nv,
             materias: Array.from(nv.materias.values()).map(mt => ({
                 ...mt,
-                grupos: Array.from(mt.grupos.values()),
+                grupos: Array.from(mt.grupos.values()).map(g => ({ ...g, horarios: sortHorarios(g.horarios) })),
             })),
         }));
 });

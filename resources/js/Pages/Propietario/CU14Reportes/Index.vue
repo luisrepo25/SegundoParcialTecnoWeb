@@ -37,10 +37,36 @@ function aplicarFiltros() {
     }, { preserveState: true, preserveScroll: true, replace: true });
 }
 
+// Cuando cambia la carrera, resetear período si ya no pertenece a esa carrera
+watch(fCarrera, (nuevaCarrera) => {
+    if (fPeriodo.value && nuevaCarrera) {
+        const valido = props.periodos.some(
+            p => p.nombre === fPeriodo.value && p.id_carrera === Number(nuevaCarrera)
+        );
+        if (!valido) fPeriodo.value = '';
+    }
+});
+
 watch([fUsuarios, fAulas, fHorarios, fPeriodo, fCarrera], aplicarFiltros);
 
+// Períodos filtrados según carrera seleccionada (deduplica nombres cuando es "Todas")
+const periodosDisponibles = computed(() => {
+    if (!fCarrera.value) {
+        // Sin carrera: un período por nombre único, el más reciente
+        const map = new Map();
+        for (const p of props.periodos) {
+            if (!map.has(p.nombre) || p.max_fecha > map.get(p.nombre).max_fecha)
+                map.set(p.nombre, p);
+        }
+        return [...map.values()].sort((a, b) => b.max_fecha?.localeCompare(a.max_fecha ?? '') ?? 0);
+    }
+    return props.periodos
+        .filter(p => p.id_carrera === Number(fCarrera.value))
+        .sort((a, b) => b.max_fecha?.localeCompare(a.max_fecha ?? '') ?? 0);
+});
+
 const carreraSeleccionada = computed(() =>
-    props.carreras.find(c => c.id_carrera === props.filtros.id_carrera)
+    props.carreras.find(c => c.id_carrera === Number(fCarrera.value))
 );
 
 const hayFiltroActivo = computed(() => !!(fPeriodo.value || fCarrera.value));
@@ -258,7 +284,7 @@ const totalInscripciones  = computed(() => props.administrativo.inscripcionesPor
                         class="text-xs rounded-lg px-3 py-1.5 focus:outline-none"
                         style="background-color: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color);">
                     <option value="">Todos</option>
-                    <option v-for="p in periodos" :key="p.nombre" :value="p.nombre">{{ p.nombre }}</option>
+                    <option v-for="p in periodosDisponibles" :key="p.nombre + '_' + p.id_carrera" :value="p.nombre">{{ p.nombre }}</option>
                 </select>
             </div>
 
