@@ -23,7 +23,8 @@ function onInput() {
     loading.value = true;
     debounceTimer = setTimeout(async () => {
         try {
-            const res = await fetch(`/buscar?q=${encodeURIComponent(query.value)}`, {
+            const url = route('buscar') + '?q=' + encodeURIComponent(query.value);
+            const res = await fetch(url, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
             });
             results.value = await res.json();
